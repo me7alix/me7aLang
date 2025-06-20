@@ -1,0 +1,115 @@
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+#include <stdio.h>
+#include "../include/lexer.h"
+
+#define ARR_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
+
+bool tok_compare(Token a, Token b) {
+	if (a.type == b.type) {
+		if (a.type == TOK_STRING || a.type == TOK_INT ||
+			a.type == TOK_FLOAT || a.type == TOK_ID ||
+			a.type == TOK_CHAR || a.type == TOK_TYPE) {
+			if (strcmp(a.data, b.data))	{
+				return false;
+			}
+		}
+		return true;
+	}
+	return false;
+}
+
+
+bool test_lexer(char *code, Token *tokens, size_t tokens_num) {
+	Lexer lexer = lexer_alloc(code);
+	lexer_lex(&lexer);
+
+	if (tokens_num != lexer.tokens_num) 
+		return false;
+
+	for (size_t i = 0; i < lexer.tokens_num; i++) {
+		if (!tok_compare(lexer.tokens[i], tokens[i])) {
+			printf("error: %s | %s\n", tok_to_str(lexer.tokens[i].type), tok_to_str(tokens[i].type));
+			return false;
+		}
+	}
+
+	lexer_free(&lexer);
+	return true;
+}
+
+void run_test(char *code, Token *tokens, size_t tokens_num, size_t test_num) {
+	if (test_lexer(code, tokens, tokens_num))
+		printf("test %zu passed\n", test_num);
+	else
+		printf("test %zu failed\n", test_num);
+}
+
+int main() {
+	printf("Lexer tests:\n");
+	char *test_code_1 = "func main() {\n a: i32 = 10 + 2\n }";
+	Token test_tokens_1[] = {
+		{ .type = TOK_FUNC },
+		{ .type = TOK_ID, .data = "main" },
+		{ .type = TOK_LBRA },
+		{ .type = TOK_RBRA },
+		{ .type = TOK_LBRC },
+		{ .type = TOK_ID, .data = "a" },
+		{ .type = TOK_TYPE, .data = "i32" },
+		{ .type = TOK_EQ },
+		{ .type = TOK_INT, .data = "10" },
+		{ .type = TOK_PLUS },
+		{ .type = TOK_INT, .data = "2" },
+		{ .type = TOK_SEMI },
+		{ .type = TOK_RBRC },
+	};
+
+	run_test(test_code_1, test_tokens_1, ARR_LEN(test_tokens_1), 1);	
+
+	char *test_code_2 = "func main() {\n println(\"hi\")\n}";
+	Token test_tokens_2[] = {
+		{ .type = TOK_FUNC },
+		{ .type = TOK_ID, .data = "main" },
+		{ .type = TOK_LBRA },
+		{ .type = TOK_RBRA },
+		{ .type = TOK_LBRC },
+		{ .type = TOK_ID, .data = "println" },
+		{ .type = TOK_LBRA },
+		{ .type = TOK_STRING, .data = "hi" },
+		{ .type = TOK_RBRA },
+		{ .type = TOK_SEMI },
+		{ .type = TOK_RBRC },
+	};
+
+	run_test(test_code_2, test_tokens_2, ARR_LEN(test_tokens_2), 2);	
+
+	char *test_code_3 = "if (a == b && c != true || 10 == 10)";
+	Token test_tokens_3[] = {
+		{ .type = TOK_IF_SYM },
+		{ .type = TOK_LBRA },
+		{ .type = TOK_ID, .data = "a" },
+		{ .type = TOK_EQ },
+		{ .type = TOK_EQ },	
+		{ .type = TOK_ID, .data = "b" },
+		{ .type = TOK_AMP },
+		{ .type = TOK_AMP },
+		{ .type = TOK_ID, .data = "c" },
+		{ .type = TOK_EXC },
+		{ .type = TOK_EQ },
+		{ .type = TOK_ID, .data = "true" },
+		{ .type = TOK_PIPE },
+		{ .type = TOK_PIPE },	
+		{ .type = TOK_INT, .data = "10" },
+		{ .type = TOK_EQ },
+		{ .type = TOK_EQ },
+		{ .type = TOK_INT, .data = "10" },
+		{ .type = TOK_RBRA },
+	};
+
+	run_test(test_code_3, test_tokens_3, ARR_LEN(test_tokens_3), 3);	
+
+	printf("\n");
+	return 0;
+}

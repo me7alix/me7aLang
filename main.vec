@@ -1,0 +1,8 @@
+TILE: i32 = 10
+
+func main() {
+	ch: char = 'a'
+	if (TILE == 10) {
+		printf("wow\n")
+	}
+}
