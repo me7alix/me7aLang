@@ -10,6 +10,10 @@ extern EndDrawing()
 extern CloseWindow()
 extern GetRandomValue(): int
 
+func rect(x: int, y: int, w: int, h: int, c: int) {
+	DrawRectangleLines(x, y, w, h, c)
+}
+
 func main(): int {
 	WHITE := 4126537215
 
@@ -68,8 +72,8 @@ func main(): int {
 			ball_dir_y = -ball_dir_y
 		}
 
-		DrawRectangleLines(ball_x, ball_y, ball_r*2, ball_r*2, WHITE)
-		DrawRectangleLines(paddle_x, paddle_y, paddle_w, paddle_h, WHITE)
+		rect(ball_x, ball_y, ball_r*2, ball_r*2, WHITE)
+		rect(paddle_x, paddle_y, paddle_w, paddle_h, WHITE)
 		EndDrawing()
 	}
 	
