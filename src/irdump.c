@@ -47,6 +47,7 @@ void ir_dump_inst(Instruction inst, char *res) {
 		case OP_JUMP_IF_NOT: sprintf(res, "    jmp_if_not %s %s", dst, arg1); break;
 		case OP_JUMP:   sprintf(res, "    jmp %s", dst); break;
 		case OP_CAST:   sprintf(res, "    var%s = cast %s", dst, arg1); break;
+		case OP_NEG:    sprintf(res, "    var%s = -%s", dst, arg1); break;
 		case OP_LABEL:  sprintf(res, "%s", arg1); break;
 		case OP_SUB:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "-", arg2);  break;
 		case OP_MUL:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "*", arg2);  break;

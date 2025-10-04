@@ -9,26 +9,29 @@
 int64_t parse_int(char *data) { return atol(data); }
 double parse_float(char *data) { return atof(data); }
 
-float op_cost(TokenType op, bool is_left) {
+float op_cost(AST_ExprOp op, bool is_left) {
 	switch (op) {
-		case TOK_PLUS: case TOK_MINUS:
+		case AST_OP_ADD: case AST_OP_SUB:
 			if (is_left) return 1.1;
 			else         return 1.0;
-		case TOK_STAR: case TOK_SLASH:
+		case AST_OP_MUL: case AST_OP_DIV:
 			if (is_left) return 2.1;
 			else         return 2.0;
-		case TOK_EQ_EQ: case TOK_LESS:
-		case TOK_LESS_EQ: case TOK_GREAT:
-		case TOK_GREAT_EQ: case TOK_NOT_EQ:
+		case AST_OP_EQ: case AST_OP_GREAT:
+		case AST_OP_LESS: case AST_OP_GREAT_EQ:
+		case AST_OP_LESS_EQ: case AST_OP_NOT_EQ:
 			if (is_left) return 0.9;
 			else         return 0.8;
-		case TOK_AND: case TOK_OR:
+		case AST_OP_AND: case AST_OP_OR:
 			if (is_left) return 0.6;
 			else         return 0.5;
-		case TOK_COL:
+		case AST_OP_CAST:
 			if (is_left) return 0.0;
 			else         return 3.0;
-		case TOK_EXC:
+		case AST_OP_NOT:
+			if (is_left) return 3.0;
+			else         return 0.0;
+		case AST_OP_NEG:
 			if (is_left) return 3.0;
 			else         return 0.0;
 		default:         break;
@@ -38,7 +41,7 @@ float op_cost(TokenType op, bool is_left) {
 }
 
 AST_Node *parse_func_call(Parser *parser) {
-	AST_Node *fcn = ast_new({ .type = AST_FUNC_CALL });
+	AST_Node *fcn = ast_new({ .kind = AST_FUNC_CALL });
 	fcn->func_call.id = parser->cur_token->data;
 	expect_token(++parser->cur_token, TOK_OPAR);
 	parser->cur_token++;
@@ -75,14 +78,14 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 	for (size_t i = 0; i < nodes->count; i++) {
 		if (nodes->count == 1) break;
 		AST_Node *node = da_get(nodes, i);
-		bool is_bin_op = node->type == AST_BIN_EXP && !(node->exp_binary.l && node->exp_binary.r);
-		bool is_un_op = node->type == AST_UN_EXP && !node->exp_unary.v;
+		bool is_bin_op = node->kind == AST_BIN_EXP && !(node->exp_binary.l && node->exp_binary.r);
+		bool is_un_op = node->kind == AST_UN_EXP && !node->exp_unary.v;
 		if (!is_bin_op && !is_un_op) {
 			bool is_lelf = false;
 			float l_cost = 0, r_cost = 0;
 
 			if (i != 0) {
-				switch (da_get(nodes, i-1)->type) {
+				switch (da_get(nodes, i-1)->kind) {
 					case AST_BIN_EXP: l_cost = op_cost(da_get(nodes, i-1)->exp_binary.op, true); break;
 					case AST_UN_EXP:  l_cost = op_cost(da_get(nodes, i-1)->exp_unary.op, true);  break;
 					default: unreachable;
@@ -90,7 +93,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 			}
 
 			if (i != nodes->count-1) {
-				switch (da_get(nodes, i+1)->type) {
+				switch (da_get(nodes, i+1)->kind) {
 					case AST_BIN_EXP: r_cost = op_cost(da_get(nodes, i+1)->exp_binary.op, false); break;
 					case AST_UN_EXP:  r_cost = op_cost(da_get(nodes, i+1)->exp_unary.op, false);  break;
 					default: unreachable;
@@ -101,13 +104,13 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 			if (l_cost == 0 && r_cost == 0) assert(!"wrong expression");
 
 			if (is_lelf) {
-				switch (da_get(nodes, i-1)->type) {
+				switch (da_get(nodes, i-1)->kind) {
 					case AST_BIN_EXP: da_get(nodes, i-1)->exp_binary.r = node; break;
 					case AST_UN_EXP:  da_get(nodes, i-1)->exp_unary.v = node;  break;
 					default: unreachable;
 				}
 			} else {
-				switch (da_get(nodes, i+1)->type) {
+				switch (da_get(nodes, i+1)->kind) {
 					case AST_BIN_EXP: da_get(nodes, i+1)->exp_binary.l = node; break;
 					case AST_UN_EXP:  da_get(nodes, i+1)->exp_unary.v = node;  break;
 					default: unreachable;
@@ -123,7 +126,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 }
 
 Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
-	switch (expr->type) {
+	switch (expr->kind) {
 		case AST_VAR: return parser_st_get(parser, expr->var_id)->variable.type;
 		case AST_FUNC_CALL: return expr->func_call.type;
 
@@ -153,9 +156,9 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 			expr->exp_binary.type = rt;
 
 			switch (expr->exp_binary.op) {
-				case TOK_EQ_EQ: case TOK_NOT_EQ:
-				case TOK_LESS_EQ: case TOK_GREAT_EQ:
-				case TOK_GREAT: case TOK_LESS:
+				case AST_OP_EQ: case AST_OP_NOT_EQ:
+				case AST_OP_LESS_EQ: case AST_OP_GREAT_EQ:
+				case AST_OP_GREAT: case AST_OP_LESS:
 					expr->exp_binary.type.kind = TYPE_BOOL;
 					expr->exp_binary.type.size = 1;
 				default:;
@@ -165,17 +168,45 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 		} break;
 
 		case AST_UN_EXP: {
-			Type vt = expr_calc_types(parser, expr->exp_unary.v, &expr->exp_unary.type);
-
-			if (expr->exp_unary.op == TOK_COL) {
+			if (expr->exp_unary.op == AST_OP_CAST) {
+				expr_calc_types(parser, expr->exp_unary.v, &expr->exp_unary.type);
 				return expr->exp_unary.type;
 			}
 
+			Type vt = expr_calc_types(parser, expr->exp_unary.v, vart);
 			expr->exp_unary.type = vt;
 			return vt;
 		} break;
 
 		default: unreachable;
+	}
+}
+
+AST_ExprOp tok_to_binary_expr_op(TokenType tok) {
+	switch (tok) {
+		case TOK_EQ_EQ:     return AST_OP_EQ;
+		case TOK_GREAT:     return AST_OP_GREAT;
+		case TOK_LESS:      return AST_OP_LESS;
+		case TOK_GREAT_EQ:  return AST_OP_GREAT_EQ;
+		case TOK_LESS_EQ:   return AST_OP_LESS_EQ;
+		case TOK_AND:       return AST_OP_AND;
+		case TOK_OR:        return AST_OP_OR;
+		case TOK_PLUS:      return AST_OP_ADD;
+		case TOK_MINUS:     return AST_OP_SUB;
+		case TOK_STAR:      return AST_OP_MUL;
+		case TOK_SLASH:     return AST_OP_DIV;
+		default: return -1;
+	}
+}
+
+AST_ExprOp tok_to_unary_expr_op(TokenType tok) {
+	switch (tok) {
+		case TOK_COL:       return AST_OP_CAST;
+		case TOK_STAR:      return AST_OP_DEREF;
+		case TOK_AMP:       return AST_OP_REF;
+		case TOK_EXC:       return AST_OP_NOT;
+		case TOK_MINUS:     return AST_OP_NEG;
+		default: return -1;
 	}
 }
 
@@ -214,7 +245,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 			case TOK_ID:
 				if ((parser->cur_token+1)->type != TOK_OPAR) {
 					da_append(&nodes, ast_new({
-						.type = AST_VAR,
+						.kind = AST_VAR,
 						.var_id = parser->cur_token->data
 					}));
 				} else {
@@ -225,7 +256,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 
 			case TOK_INT:
 				da_append(&nodes, ast_new({
-					.type = AST_LITERAL,
+					.kind = AST_LITERAL,
 					.literal.kind = LIT_INT,
 					.literal.lint = parse_int(parser->cur_token->data),
 				}));
@@ -233,7 +264,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 
 			case TOK_TRUE:
 				da_append(&nodes, ast_new({
-					.type = AST_LITERAL,
+					.kind = AST_LITERAL,
 					.literal.kind = LIT_BOOL,
 					.literal.lint = 1,
 				}));
@@ -241,7 +272,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 
 			case TOK_FALSE:
 				da_append(&nodes, ast_new({
-					.type = AST_LITERAL,
+					.kind = AST_LITERAL,
 					.literal.kind = LIT_BOOL,
 					.literal.lint = 0,
 				}));
@@ -249,7 +280,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 
 			case TOK_CHAR:
 				da_append(&nodes, ast_new({
-					.type = AST_LITERAL,
+					.kind = AST_LITERAL,
 					.literal.kind = LIT_CHAR,
 					.literal.lint = parser->cur_token->data[0],
 				}));
@@ -257,7 +288,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 
 			case TOK_FLOAT:
 				da_append(&nodes, ast_new({
-					.type = AST_LITERAL,
+					.kind = AST_LITERAL,
 					.literal.kind = LIT_FLOAT,
 					.literal.lfloat = parse_float(parser->cur_token->data),
 				}));
@@ -266,33 +297,53 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 			case TOK_COL: {
 				Type t = parse_type(parser);
 				da_append(&nodes, ast_new({
-					.type = AST_UN_EXP,
+					.kind = AST_UN_EXP,
 					.exp_unary.type = t,
-					.exp_unary.op = TOK_COL,
+					.exp_unary.op = AST_OP_CAST,
 					.exp_unary.v = NULL,
 				}));
 			} break;
 
 			case TOK_EXC:
 				da_append(&nodes, ast_new({
-					.type = AST_UN_EXP,
-					.exp_unary.op = parser->cur_token->type,
+					.kind = AST_UN_EXP,
+					.exp_unary.op = AST_OP_NOT,
 					.exp_unary.v = NULL
 				}));
 				break;
+
 			case TOK_NOT_EQ: case TOK_OR:
 			case TOK_LESS: case TOK_GREAT:
 			case TOK_LESS_EQ: case TOK_GREAT_EQ:
 			case TOK_EQ_EQ: case TOK_AND:
 			case TOK_PLUS: case TOK_MINUS:
 			case TOK_STAR: case TOK_SLASH:
-				da_append(&nodes, ast_new({
-					.type = AST_BIN_EXP,
-					.exp_binary.op = parser->cur_token->type,
-					.exp_binary.l = NULL,
-					.exp_binary.r = NULL
-				}));
-				break;
+			case TOK_AMP: {
+				bool is_unary_op = false;
+				if (nodes.count == 0) {
+					is_unary_op = true;
+				} else {
+					if (da_last(&nodes)->kind == AST_BIN_EXP ||
+						da_last(&nodes)->kind == AST_UN_EXP) {
+						is_unary_op = true;
+					}
+				}
+
+				if (!is_unary_op) {
+					da_append(&nodes, ast_new({
+						.kind = AST_BIN_EXP,
+						.exp_binary.op = tok_to_binary_expr_op(parser->cur_token->type),
+						.exp_binary.l = NULL,
+						.exp_binary.r = NULL
+					}));
+				} else {
+					da_append(&nodes, ast_new({
+						.kind = AST_UN_EXP,
+						.exp_unary.op = tok_to_unary_expr_op(parser->cur_token->type),
+						.exp_unary.v = NULL,
+					}));
+				}
+			} break;
 
 			default:
 				unexpect_token(parser->cur_token, parser->cur_token->type);

@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <threads.h>
 
 #include "../include/parser.h"
 
@@ -95,7 +94,7 @@ AST_Node *parse_var_def(Parser *parser) {
 	parser->cur_token++;
 
 	AST_Node *vdn = ast_new({
-		.type = AST_VAR_DEF,
+		.kind = AST_VAR_DEF,
 		.var_def.id = id,
 		.var_def.type = type,
 		.var_def.exp = NULL,
@@ -122,12 +121,12 @@ AST_Node *parse_var_assign(Parser *parser) {
 	AST_Node *exp = parse_expr(parser, EXPR_PARSING_VAR, NULL);
 
 	AST_Node *vdn = ast_new({
-		.type = AST_VAR_DEF,
+		.kind = AST_VAR_DEF,
 		.var_def.id = id,
 		.var_def.exp = exp,
 	});
 
-	switch (exp->type) {
+	switch (exp->kind) {
 		case AST_BIN_EXP:   vdn->var_def.type = exp->exp_binary.type; break;
 		case AST_UN_EXP:    vdn->var_def.type = exp->exp_unary.type;  break;
 		case AST_LITERAL:   vdn->var_def.type = exp->literal.type;    break;
@@ -136,7 +135,7 @@ AST_Node *parse_var_assign(Parser *parser) {
 			Symbol *s = parser_st_get(parser, exp->var_id);
 			vdn->var_def.type = s->variable.type;
 		} break;
-		default: printf("wtf %d\n", exp->type); break;
+		default: unreachable;
 	}
 
 	assert(vdn->var_def.type.kind);
@@ -155,7 +154,7 @@ AST_Node *parse_var_mut(Parser *parser, ExprParsingType pt) {
 	parser->cur_token++;
 
 	AST_Node *vmn = ast_new({
-		.type = AST_VAR_MUT,
+		.kind = AST_VAR_MUT,
 		.var_mut.type = s->variable.type,
 		.var_mut.id = id,
 		.var_mut.exp = parse_expr(parser, pt, &s->variable.type),
@@ -165,7 +164,7 @@ AST_Node *parse_var_mut(Parser *parser, ExprParsingType pt) {
 }
 
 AST_Node *parse_func_return(Parser *parser, AST_Node *func) {
-	AST_Node *ret = ast_new({.type = AST_FUNC_RET});
+	AST_Node *ret = ast_new({.kind = AST_FUNC_RET});
 	parser->cur_token++;
 	ret->func_ret.exp = parse_expr(parser, EXPR_PARSING_VAR, &func->func_def.type);
 	ret->func_ret.type = func->func_def.type;
@@ -176,7 +175,7 @@ AST_Node *parse_body(Parser *parser, AST_Node *func);
 
 AST_Node *parse_if_stmt(Parser *parser, AST_Node *func) {
 	parser->cur_token++;
-	AST_Node *r = ast_new({.type = AST_IF_STMT});
+	AST_Node *r = ast_new({.kind = AST_IF_STMT});
 
 	r->stmt_if.exp = parse_expr(parser, EXPR_PARSING_STMT, NULL);
 	parser->cur_token++;
@@ -187,7 +186,7 @@ AST_Node *parse_if_stmt(Parser *parser, AST_Node *func) {
 
 AST_Node *parse_while_stmt(Parser *parser, AST_Node *func) {
 	parser->cur_token++;
-	AST_Node *r = ast_new({.type = AST_WHILE_STMT});
+	AST_Node *r = ast_new({.kind = AST_WHILE_STMT});
 
 	r->stmt_while.exp = parse_expr(parser, EXPR_PARSING_STMT, NULL);
 	parser->cur_token++;
@@ -199,7 +198,7 @@ AST_Node *parse_while_stmt(Parser *parser, AST_Node *func) {
 AST_Node *parse_for_stmt(Parser *parser, AST_Node *func) {
 	parser->cur_token++;
 
-	AST_Node *r = ast_new({.type = AST_FOR_STMT});
+	AST_Node *r = ast_new({.kind = AST_FOR_STMT});
 
 	if ((parser->cur_token+1)->type == TOK_COL)
 		r->stmt_for.var = parse_var_def(parser);
@@ -218,7 +217,7 @@ AST_Node *parse_for_stmt(Parser *parser, AST_Node *func) {
 }
 
 AST_Node *parse_body(Parser *parser, AST_Node *func) {
-	AST_Node *body = ast_new({.type = AST_BODY});
+	AST_Node *body = ast_new({.kind = AST_BODY});
 	int br_cnt = 0;
 
 	while (true) {
@@ -277,7 +276,7 @@ AST_Node *parse_function(Parser *parser) {
 
 	expect_token(parser->cur_token, TOK_ID);
 	AST_Node *fdn = ast_new({
-		.type = AST_FUNC_DEF,
+		.kind = AST_FUNC_DEF,
 		.func_def.id = parser->cur_token->data
 	});
 
@@ -293,7 +292,7 @@ AST_Node *parse_function(Parser *parser) {
 			case TOK_ID:
 				expect_token(parser->cur_token+1, TOK_COL);
 				AST_Node *farg = ast_new({
-					.type = AST_FUNC_DEF_ARG,
+					.kind = AST_FUNC_DEF_ARG,
 					.func_def_arg.id = parser->cur_token->data
 				});
 
@@ -357,7 +356,7 @@ void parse_extern(Parser *parser) {
 			case TOK_ID:
 				expect_token(parser->cur_token+1, TOK_COL);
 				AST_Node *farg = ast_new({
-					.type = AST_FUNC_DEF_ARG,
+					.kind = AST_FUNC_DEF_ARG,
 					.func_def_arg.id = parser->cur_token->data
 				});
 
@@ -389,7 +388,7 @@ void parse_extern(Parser *parser) {
 }
 
 void parser_parse(Parser *parser, Token *tokens) {
-	AST_Node *prog = ast_new({.type = AST_PROG});
+	AST_Node *prog = ast_new({.kind = AST_PROG});
 	parser->program = prog;
 	parser->cur_token = tokens;
 

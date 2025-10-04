@@ -207,16 +207,17 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 				sb_append_strf(&body, TAB"mov %s, %s\n", dst, arg1);
 			} break;
 
-			case OP_NOT: {
+			case OP_NOT: case OP_NEG: {
 				char ts[32]; type_to_stack(ci.dst.var.type, ts);
 				total_offset += ci.dst.var.type.size;
 				iot_add(ci.dst.var.index, total_offset);
 				sprintf(dst, "%s [rbp - %zu]", ts, total_offset);
-				reg_alloc(ci, arg1, arg2);	
+				reg_alloc(ci, arg1, arg2);
 
 				sb_append_strf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
 
-				if (ci.op == OP_NOT) {
+				if      (ci.op == OP_NEG) sb_append_strf(&body, TAB"neg %s\n", arg1);
+				else if (ci.op == OP_NOT) {
 					sb_append_strf(&body, TAB"test %s, %s\n", arg1, arg1);
 					sb_append_strf(&body, TAB"setz al\n");
 					sprintf(arg1, "al");

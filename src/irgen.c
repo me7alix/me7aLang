@@ -42,7 +42,7 @@ void vt_set(char *name, size_t index) {
 
 Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 	*ret = true;
-	if (l.type == OPR_LITERAL && r.type == OPR_LITERAL && en->type == AST_BIN_EXP) {
+	if (l.type == OPR_LITERAL && r.type == OPR_LITERAL && en->kind == AST_BIN_EXP) {
 		if (l.literal.type.kind == r.literal.type.kind) {
 			switch (l.literal.type.kind) {
 				case TYPE_INT: {
@@ -51,10 +51,10 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 					int32_t res;
 
 					switch (en->exp_binary.op) {
-						case TOK_PLUS:  res = lv + rv; break;
-						case TOK_MINUS: res = lv - rv; break;
-						case TOK_STAR:  res = lv * rv; break;
-						case TOK_SLASH: res = lv / rv; break;
+						case AST_OP_ADD:  res = lv + rv; break;
+						case AST_OP_SUB: res = lv - rv; break;
+						case AST_OP_MUL:  res = lv * rv; break;
+						case AST_OP_DIV: res = lv / rv; break;
 						default: *ret = false; return (Operand) {};
 					}
 
@@ -75,10 +75,10 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 					int64_t res;
 
 					switch (en->exp_binary.op) {
-						case TOK_PLUS:  res = lv + rv; break;
-						case TOK_MINUS: res = lv - rv; break;
-						case TOK_STAR:  res = lv * rv; break;
-						case TOK_SLASH: res = lv / rv; break;
+						case AST_OP_ADD:  res = lv + rv; break;
+						case AST_OP_SUB: res = lv - rv; break;
+						case AST_OP_MUL:  res = lv * rv; break;
+						case AST_OP_DIV: res = lv / rv; break;
 						default: *ret = false; return (Operand) {};
 					}
 
@@ -99,10 +99,10 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 					int8_t res;
 
 					switch (en->exp_binary.op) {
-						case TOK_PLUS:  res = lv + rv; break;
-						case TOK_MINUS: res = lv - rv; break;
-						case TOK_STAR:  res = lv * rv; break;
-						case TOK_SLASH: res = lv / rv; break;
+						case AST_OP_ADD:  res = lv + rv; break;
+						case AST_OP_SUB: res = lv - rv; break;
+						case AST_OP_MUL:  res = lv * rv; break;
+						case AST_OP_DIV: res = lv / rv; break;
 						default: *ret = false; return (Operand) {};
 					}
 
@@ -129,7 +129,7 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 void ir_gen_func_call(Func *func, AST_Node *cn);
 
 Operand ir_gen_expr(Func *func, AST_Node *en) {
-	switch (en->type) {
+	switch (en->kind) {
 		case AST_LITERAL: {
 			return (Operand) {
 				.type = OPR_LITERAL,
@@ -188,19 +188,19 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 			};
 
 			switch (en->exp_binary.op) {
-				case TOK_PLUS:     inst.op = OP_ADD;      break;
-				case TOK_MINUS:    inst.op = OP_SUB;      break;
-				case TOK_STAR:     inst.op = OP_MUL;      break;
-				case TOK_SLASH:    inst.op = OP_DIV;      break;
-				case TOK_LESS:     inst.op = OP_LESS;     break;
-				case TOK_LESS_EQ:  inst.op = OP_LESS_EQ;  break;
-				case TOK_GREAT:    inst.op = OP_GREAT;    break;
-				case TOK_GREAT_EQ: inst.op = OP_GREAT_EQ; break;
-				case TOK_EQ_EQ:    inst.op = OP_EQ;       break;
-				case TOK_NOT_EQ:   inst.op = OP_NOT_EQ;   break;
-				case TOK_AND:      inst.op = OP_AND;      break;
-				case TOK_OR:       inst.op = OP_OR;       break;
-				default:           assert(!"unreachable");
+				case AST_OP_ADD:      inst.op = OP_ADD;      break;
+				case AST_OP_SUB:      inst.op = OP_SUB;      break;
+				case AST_OP_MUL:      inst.op = OP_MUL;      break;
+				case AST_OP_DIV:      inst.op = OP_DIV;      break;
+				case AST_OP_LESS:     inst.op = OP_LESS;     break;
+				case AST_OP_LESS_EQ:  inst.op = OP_LESS_EQ;  break;
+				case AST_OP_GREAT:    inst.op = OP_GREAT;    break;
+				case AST_OP_GREAT_EQ: inst.op = OP_GREAT_EQ; break;
+				case AST_OP_EQ:       inst.op = OP_EQ;       break;
+				case AST_OP_NOT_EQ:   inst.op = OP_NOT_EQ;   break;
+				case AST_OP_AND:      inst.op = OP_AND;      break;
+				case AST_OP_OR:       inst.op = OP_OR;       break;
+				default:              assert(!"unreachable");
 			}
 
 			da_append(&func->body, inst);
@@ -218,8 +218,9 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 			};
 
 			switch (en->exp_unary.op) {
-				case TOK_COL: inst.op = OP_CAST; break;
-				case TOK_EXC: inst.op = OP_NOT;  break;
+				case AST_OP_CAST: inst.op = OP_CAST; break;
+				case AST_OP_NOT:  inst.op = OP_NOT;  break;
+				case AST_OP_NEG:  inst.op = OP_NEG;  break;
 				default: unreachable;
 			}
 
@@ -299,7 +300,7 @@ void ir_gen_func_call(Func *func, AST_Node *cn) {
 void ir_gen_body(Func *func, AST_Node *fn) {
 	for (size_t i = 0; i < fn->body.stmts.count; i++) {
 		AST_Node *cn = da_get(&fn->body.stmts, i);
-		switch (cn->type) {
+		switch (cn->kind) {
 			case AST_VAR_DEF:
 				ir_gen_var_def(func, cn);
 				break;
@@ -406,7 +407,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 			} break;
 
 			case AST_FOR_STMT: {
-				switch (cn->stmt_for.var->type) {
+				switch (cn->stmt_for.var->kind) {
 					case AST_VAR_MUT: ir_gen_var_mut(func, cn->stmt_for.var); break;
 					case AST_VAR_DEF: ir_gen_var_def(func, cn->stmt_for.var); break;
 					default: unreachable;
@@ -484,7 +485,7 @@ Program ir_gen_prog(Parser *parser) {
 	AST_Node *pn = parser->program;
 	for (size_t i = 0; i < pn->program.stmts.count; i++) {
 		AST_Node *cn = da_get(&pn->program.stmts, i);
-		switch (cn->type) {
+		switch (cn->kind) {
 			case AST_FUNC_DEF:
 				ir_gen_func(&prog, cn);
 				break;

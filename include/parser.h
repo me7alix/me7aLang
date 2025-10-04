@@ -69,6 +69,31 @@ typedef struct {
 } Literal;
 
 typedef enum {
+	// number
+	AST_OP_ADD,
+	AST_OP_SUB,
+	AST_OP_DIV,
+	AST_OP_MUL,
+	AST_OP_NEG,
+
+	// boolean
+	AST_OP_EQ,
+	AST_OP_NOT_EQ,
+	AST_OP_LESS,
+	AST_OP_GREAT,
+	AST_OP_LESS_EQ,
+	AST_OP_GREAT_EQ,
+	AST_OP_AND,
+	AST_OP_OR,
+	AST_OP_NOT,
+
+	// other
+	AST_OP_CAST,
+	AST_OP_REF,
+	AST_OP_DEREF,
+} AST_ExprOp;
+
+typedef enum {
 	AST_WHILE_STMT,
 	AST_IF_STMT, AST_BIN_EXP, AST_UN_EXP,
 	AST_VAR_DEF, AST_VAR, AST_LITERAL, AST_TYPE,
@@ -77,13 +102,13 @@ typedef enum {
 	AST_STRING, AST_OP_PLUS, AST_VAR_MUT,
 	AST_FUNC_RET_TYPE, AST_FOR_STMT,
 	AST_UN_OP, AST_BIN_OP, AST_PROG,
-} AST_NodeType;
+} AST_NodeKind;
 
 typedef struct AST_Node AST_Node;
 typedef da(AST_Node*) AST_Nodes;
 
 struct AST_Node {
-	AST_NodeType type;
+	AST_NodeKind kind;
 
 	union {
 		struct {
@@ -128,12 +153,12 @@ struct AST_Node {
 			AST_Node *body;
 		} stmt_for;
 		struct {
-			TokenType op;
+			AST_ExprOp op;
 			Type type;
 			AST_Node *v;
 		} exp_unary;
 		struct {
-			TokenType op;
+			AST_ExprOp op;
 			Type type;
 			AST_Node *l, *r;
 		} exp_binary;
