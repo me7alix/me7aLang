@@ -69,7 +69,7 @@ struct AST_Node {
 		struct {
 			char *id;
 			AST_Nodes args;
-			Type *type;
+			Type type;
 			AST_Node *body;
 		} func_def;
 		struct {
@@ -81,18 +81,15 @@ struct AST_Node {
 		} func_call;
 		struct {
 			AST_Nodes stmts;
-			size_t total_off;
 		} body;
 		struct {
 			char *id;
-			Type *type;
-			size_t offset;
+			Type type;
 			AST_Node *exp;
 		} var_def;
 		struct {
 			char *id;
-			Type *type;
-			size_t offset;
+			Type type;
 			AST_Node *exp;
 		} var_mut;
 		struct {
@@ -105,20 +102,21 @@ struct AST_Node {
 		} stmt_while;
 		struct {
 			TokenType op;
+			Type type;
 			AST_Node *v;
 		} exp_unary;
 		struct {
 			TokenType op;
-			Type *type;
+			Type type;
 			AST_Node *l, *r;
 		} exp_binary;
 		struct {
 			char *id;
-			Type *type;
+			Type type;
 		} func_def_arg;
 		struct {
 			AST_Node *exp;
-			Type *type;
+			Type type;
 		} func_ret;
 
 		AST_Node *func_ret_exp;
@@ -142,8 +140,7 @@ typedef struct {
 			AST_Node *type;
 		} func_def;
 		struct {
-			Type *type;
-			size_t offset;
+			Type type;
 		} variable;
 	};
 } Symbol;

@@ -8,10 +8,8 @@ size_t var_index, label_index;
 
 typedef struct {
 	char *name;
-	Type *type;
+	Type type;
 	size_t index;
-	bool is_imm;
-	Operand opr;
 } Var;
 
 da(Var) vt = {0};
@@ -39,7 +37,7 @@ void vt_set(char *name, size_t index) {
 	}
 }
 
-Operand ir_gen_expr(Func *func, AST_Node *en, char *mut) {
+Operand ir_gen_expr(Func *func, AST_Node *en) {
 	switch (en->type) {
 		case AST_INT:
 			return (Operand) {
@@ -56,11 +54,6 @@ Operand ir_gen_expr(Func *func, AST_Node *en, char *mut) {
 		case AST_VAR: {
 			Var v = vt_get(en->var_id);
 
-			if (v.is_imm && 0) {
-				bool is_mut = mut != NULL;
-				if (!(is_mut && strcmp(mut, v.name) == 0)) return v.opr;
-			}
-
 			return (Operand) {
 				.type = OPR_VAR,
 				.var.type = v.type,
@@ -70,8 +63,8 @@ Operand ir_gen_expr(Func *func, AST_Node *en, char *mut) {
 		} break;
 
 		case AST_BIN_EXP: {
-			Operand l = ir_gen_expr(func, en->exp_binary.l, mut);
-			Operand r = ir_gen_expr(func, en->exp_binary.r, mut);
+			Operand l = ir_gen_expr(func, en->exp_binary.l);
+			Operand r = ir_gen_expr(func, en->exp_binary.r);
 
 			// to make this work correctly, i need to have imm for each TYPE
 			if (l.type == OPR_IMM_INT && r.type == OPR_IMM_INT) {
@@ -109,6 +102,8 @@ Operand ir_gen_expr(Func *func, AST_Node *en, char *mut) {
 				case TOK_GREAT_EQ: inst.op = OP_GREAT_EQ; break;
 				case TOK_EQ_EQ:    inst.op = OP_EQ;       break;
 				case TOK_NOT_EQ:   inst.op = OP_NOT_EQ;   break;
+				case TOK_AND:      inst.op = OP_AND;      break;
+				case TOK_OR:       inst.op = OP_OR;       break;
 				default:           assert(!"unreachable");
 			}
 
@@ -129,9 +124,9 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 		AST_Node *cn = da_get(&fn->body.stmts, i);
 		switch (cn->type) {
 			case AST_VAR_DEF: {
-				Operand res = ir_gen_expr(func, cn->var_def.exp, NULL);
+				Operand res = ir_gen_expr(func, cn->var_def.exp);
 				switch (res.type) {
-					case OPR_IMM_FLOAT: case OPR_IMM_INT: {
+					case OPR_IMM_FLOAT: case OPR_IMM_INT: case OPR_VAR: {
 						da_append(&func->body, ((Instruction){
 							.op = OP_ASSIGN,
 							.arg1 = res,
@@ -146,17 +141,6 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 							.name = cn->var_def.id,
 							.type = cn->var_def.type,
 							.index = var_index++,
-							.is_imm = true,
-							.opr = res,
-						});
-					} break;
-
-					case OPR_VAR: {
-						vt_add((Var){
-							.name = cn->var_def.id,
-							.type = cn->var_def.type,
-							.index = res.var.index,
-							.is_imm = false,
 						});
 					} break;
 
@@ -165,7 +149,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 			} break;
 
 			case AST_FUNC_RET: {
-				Operand res = ir_gen_expr(func, cn->func_ret.exp, NULL);
+				Operand res = ir_gen_expr(func, cn->func_ret.exp);
 				switch (res.type) {
 					case OPR_IMM_FLOAT: case OPR_IMM_INT: {
 						da_append(&func->body, ((Instruction){
@@ -191,23 +175,10 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 
 			case AST_VAR_MUT: {
 				Var v = vt_get(cn->var_mut.id);
-				Operand res = ir_gen_expr(func, cn->var_def.exp, v.name);
+				Operand res = ir_gen_expr(func, cn->var_mut.exp);
 
 				switch (res.type) {
-					case OPR_IMM_FLOAT: case OPR_IMM_INT: {
-						da_append(&func->body, ((Instruction){
-							.op = OP_ASSIGN,
-							.arg1 = res,
-							.dst = (Operand) {
-								.type = OPR_VAR,
-								.var.type = cn->var_mut.type,
-								.var.index = v.index,
-							},
-						}));
-					} break;
-
-					case OPR_VAR: { // TODO: unnecessary ASSIGN
-						//vt_set(v.name, res.var.index);
+					case OPR_IMM_FLOAT: case OPR_IMM_INT: case OPR_VAR: {
 						da_append(&func->body, ((Instruction){
 							.op = OP_ASSIGN,
 							.arg1 = res,
@@ -225,7 +196,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 
 
 			case AST_IF_STMT: {
-				Operand res = ir_gen_expr(func, cn->stmt_if.exp, NULL);
+				Operand res = ir_gen_expr(func, cn->stmt_if.exp);
 				size_t lbl = label_index++;
 
 				da_append(&func->body, ((Instruction){
@@ -259,7 +230,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 					},
 				}));
 
-				Operand res = ir_gen_expr(func, cn->stmt_if.exp, NULL);
+				Operand res = ir_gen_expr(func, cn->stmt_while.exp);
 
 				size_t lbl_ex = label_index++;
 
@@ -272,7 +243,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 					},
 				}));
 
-				ir_gen_body(func, cn->stmt_if.body);
+				ir_gen_body(func, cn->stmt_while.body);
 
 				da_append(&func->body, ((Instruction){
 					.op = OP_JUMP,

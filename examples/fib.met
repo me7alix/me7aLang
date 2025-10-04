@@ -1,0 +1,14 @@
+func main(): int {
+	a := 1
+	b := 2
+
+	i := 0; while i != 5 {
+		l := b
+		b = b + a
+		a = l
+
+		i = i + 1
+	}
+
+	return b
+}

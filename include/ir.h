@@ -37,7 +37,7 @@ typedef struct {
 		double_t imm_float;
 		size_t label_index;
 		struct {
-			Type *type;
+			Type type;
 			size_t index;
 		} var;
 	};
@@ -51,13 +51,13 @@ typedef struct {
 } Instruction;
 
 typedef struct {
-	Type *type;
+	Type type;
 	char *name;
 } FuncArg;
 
 typedef struct {
 	char *name;
-	Type *ret_type;
+	Type ret_type;
 	da(FuncArg) args;
 	da(Instruction) body;
 } Func;

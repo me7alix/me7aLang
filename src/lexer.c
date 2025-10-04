@@ -156,9 +156,14 @@ void lexer_lex(Lexer *lexer, char *code) {
 				break;
 
 			case ':': {
-				lexer->cur_char++;
-				char *type = get_word(lexer);
-				add_token(lexer, TOK_TYPE, type);
+				if (lexer->cur_char[1] == '=') {
+					add_token(lexer, TOK_ASSIGN, ":=");
+					lexer->cur_char++;
+				} else {
+					lexer->cur_char++;
+					char *type = get_word(lexer);
+					add_token(lexer, TOK_TYPE, type);
+				}
 			} break;
 
 			case '/': {

@@ -49,7 +49,7 @@ void run_test(char *code, Token *tokens, size_t tokens_num, size_t test_num) {
 
 int main() {
 	printf("Lexer tests:\n");
-	char *test_code_1 = "func main() {\n a: i32 = 10 + 2\n }";
+	char *test_code_1 = "func main() {\n a: i32 = 10 + 2\nb := 2; }";
 	Token test_tokens_1[] = {
 		{ .type = TOK_FUNC },
 		{ .type = TOK_ID, .data = "main" },
@@ -61,6 +61,10 @@ int main() {
 		{ .type = TOK_EQ },
 		{ .type = TOK_INT, .data = "10" },
 		{ .type = TOK_PLUS },
+		{ .type = TOK_INT, .data = "2" },
+		{ .type = TOK_SEMI },
+		{ .type = TOK_ID, .data = "b" },
+		{ .type = TOK_ASSIGN },
 		{ .type = TOK_INT, .data = "2" },
 		{ .type = TOK_SEMI },
 		{ .type = TOK_CBRA },
@@ -96,8 +100,7 @@ int main() {
 		{ .type = TOK_ID, .data = "b" },
 		{ .type = TOK_AND },
 		{ .type = TOK_ID, .data = "c" },
-		{ .type = TOK_EXC },
-		{ .type = TOK_EQ },
+		{ .type = TOK_NOT_EQ },
 		{ .type = TOK_ID, .data = "true" },
 		{ .type = TOK_OR },
 		{ .type = TOK_INT, .data = "10" },

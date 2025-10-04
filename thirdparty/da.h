@@ -102,10 +102,10 @@
 	})) \
 
 #define da_last(da) \
-	({ \
+	(*({ \
 		_da_error_if((da)->count == 0, "da_last on empty dynamic array\n"); \
-		(da)->items[(da)->count - 1]; \
-	})
+		(da)->items + ((da)->count - 1); \
+	}))
 
 #define da_resize(da, cnt) \
 	do { \

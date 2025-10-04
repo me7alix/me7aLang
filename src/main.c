@@ -7,6 +7,7 @@
 #include "../thirdparty/sb.h"
 
 #define SB_IMPLEMENTATION
+#include "irdump.c"
 #include "nasmgen.c"
 //#include "codegen.c"
 
@@ -68,13 +69,15 @@ void print_usage() {
 		"Usage: [options] file...\n"
 		"Options:\n"
 		"  -o   Output file path\n"
-		"  -asm Returns asm output\n");
+		"  -asm Saves asm output\n"
+		"  -ir  Saves IR output\n");
 }
 
 int main(int argc, char **argv) {
 	char *input_file = NULL;
 	char *output_bin = "a.out";
 	bool save_asm_output = false;
+	bool save_ir_output = false;
 
 	if (argc == 1) {
 		print_usage();
@@ -92,6 +95,8 @@ int main(int argc, char **argv) {
 			i++;
 		} else if (strcmp(argv[i], "-asm") == 0) {
 			save_asm_output = true;
+		} else if (strcmp(argv[i], "-ir") == 0) {
+			save_ir_output = true;
 		} else if (
 			strcmp(argv[i], "-h") == 0 ||
 			strcmp(argv[i], "--help") == 0) {
@@ -119,14 +124,14 @@ int main(int argc, char **argv) {
 	Parser parser = {0};
 	parser_parse(&parser, lexer.tokens.items);
 
-	//NASM_Codegen cg = {0};
-	//nasm_codegen(&cg, &parser);
-
-
 	char buf[512];
 	char output_file[256];
 
 	Program *prog = ir_gen_prog(parser.program);
+	if (save_ir_output) {
+		sprintf(buf, "%s.ir", output_bin);
+		ir_dump_prog(prog, buf);
+	}
 
 	StringBuilder cg = nasm_gen_prog(prog);
 

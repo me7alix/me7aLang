@@ -1,9 +1,11 @@
+#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <threads.h>
 
 #include "../include/parser.h"
 
@@ -24,18 +26,8 @@ void parser_st_add(Parser *parser, Symbol smbl) {
 	da_append(&parser->st, smbl);
 }
 
-Symbol *st_get(SymbolTable *st, const char *id) {
-	for (size_t i = st->count - 1; i >= 0; i--) {
-		if (strcmp(da_get(st, i).id, id) == 0) {
-			return &da_get(st, i);
-		}
-	}
-
-	return NULL;
-}
-
 Symbol *parser_st_get(Parser *parser, const char *id) {
-	for (size_t i = parser->st.count - 1; i >= 0; i--) {
+	for (int i = parser->st.count - 1; i >= 0; i--) {
 		if (strcmp(da_get(&parser->st, i).id, id) == 0 &&
 			check_nested(da_get(&parser->st, i).nested, parser->nested)) {
 			return &da_get(&parser->st, i);
@@ -45,20 +37,22 @@ Symbol *parser_st_get(Parser *parser, const char *id) {
 	return NULL;
 }
 
-Type *parse_type(Parser *parser) {
+Type parse_type(Parser *parser) {
 	expect_token(parser->cur_token, TOK_TYPE);
-	Type *type = malloc(sizeof(Type));
-	*type = (Type){0};
+	Type type = {0};
 
 	if (parser->cur_token->type == 0) {}
 
 	char *tok_data = parser->cur_token->data;
 	if (strcmp(tok_data, "int") == 0) {
-		type->kind = TYPE_INT;
-		type->size = 4;
+		type.kind = TYPE_INT;
+		type.size = 4;
 	} else if (strcmp(tok_data, "float") == 0) {
-		type->kind = TYPE_FLOAT;
-		type->size = 4;
+		type.kind = TYPE_FLOAT;
+		type.size = 4;
+	} else if (strcmp(tok_data, "bool") == 0) {
+		type.kind = TYPE_BOOL;
+		type.size = 1;
 	}
 
 	return type;
@@ -90,19 +84,16 @@ void unexpect_token(Token *token, TokenType type) {
 	exit(1);
 }
 
-AST_Node *parse_var_def(Parser *parser, size_t *offset) {
+AST_Node *parse_var_def(Parser *parser) {
 	char *id = (parser->cur_token++)->data;
-	Type *type = parse_type(parser);
+	Type type = parse_type(parser);
 	parser->cur_token++;
-
-	*offset += type->size;
 
 	AST_Node *vdn = ast_alloc((AST_Node){
 		.type = AST_VAR_DEF,
 		.var_def.id = id,
 		.var_def.type = type,
 		.var_def.exp = NULL,
-		.var_def.offset = *offset,
 	});
 
 	if (parser->cur_token->type == TOK_EQ) {
@@ -113,7 +104,33 @@ AST_Node *parse_var_def(Parser *parser, size_t *offset) {
 	parser_st_add(parser, (Symbol) {
 		.id = vdn->var_def.id,
 		.variable.type = type,
-		.variable.offset = *offset,
+	});
+
+	return vdn;
+}
+
+AST_Node *parse_var_assign(Parser *parser) {
+	char *id = parser->cur_token->data;
+	parser->cur_token += 2;
+
+	AST_Node *exp = parse_expr(parser, EXPR_PARSING_VAR);
+
+	AST_Node *vdn = ast_alloc((AST_Node){
+		.type = AST_VAR_DEF,
+		.var_def.id = id,
+		.var_def.exp = exp,
+	});
+
+	switch (exp->type) {
+		case AST_BIN_EXP: vdn->var_def.type = exp->exp_binary.type; break;
+		case AST_UN_EXP:  vdn->var_def.type = exp->exp_unary.type; break;
+		case AST_INT:     vdn->var_def.type = (Type) { .kind = TYPE_INT, .size = 4 }; break;
+		default: break;
+	}
+
+	parser_st_add(parser, (Symbol) {
+		.id = vdn->var_def.id,
+		.variable.type = vdn->var_def.type,
 	});
 
 	return vdn;
@@ -127,7 +144,6 @@ AST_Node *parse_var_mut(Parser *parser) {
 	AST_Node *vmn = ast_alloc((AST_Node){
 		.type = AST_VAR_MUT,
 		.var_mut.type = s->variable.type,
-		.var_mut.offset = s->variable.offset,
 		.var_mut.id = id,
 		.var_mut.exp = parse_expr(parser, EXPR_PARSING_VAR),
 	});
@@ -187,9 +203,11 @@ AST_Node *parse_body(Parser *parser, AST_Node *func) {
 
 			case TOK_ID:
 				if ((parser->cur_token+1)->type == TOK_TYPE)
-					da_append(&body->body.stmts, parse_var_def(parser, &body->body.total_off));
+					da_append(&body->body.stmts, parse_var_def(parser));
 				else if ((parser->cur_token+1)->type == TOK_EQ)
 					da_append(&body->body.stmts, parse_var_mut(parser));
+				else if ((parser->cur_token+1)->type == TOK_ASSIGN)
+					da_append(&body->body.stmts, parse_var_assign(parser));
 				break;
 
 			case TOK_IF_SYM:

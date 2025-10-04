@@ -85,38 +85,32 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 	return expr_expand(nodes);
 }
 
-Type *expr_calc_types(Parser *parser, AST_Node *expr) {
+Type expr_calc_types(Parser *parser, AST_Node *expr) {
 	if (expr->type == AST_INT) {
-		Type *t = malloc(sizeof(Type));
-		*t = (Type) {
+		return (Type) {
 			.kind = TYPE_INT,
 			.size = 4,
 		};
-		printf("int: %d\n", t->kind);
-		return t;
 	}
 
 	if (expr->type == AST_FLOAT) {
-		Type *t = malloc(sizeof(Type));
-		*t = (Type) {
+		return (Type) {
 			.kind = TYPE_FLOAT,
 			.size = 4,
 		};
-		return t;
 	}
 
 	if (expr->type == AST_VAR) {
 		Symbol *v = parser_st_get(parser, expr->var_id);
-		printf("var: %d\n", v->variable.type->kind);
 		return v->variable.type;
 	}
 
-	Type *lt = expr_calc_types(parser, expr->exp_binary.l);
-	Type *rt = expr_calc_types(parser, expr->exp_binary.r);
+	Type lt = expr_calc_types(parser, expr->exp_binary.l);
+	Type rt = expr_calc_types(parser, expr->exp_binary.r);
 
-	if (lt->kind != rt->kind) {
+	if (lt.kind != rt.kind) {
 		fprintf(stderr, "wrong types in exression\n");
-		fprintf(stderr, "%d %d\n", lt->kind, rt->kind);
+		fprintf(stderr, "%d %d\n", lt.kind, rt.kind);
 		exit(1);
 	}
 
@@ -128,7 +122,8 @@ Type *expr_calc_types(Parser *parser, AST_Node *expr) {
 		expr->exp_binary.op == TOK_LESS_EQ ||
 		expr->exp_binary.op == TOK_GREAT ||
 		expr->exp_binary.op == TOK_LESS) {
-		expr->exp_binary.type->kind = TYPE_BOOL;
+		expr->exp_binary.type.kind = TYPE_BOOL;
+		expr->exp_binary.type.size = 1;
 	}
 
 	return lt;
