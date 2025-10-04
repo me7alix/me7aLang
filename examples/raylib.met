@@ -1,0 +1,53 @@
+extern InitWindow()
+extern SetTargetFPS()
+extern DrawRectangle()
+extern IsKeyPressed(): i8
+extern IsKeyDown(): i8
+extern WindowShouldClose(): i8
+extern ClearBackground()
+extern BeginDrawing()
+extern EndDrawing()
+extern CloseWindow()
+
+func main(): int {
+	WHITE := 4126537215
+	RED := 4278190335
+
+	KEY_W := 87
+	KEY_S := 83
+	KEY_D := 68
+	KEY_A := 65
+
+	pos_x := 0
+	pos_y := 0
+
+	InitWindow(800, 600, 0:i64)
+	SetTargetFPS(60)
+
+	while WindowShouldClose() == 0:i8 {
+		BeginDrawing()
+		ClearBackground(WHITE)
+
+		if IsKeyDown(KEY_W) != 0:i8 {
+			pos_y = pos_y - 2
+		}
+
+		if IsKeyDown(KEY_S) != 0:i8 {
+			pos_y = pos_y + 2
+		}
+
+		if IsKeyDown(KEY_D) != 0:i8 {
+			pos_x = pos_x + 2
+		}
+
+		if IsKeyDown(KEY_A) != 0:i8 {
+			pos_x = pos_x - 2
+		}
+
+		DrawRectangle(pos_x, pos_y, 200, 200, RED)
+		EndDrawing()
+	}
+	
+	CloseWindow()
+	return 0
+}
