@@ -55,7 +55,6 @@ AST_Node *parse_func_call(Parser *parser) {
 	parser->cur_token++;
 
 	Symbol *fc = parser_st_get(parser, fcn->func_call.id);
-	printf("> %d : %s\n", fc->type, fc->id);
 	switch (fc->type) {
 		case SBL_FUNC_DEF:    fcn->func_call.type = fc->func_def.type;    break;
 		case SBL_FUNC_EXTERN: fcn->func_call.type = fc->func_extern.type; break;
@@ -224,6 +223,22 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 					.type = AST_LITERAL,
 					.literal.kind = LIT_INT,
 					.literal.lint = parse_int(parser->cur_token->data),
+				}));
+				break;
+
+			case TOK_TRUE:
+				da_append(&nodes, ast_new({
+					.type = AST_LITERAL,
+					.literal.kind = LIT_BOOL,
+					.literal.lint = 1,
+				}));
+				break;
+
+			case TOK_FALSE:
+				da_append(&nodes, ast_new({
+					.type = AST_LITERAL,
+					.literal.kind = LIT_BOOL,
+					.literal.lint = 0,
 				}));
 				break;
 

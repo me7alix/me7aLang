@@ -49,7 +49,7 @@ char *opr_to_nasm(Operand opr) {
 			if (off == 0) assert(0);
 			switch (opr.var.type.kind) {
 				case TYPE_INT:  sprintf(opr_to_nasm_buf, "dword [rbp - %zu]", off); break;
-				case TYPE_BOOL: sprintf(opr_to_nasm_buf, "byte [rbp - %zu]", off); break;
+				case TYPE_BOOL:
 				case TYPE_I8:   sprintf(opr_to_nasm_buf, "byte [rbp - %zu]", off); break;
 				case TYPE_I64:  sprintf(opr_to_nasm_buf, "qword [rbp - %zu]", off); break;
 				default: unreachable;
@@ -59,6 +59,7 @@ char *opr_to_nasm(Operand opr) {
 			switch (opr.literal.type.kind) {
 				case TYPE_INT:   sprintf(opr_to_nasm_buf, "%d", (int32_t) opr.literal.lint); break;
 				case TYPE_FLOAT: sprintf(opr_to_nasm_buf, "%f", (float) opr.literal.lfloat); break;
+				case TYPE_BOOL:
 				case TYPE_I8:    sprintf(opr_to_nasm_buf, "%d", (int8_t) opr.literal.lint); break;
 				case TYPE_I64:   sprintf(opr_to_nasm_buf, "%li", opr.literal.lint); break;
 				default: unreachable;
@@ -68,6 +69,7 @@ char *opr_to_nasm(Operand opr) {
 			switch (opr.func_ret.type.kind) {
 				case TYPE_INT:   sprintf(opr_to_nasm_buf, "eax"); break;
 				case TYPE_FLOAT: sprintf(opr_to_nasm_buf, "xmm0"); break;
+				case TYPE_BOOL:
 				case TYPE_I8:    sprintf(opr_to_nasm_buf, "al"); break;
 				case TYPE_I64:   sprintf(opr_to_nasm_buf, "rax"); break;
 				default: unreachable;
@@ -155,7 +157,9 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			case OP_ADD: case OP_SUB:
 			case OP_MUL: case OP_DIV:
 			case OP_EQ: case OP_NOT_EQ:
-			case OP_AND: {
+			case OP_AND: case OP_OR:
+			case OP_GREAT: case OP_LESS:
+			case OP_GREAT_EQ: case OP_LESS_EQ: {
 				switch (ci.dst.var.type.kind) {
 					case TYPE_BOOL: case TYPE_I8:
 						total_offset += 1;
@@ -196,16 +200,31 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 					sb_append_strf(&body, TAB"cmp %s, %s\n", arg1, arg2);
 					sb_append_strf(&body, TAB"sete al\n");
 					sprintf(arg1, "al");
-				}
-
-				else if (ci.op == OP_NOT_EQ) {
+				} else if (ci.op == OP_NOT_EQ) {
 					sb_append_strf(&body, TAB"cmp %s, %s\n", arg1, arg2);
 					sb_append_strf(&body, TAB"setne al\n");
 					sprintf(arg1, "al");
-				}
-
-				else if (ci.op == OP_AND) {
+				} else if (ci.op == OP_AND) {
 					sb_append_strf(&body, TAB"and %s, %s\n", arg1, arg2);
+					sprintf(arg1, "al");
+				} else if (ci.op == OP_OR) {
+					sb_append_strf(&body, TAB"and %s, %s\n", arg1, arg2);
+					sprintf(arg1, "al");
+				} else if (ci.op == OP_GREAT) {
+					sb_append_strf(&body, TAB"cmp %s, %s\n", arg1, arg2);
+					sb_append_strf(&body, TAB"seta al\n");
+					sprintf(arg1, "al");
+				} else if (ci.op == OP_LESS) {
+					sb_append_strf(&body, TAB"cmp %s, %s\n", arg1, arg2);
+					sb_append_strf(&body, TAB"setb al\n");
+					sprintf(arg1, "al");
+				} else if (ci.op == OP_GREAT_EQ) {
+					sb_append_strf(&body, TAB"cmp %s, %s\n", arg1, arg2);
+					sb_append_strf(&body, TAB"setae al\n");
+					sprintf(arg1, "al");
+				} else if (ci.op == OP_LESS_EQ) {
+					sb_append_strf(&body, TAB"cmp %s, %s\n", arg1, arg2);
+					sb_append_strf(&body, TAB"setbe al\n");
 					sprintf(arg1, "al");
 				}
 

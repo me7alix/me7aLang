@@ -37,6 +37,11 @@ void ir_dump_inst(Instruction inst, char *res) {
 		case OP_ADD:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "+", arg2);  break;
 		case OP_EQ:     sprintf(res, "    var%s = %s %s %s", dst, arg1, "==", arg2); break;
 		case OP_OR:     sprintf(res, "    var%s = %s %s %s", dst, arg1, "||", arg2); break;
+		case OP_AND:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "&&", arg2); break;
+		case OP_GREAT:  sprintf(res, "    var%s = %s %s %s", dst, arg1, ">", arg2);  break;
+		case OP_LESS:   sprintf(res, "    var%s = %s %s %s", dst, arg1, "<", arg2);  break;
+		case OP_GREAT_EQ:sprintf(res, "    var%s = %s %s %s", dst, arg1, ">=", arg2);  break;
+		case OP_LESS_EQ:sprintf(res, "    var%s = %s %s %s", dst, arg1, "<=", arg2);  break;
 		case OP_NOT_EQ: sprintf(res, "    var%s = %s %s %s", dst, arg1, "!=", arg2); break;
 		case OP_JUMP_IF_NOT: sprintf(res, "    jmp_if_not %s %s", dst, arg1); break;
 		case OP_JUMP:   sprintf(res, "    jmp %s", dst); break;

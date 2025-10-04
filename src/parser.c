@@ -22,7 +22,6 @@ void set_nested(int pn[16], int n[16]) {
 }
 
 void parser_st_add(Parser *parser, Symbol smbl) {
-	printf("%d : %s\n", smbl.type, smbl.id);
 	set_nested(parser->nested, smbl.nested);
 	da_append(&parser->st, smbl);
 }
@@ -129,9 +128,10 @@ AST_Node *parse_var_assign(Parser *parser) {
 	});
 
 	switch (exp->type) {
-		case AST_BIN_EXP: vdn->var_def.type = exp->exp_binary.type; break;
-		case AST_UN_EXP:  vdn->var_def.type = exp->exp_unary.type;  break;
-		case AST_LITERAL: vdn->var_def.type = exp->literal.type;    break;
+		case AST_BIN_EXP:   vdn->var_def.type = exp->exp_binary.type; break;
+		case AST_UN_EXP:    vdn->var_def.type = exp->exp_unary.type;  break;
+		case AST_LITERAL:   vdn->var_def.type = exp->literal.type;    break;
+		case AST_FUNC_CALL: vdn->var_def.type = exp->func_call.type;  break;
 		case AST_VAR: {
 			Symbol *s = parser_st_get(parser, exp->var_id);
 			vdn->var_def.type = s->variable.type;

@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <threads.h>
 
 #include "../include/ir.h"
 #include "../include/parser.h"
@@ -41,24 +42,82 @@ void vt_set(char *name, size_t index) {
 
 Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 	*ret = true;
-	if (l.type == OPR_LITERAL && r.type == OPR_LITERAL) {
+	if (l.type == OPR_LITERAL && r.type == OPR_LITERAL && en->type == AST_BIN_EXP) {
 		if (l.literal.type.kind == r.literal.type.kind) {
 			switch (l.literal.type.kind) {
 				case TYPE_INT: {
+					int32_t lv = (int32_t) l.literal.lint;
+					int32_t rv = (int32_t) r.literal.lint;
+					int32_t res;
+
 					switch (en->exp_binary.op) {
-						case TOK_PLUS:
-							return (Operand) {.type = OPR_LITERAL, .literal.lint = (int32_t)l.literal.lint + (int32_t)r.literal.lint };
-						case TOK_MINUS:
-							return (Operand) {.type = OPR_LITERAL, .literal.lint = (int32_t)l.literal.lint - (int32_t)r.literal.lint };
-						case TOK_STAR:
-							return (Operand) {.type = OPR_LITERAL, .literal.lint = (int32_t)l.literal.lint * (int32_t)r.literal.lint };
-						case TOK_SLASH:
-							return (Operand) {.type = OPR_LITERAL, .literal.lint = (int32_t)l.literal.lint / (int32_t)r.literal.lint };
-						default: break;
+						case TOK_PLUS:  res = lv + rv; break;
+						case TOK_MINUS: res = lv - rv; break;
+						case TOK_STAR:  res = lv * rv; break;
+						case TOK_SLASH: res = lv / rv; break;
+						default: *ret = false; return (Operand) {};
 					}
+
+					return (Operand) {
+						.type = OPR_LITERAL,
+						.literal.kind = LIT_INT,
+						.literal.lint = res,
+						.literal.type = (Type) {
+							.kind = TYPE_INT,
+							.size = 4,
+						},
+					};
 				} break;
 
-				default: break;
+				case TYPE_I64: {
+					int64_t lv = l.literal.lint;
+					int64_t rv = r.literal.lint;
+					int64_t res;
+
+					switch (en->exp_binary.op) {
+						case TOK_PLUS:  res = lv + rv; break;
+						case TOK_MINUS: res = lv - rv; break;
+						case TOK_STAR:  res = lv * rv; break;
+						case TOK_SLASH: res = lv / rv; break;
+						default: *ret = false; return (Operand) {};
+					}
+
+					return (Operand) {
+						.type = OPR_LITERAL,
+						.literal.kind = LIT_INT,
+						.literal.lint = res,
+						.literal.type = (Type) {
+							.kind = TYPE_I64,
+							.size = 8,
+						},
+					};
+				} break;
+
+				case TYPE_I8: {
+					int8_t lv = (int8_t) l.literal.lint;
+					int8_t rv = (int8_t) r.literal.lint;
+					int8_t res;
+
+					switch (en->exp_binary.op) {
+						case TOK_PLUS:  res = lv + rv; break;
+						case TOK_MINUS: res = lv - rv; break;
+						case TOK_STAR:  res = lv * rv; break;
+						case TOK_SLASH: res = lv / rv; break;
+						default: *ret = false; return (Operand) {};
+					}
+
+					return (Operand) {
+						.type = OPR_LITERAL,
+						.literal.kind = LIT_INT,
+						.literal.lint = res,
+						.literal.type = (Type) {
+							.kind = TYPE_I8,
+							.size = 1,
+						},
+					};
+				} break;
+
+				default: unreachable;
 			}
 		}
 	}
@@ -91,19 +150,33 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 		case AST_FUNC_CALL: {
 			ir_gen_func_call(func, en);
 
-			return (Operand) {
+			Operand res = {
 				.type = OPR_FUNC_RET,
 				.func_ret.type = en->func_call.type,
 			};
+
+			Instruction inst = {
+				.op = OP_ASSIGN,
+				.arg1 = res,
+				.dst = (Operand) {
+					.type = OPR_VAR,
+					.var.type = en->func_call.type,
+					.var.index = var_index++,
+				},
+			};
+
+			da_append(&func->body, inst);
+
+			return inst.dst;
 		} break;
 
 		case AST_BIN_EXP: {
 			Operand l = ir_gen_expr(func, en->exp_binary.l);
 			Operand r = ir_gen_expr(func, en->exp_binary.r);
 
-			//bool ret;
-			//Operand calc = ir_opr_calc(en, l, r, &ret);
-			//if (ret) return calc;
+			bool ret;
+			Operand calc = ir_opr_calc(en, l, r, &ret);
+			if (ret) return calc;
 
 			Instruction inst = {
 				.arg1 = l,
@@ -164,27 +237,21 @@ void ir_dump_opr(Operand opr, char *buf);
 
 void ir_gen_var_def(Func *func, AST_Node *cn) {
 	Operand res = ir_gen_expr(func, cn->var_def.exp);
-	switch (res.type) {
-		case OPR_LITERAL: case OPR_VAR: {
-			da_append(&func->body, ((Instruction){
-				.op = OP_ASSIGN,
-				.arg1 = res,
-				.dst = (Operand) {
-					.type = OPR_VAR,
-					.var.type = cn->var_def.type,
-					.var.index = var_index,
-				},
-			}));
+	da_append(&func->body, ((Instruction){
+		.op = OP_ASSIGN,
+		.arg1 = res,
+		.dst = (Operand) {
+			.type = OPR_VAR,
+			.var.type = cn->var_def.type,
+			.var.index = var_index,
+		},
+	}));
 
-			vt_add((Var){
-				.name = cn->var_def.id,
-				.type = cn->var_def.type,
-				.index = var_index++,
-			});
-		} break;
-
-		default: unreachable;
-	}
+	vt_add((Var){
+		.name = cn->var_def.id,
+		.type = cn->var_def.type,
+		.index = var_index++,
+	});
 }
 
 void ir_gen_var_mut(Func *func, AST_Node *cn) {
