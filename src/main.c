@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 #define DA_DEBUG
@@ -76,6 +77,8 @@ void print_usage() {
 int main(int argc, char **argv) {
 	char *input_file = NULL;
 	char *output_bin = "a.out";
+	char *clibs = "";
+	char *obj_files = "";
 	bool save_asm_output = false;
 	bool save_ir_output = false;
 
@@ -91,8 +94,21 @@ int main(int argc, char **argv) {
 				return 1;
 			}
 
-			output_bin = argv[i+1];
-			i++;
+			output_bin = argv[++i];
+		} else if (strcmp(argv[i], "-obj") == 0) {
+			if (i >= argc) {
+				fprintf(stderr, "invalid -obj argument\n");
+				return 1;
+			}
+
+			obj_files = argv[++i];
+		} else if (strcmp(argv[i], "-clibs") == 0) {
+			if (i >= argc) {
+				fprintf(stderr, "invalid -clibs argument\n");
+				return 1;
+			}
+
+			clibs = argv[++i];
 		} else if (strcmp(argv[i], "-asm") == 0) {
 			save_asm_output = true;
 		} else if (strcmp(argv[i], "-ir") == 0) {
@@ -104,7 +120,7 @@ int main(int argc, char **argv) {
 			return 0;
 		} else {
 			if (argv[i][0] == '-') {
-				fprintf(stderr, "invalid option\n");
+				fprintf(stderr, "invalid option %s\n", argv[i]);
 				return 1;
 			}
 
@@ -140,7 +156,7 @@ int main(int argc, char **argv) {
 
 	sprintf(buf, "nasm -f elf64 %s", output_file);
 	system(buf); printf("[INFO] %s\n", buf);
-	sprintf(buf, "gcc -no-pie ./examples/runtime.o %s.o -o %s -lraylib", output_bin, output_bin);
+	sprintf(buf, "gcc -no-pie %s %s.o -o %s %s", obj_files, output_bin, output_bin, clibs);
 	system(buf); printf("[INFO] %s\n", buf);
 	sprintf(buf, "rm %s.o", output_bin);
 	system(buf);  printf("[INFO] %s\n", buf);

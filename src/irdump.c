@@ -11,13 +11,17 @@ void ir_dump_opr(Operand opr, char *buf) {
 		case OPR_FUNC_INP:  sprintf(buf, "FI(%zu):%d", opr.func_inp.arg_ind, opr.func_ret.type.kind); break;
 		case OPR_FUNC_RET:  sprintf(buf, "FR:%d", opr.func_ret.type.kind); break;
 		case OPR_NAME:      sprintf(buf, "\"%s\"", opr.name); break;
-		case OPR_VAR:       sprintf(buf, "(%zu):%d", opr.var.index, opr.var.type.kind); break;
+		case OPR_VAR: {
+			if (!opr.var.is_mem_addr) sprintf(buf, "(%li):%d", opr.var.index, opr.var.type.kind);
+			else                      sprintf(buf, "[%li]:%d", opr.var.index, opr.var.type.kind);
+		} break;
 
 		case OPR_LITERAL: {
 			switch (opr.literal.type.kind) {
 				case TYPE_INT:   sprintf(buf, "%d:%d", (int32_t) opr.literal.lint, opr.literal.type.kind); break;
 				case TYPE_I8:
 				case TYPE_BOOL:  sprintf(buf, "%d:%d", (int8_t) opr.literal.lint, opr.literal.type.kind); break;
+				case TYPE_POINTER:
 				case TYPE_I64:   sprintf(buf, "%li:%d", opr.literal.lint, opr.literal.type.kind); break;
 				case TYPE_FLOAT: sprintf(buf, "%f:%d", (float) opr.literal.lfloat, opr.literal.type.kind); break;
 				default: sprintf(buf, "ERR\n"); break;
@@ -52,6 +56,8 @@ void ir_dump_inst(Instruction inst, char *res) {
 		case OP_LABEL:  sprintf(res, "%s", arg1); break;
 		case OP_SUB:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "-", arg2);  break;
 		case OP_MUL:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "*", arg2);  break;
+		case OP_DEREF:  sprintf(res, "    var%s = deref %s", dst, arg1);  break;
+		case OP_REF:    sprintf(res, "    var%s = ref %s", dst, arg1);  break;
 		case OP_DIV:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "/", arg2);  break;
 		case OP_ASSIGN: sprintf(res, "    var%s = %s", dst, arg1); break;
 		case OP_RETURN: sprintf(res, "    return %s", arg1); break;

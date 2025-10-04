@@ -33,7 +33,7 @@ Symbol *parser_st_get(Parser *parser, const char *id) {
 		}
 	}
 
-	lexer_error(parser->cur_token->location, "parser error: no such variable");
+	lexer_error(parser->cur_token->loc, "parser error: no such variable");
 
 	return NULL;
 }
@@ -42,6 +42,12 @@ Type parse_type(Parser *parser) {
 	expect_token(parser->cur_token, TOK_COL);
 	Type type = {0};
 	parser->cur_token++;
+
+	bool is_pointer = false;
+	if (parser->cur_token->type == TOK_STAR) {
+		is_pointer = true;
+		parser->cur_token++;
+	}
 
 	char *type_name = parser->cur_token->data;
 	if (strcmp(type_name, "int") == 0) {
@@ -61,6 +67,11 @@ Type parse_type(Parser *parser) {
 		type.size = 8;
 	}
 
+	if (is_pointer) {
+		Type *base = malloc(sizeof(Type)); *base = type;
+		type = (Type) { .kind = TYPE_POINTER, .pointer.base = base, .size = 8 };
+	}
+
 	return type;
 }
 
@@ -75,7 +86,7 @@ void expect_token(Token *token, TokenType type) {
 
 	char err[256];
 	sprintf(err, "parser error: %s token expected", tok_to_str(type));
-	lexer_error(token->location, err);
+	lexer_error(token->loc, err);
 	exit(1);
 }
 
@@ -84,17 +95,19 @@ void unexpect_token(Token *token, TokenType type) {
 
 	char err[256];
 	sprintf(err, "parser error: unexpected token %s", tok_to_str(type));
-	lexer_error(token->location, err);
+	lexer_error(token->loc, err);
 	exit(1);
 }
 
 AST_Node *parse_var_def(Parser *parser) {
-	char *id = (parser->cur_token++)->data;
+	char *id = parser->cur_token->data;
+	Location loc = (parser->cur_token++)->loc;
 	Type type = parse_type(parser);
 	parser->cur_token++;
 
 	AST_Node *vdn = ast_new({
 		.kind = AST_VAR_DEF,
+		.loc = loc,
 		.var_def.id = id,
 		.var_def.type = type,
 		.var_def.exp = NULL,
@@ -116,12 +129,14 @@ AST_Node *parse_var_def(Parser *parser) {
 
 AST_Node *parse_var_assign(Parser *parser) {
 	char *id = parser->cur_token->data;
+	Location loc = parser->cur_token->loc;
 	parser->cur_token += 2;
 
 	AST_Node *exp = parse_expr(parser, EXPR_PARSING_VAR, NULL);
 
 	AST_Node *vdn = ast_new({
 		.kind = AST_VAR_DEF,
+		.loc = loc,
 		.var_def.id = id,
 		.var_def.exp = exp,
 	});
@@ -149,22 +164,23 @@ AST_Node *parse_var_assign(Parser *parser) {
 }
 
 AST_Node *parse_var_mut(Parser *parser, ExprParsingType pt) {
-	char *id = (parser->cur_token++)->data;
-	Symbol *s = parser_st_get(parser, id);
-	parser->cur_token++;
-
+	AST_Node *exp = parse_expr(parser, pt, NULL);
 	AST_Node *vmn = ast_new({
 		.kind = AST_VAR_MUT,
-		.var_mut.type = s->variable.type,
-		.var_mut.id = id,
-		.var_mut.exp = parse_expr(parser, pt, &s->variable.type),
+		.loc = exp->loc,
+		.var_mut.type = exp->exp_binary.type,
+		.var_mut.exp = exp,
 	});
 
 	return vmn;
 }
 
 AST_Node *parse_func_return(Parser *parser, AST_Node *func) {
-	AST_Node *ret = ast_new({.kind = AST_FUNC_RET});
+	AST_Node *ret = ast_new({
+		.kind = AST_FUNC_RET,
+		.loc = parser->cur_token->loc,
+	});
+
 	parser->cur_token++;
 	ret->func_ret.exp = parse_expr(parser, EXPR_PARSING_VAR, &func->func_def.type);
 	ret->func_ret.type = func->func_def.type;
@@ -175,7 +191,10 @@ AST_Node *parse_body(Parser *parser, AST_Node *func);
 
 AST_Node *parse_if_stmt(Parser *parser, AST_Node *func) {
 	parser->cur_token++;
-	AST_Node *r = ast_new({.kind = AST_IF_STMT});
+	AST_Node *r = ast_new({
+		.kind = AST_IF_STMT,
+		.loc = (parser->cur_token-1)->loc,
+	});
 
 	r->stmt_if.exp = parse_expr(parser, EXPR_PARSING_STMT, NULL);
 	parser->cur_token++;
@@ -198,7 +217,10 @@ AST_Node *parse_while_stmt(Parser *parser, AST_Node *func) {
 AST_Node *parse_for_stmt(Parser *parser, AST_Node *func) {
 	parser->cur_token++;
 
-	AST_Node *r = ast_new({.kind = AST_FOR_STMT});
+	AST_Node *r = ast_new({
+		.kind = AST_FOR_STMT,
+		.loc = (parser->cur_token-1)->loc,
+	});
 
 	if ((parser->cur_token+1)->type == TOK_COL)
 		r->stmt_for.var = parse_var_def(parser);
@@ -222,46 +244,33 @@ AST_Node *parse_body(Parser *parser, AST_Node *func) {
 
 	while (true) {
 		switch (parser->cur_token->type) {
-			case TOK_OBRA:
+			case TOK_OBRA: {
 				br_cnt++;
-				break;
+			} break;
 
-			case TOK_CBRA:
+			case TOK_CBRA: {
 				br_cnt--;
 				if (br_cnt == 0)
 					goto ex;
-				break;
+			} break;
 
-			case TOK_ID:
+			case TOK_ID: {
 				if ((parser->cur_token+1)->type == TOK_COL)
 					da_append(&body->body.stmts, parse_var_def(parser));
-				else if ((parser->cur_token+1)->type == TOK_EQ)
-					da_append(&body->body.stmts, parse_var_mut(parser, EXPR_PARSING_VAR));
+				//else if ((parser->cur_token+1)->type == TOK_EQ)
+					
 				else if ((parser->cur_token+1)->type == TOK_ASSIGN)
 					da_append(&body->body.stmts, parse_var_assign(parser));
 				else if ((parser->cur_token+1)->type == TOK_OPAR)
 					da_append(&body->body.stmts, parse_func_call(parser));
-				break;
+				else da_append(&body->body.stmts, parse_var_mut(parser, EXPR_PARSING_VAR));
+			} break;
 
-			case TOK_IF_SYM:
-				da_append(&body->body.stmts, parse_if_stmt(parser, func));
-				break;
-
-			case TOK_WHILE_SYM:
-				da_append(&body->body.stmts, parse_while_stmt(parser, func));
-				break;
-
-			case TOK_FOR_SYM:
-				da_append(&body->body.stmts, parse_for_stmt(parser, func));
-				break;
-
-			case TOK_RET:
-				da_append(&body->body.stmts, parse_func_return(parser, func));
-				break;
-
-			default:
-				/* TODO: error handling */
-				break;
+			case TOK_IF_SYM:    da_append(&body->body.stmts, parse_if_stmt(parser, func)); break;
+			case TOK_WHILE_SYM: da_append(&body->body.stmts, parse_while_stmt(parser, func)); break;
+			case TOK_FOR_SYM:   da_append(&body->body.stmts, parse_for_stmt(parser, func));break;
+			case TOK_RET:       da_append(&body->body.stmts, parse_func_return(parser, func)); break;
+			default:            da_append(&body->body.stmts, parse_var_mut(parser, EXPR_PARSING_VAR)); break;
 		}
 
 		parser->cur_token++;
@@ -277,6 +286,7 @@ AST_Node *parse_function(Parser *parser) {
 	expect_token(parser->cur_token, TOK_ID);
 	AST_Node *fdn = ast_new({
 		.kind = AST_FUNC_DEF,
+		.loc = parser->cur_token->loc,
 		.func_def.id = parser->cur_token->data
 	});
 

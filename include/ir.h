@@ -15,6 +15,7 @@ typedef enum {
 	OP_OR, OP_AND, OP_EQ, OP_NOT_EQ,
 	OP_LESS, OP_GREAT, OP_LESS_EQ,
 	OP_GREAT_EQ, OP_CAST, OP_NOT,
+	OP_REF, OP_DEREF,
 
 	OP_LABEL,
 	OP_JUMP, OP_JUMP_IF_NOT,
@@ -48,7 +49,8 @@ typedef struct {
 		} func_inp;
 		struct {
 			Type type;
-			size_t index;
+			bool is_mem_addr;
+			int64_t index;
 		} var;
 	};
 } Operand;

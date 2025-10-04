@@ -1,34 +1,38 @@
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <threads.h>
 
 #include "../include/ir.h"
 #include "../include/parser.h"
 
-size_t var_index = 0, label_index;
+int64_t var_index = 0;
+size_t label_index = 0;
 
 typedef struct {
 	char *name;
 	Type type;
-	size_t index;
-} Var;
+	bool is_mem_addr;
+	int64_t index;
+} Variable;
 
-da(Var) vt = {0};
+da(Variable) vt = {0};
 
-void vt_add(Var var) {
+void vt_add(Variable var) {
 	da_append(&vt, var);
 }
 
-Var vt_get(char *name) {
+Variable vt_get(char *name) {
 	for (int i = vt.count - 1; i >= 0; i--) {
-		Var cv = da_get(&vt, i);
+		Variable cv = da_get(&vt, i);
 		if (strcmp(cv.name, name) == 0) {
 			return cv;
 		}
 	}
 
-	return (Var) {0};
+	return (Variable) {0};
 }
 
 void vt_set(char *name, size_t index) {
@@ -39,98 +43,13 @@ void vt_set(char *name, size_t index) {
 	}
 }
 
-Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
-	*ret = true;
-	if (l.type == OPR_LITERAL && r.type == OPR_LITERAL && en->kind == AST_BIN_EXP) {
-		if (l.literal.type.kind == r.literal.type.kind) {
-			switch (l.literal.type.kind) {
-				case TYPE_INT: {
-					int32_t lv = (int32_t) l.literal.lint;
-					int32_t rv = (int32_t) r.literal.lint;
-					int32_t res;
-
-					switch (en->exp_binary.op) {
-						case AST_OP_ADD:  res = lv + rv; break;
-						case AST_OP_SUB: res = lv - rv; break;
-						case AST_OP_MUL:  res = lv * rv; break;
-						case AST_OP_DIV: res = lv / rv; break;
-						default: *ret = false; return (Operand) {};
-					}
-
-					return (Operand) {
-						.type = OPR_LITERAL,
-						.literal.kind = LIT_INT,
-						.literal.lint = res,
-						.literal.type = (Type) {
-							.kind = TYPE_INT,
-							.size = 4,
-						},
-					};
-				} break;
-
-				case TYPE_I64: {
-					int64_t lv = l.literal.lint;
-					int64_t rv = r.literal.lint;
-					int64_t res;
-
-					switch (en->exp_binary.op) {
-						case AST_OP_ADD:  res = lv + rv; break;
-						case AST_OP_SUB: res = lv - rv; break;
-						case AST_OP_MUL:  res = lv * rv; break;
-						case AST_OP_DIV: res = lv / rv; break;
-						default: *ret = false; return (Operand) {};
-					}
-
-					return (Operand) {
-						.type = OPR_LITERAL,
-						.literal.kind = LIT_INT,
-						.literal.lint = res,
-						.literal.type = (Type) {
-							.kind = TYPE_I64,
-							.size = 8,
-						},
-					};
-				} break;
-
-				case TYPE_I8: {
-					int8_t lv = (int8_t) l.literal.lint;
-					int8_t rv = (int8_t) r.literal.lint;
-					int8_t res;
-
-					switch (en->exp_binary.op) {
-						case AST_OP_ADD:  res = lv + rv; break;
-						case AST_OP_SUB: res = lv - rv; break;
-						case AST_OP_MUL:  res = lv * rv; break;
-						case AST_OP_DIV: res = lv / rv; break;
-						default: *ret = false; return (Operand) {};
-					}
-
-					return (Operand) {
-						.type = OPR_LITERAL,
-						.literal.kind = LIT_INT,
-						.literal.lint = res,
-						.literal.type = (Type) {
-							.kind = TYPE_I8,
-							.size = 1,
-						},
-					};
-				} break;
-
-				default: unreachable;
-			}
-		}
-	}
-
-	*ret = false;
-	return (Operand) {0};
-}
-
 void ir_gen_func_call(Func *func, AST_Node *cn);
 
-Operand ir_gen_expr(Func *func, AST_Node *en, int64_t *last_var) {
+int64_t last_var;
+Operand ir_gen_expr(Func *func, AST_Node *en) {
 	switch (en->kind) {
 		case AST_LITERAL: {
-			if (last_var) *last_var = -1;
+			last_var = -1;
 			return (Operand) {
 				.type = OPR_LITERAL,
 				.literal = en->literal,
@@ -138,8 +57,8 @@ Operand ir_gen_expr(Func *func, AST_Node *en, int64_t *last_var) {
 		};
 
 		case AST_VAR: {
-			Var v = vt_get(en->var_id);
-			if (last_var) *last_var = -1;
+			Variable v = vt_get(en->var_id);
+			last_var = -1;
 			return (Operand) {
 				.type = OPR_VAR,
 				.var.type = v.type,
@@ -165,18 +84,18 @@ Operand ir_gen_expr(Func *func, AST_Node *en, int64_t *last_var) {
 				},
 			};
 
-			if (last_var) *last_var = inst.dst.var.index;
+			last_var = inst.dst.var.index;
 			da_append(&func->body, inst);
 			return inst.dst;
 		} break;
 
 		case AST_BIN_EXP: {
-			Operand l = ir_gen_expr(func, en->exp_binary.l, last_var);
-			Operand r = ir_gen_expr(func, en->exp_binary.r, last_var);
+			Operand l = ir_gen_expr(func, en->exp_binary.l);
+			Operand r = ir_gen_expr(func, en->exp_binary.r);
 
-			bool ret;
-			Operand calc = ir_opr_calc(en, l, r, &ret);
-			if (ret) return calc;
+			//bool ret;
+			//Operand calc = ir_opr_calc(en, l, r, &ret);
+			//if (ret) return calc;
 
 			Instruction inst = {
 				.arg1 = l,
@@ -204,14 +123,25 @@ Operand ir_gen_expr(Func *func, AST_Node *en, int64_t *last_var) {
 				default:              assert(!"unreachable");
 			}
 
-			if (last_var) *last_var = inst.dst.var.index;
+			last_var = inst.dst.var.index;
 			da_append(&func->body, inst);
 			return inst.dst;
 		} break;
 
 		case AST_UN_EXP: {
+			if (en->exp_unary.op == AST_OP_DEREF) {
+				Operand arg1 = ir_gen_expr(func, en->exp_unary.v);
+				last_var = -1;
+				return (Operand) {
+					.type = OPR_VAR,
+					.var.type = en->exp_unary.type,
+					.var.is_mem_addr = true,
+					.var.index = arg1.var.index,
+				};
+			}
+
 			Instruction inst = {
-				.arg1 = ir_gen_expr(func, en->exp_unary.v, last_var),
+				.arg1 = ir_gen_expr(func, en->exp_unary.v),
 				.dst = (Operand){
 					.type = OPR_VAR,
 					.var.type = en->exp_unary.type,
@@ -220,13 +150,14 @@ Operand ir_gen_expr(Func *func, AST_Node *en, int64_t *last_var) {
 			};
 
 			switch (en->exp_unary.op) {
-				case AST_OP_CAST: inst.op = OP_CAST; break;
-				case AST_OP_NOT:  inst.op = OP_NOT;  break;
-				case AST_OP_NEG:  inst.op = OP_NEG;  break;
+				case AST_OP_CAST:  inst.op = OP_CAST;  break;
+				case AST_OP_NOT:   inst.op = OP_NOT;   break;
+				case AST_OP_NEG:   inst.op = OP_NEG;   break;
+				case AST_OP_REF:   inst.op = OP_REF;   break;
 				default: unreachable;
 			}
 
-			if (last_var) *last_var = inst.dst.var.index;
+			last_var = inst.dst.var.index;
 			da_append(&func->body, inst);
 			return inst.dst;
 		} break;
@@ -240,8 +171,7 @@ Operand ir_gen_expr(Func *func, AST_Node *en, int64_t *last_var) {
 void ir_dump_opr(Operand opr, char *buf);
 
 void ir_gen_var_def(Func *func, AST_Node *cn) {
-	int64_t last_var;
-	Operand res = ir_gen_expr(func, cn->var_def.exp, &last_var);
+	Operand res = ir_gen_expr(func, cn->var_def.exp);
 	if (last_var == -1) {
 		da_append(&func->body, ((Instruction){
 			.op = OP_ASSIGN,
@@ -253,13 +183,13 @@ void ir_gen_var_def(Func *func, AST_Node *cn) {
 			},
 		}));
 
-		vt_add((Var){
+		vt_add((Variable){
 			.name = cn->var_def.id,
 			.type = cn->var_def.type,
 			.index = var_index++,
 		});
 	} else {
-		vt_add((Var){
+		vt_add((Variable){
 			.name = cn->var_def.id,
 			.type = cn->var_def.type,
 			.index = last_var,
@@ -267,9 +197,9 @@ void ir_gen_var_def(Func *func, AST_Node *cn) {
 	}
 }
 
-void ir_gen_var_mut(Func *func, AST_Node *cn) {
-	Var v = vt_get(cn->var_mut.id);
-	Operand res = ir_gen_expr(func, cn->var_mut.exp, NULL);
+void ir_gen_var_mut_old(Func *func, AST_Node *cn) {
+	Variable v = vt_get(cn->var_mut.id);
+	Operand res = ir_gen_expr(func, cn->var_mut.exp);
 	da_append(&func->body, ((Instruction){
 		.op = OP_ASSIGN,
 		.arg1 = res,
@@ -279,6 +209,34 @@ void ir_gen_var_mut(Func *func, AST_Node *cn) {
 			.var.index = v.index,
 		},
 	}));
+}
+
+void ir_gen_var_mut(Func *func, AST_Node *cn) {
+	bool is_ptr_assign = false;
+	if (cn->kind == AST_UN_EXP) is_ptr_assign = true;
+	else if (cn->exp_binary.op != AST_OP_VAR_EQ) is_ptr_assign = true;
+
+	if (!is_ptr_assign) {
+		Variable v = vt_get(cn->var_mut.exp->exp_binary.l->var_id);
+		Operand res = ir_gen_expr(func, cn->var_mut.exp);
+		da_append(&func->body, ((Instruction){
+			.op = OP_ASSIGN,
+			.arg1 = res,
+			.dst = (Operand) {
+				.type = OPR_VAR,
+				.var.type = cn->var_mut.type,
+				.var.index = v.index,
+			},
+		}));
+	} else {
+		Operand dst = ir_gen_expr(func, cn->var_mut.exp->exp_binary.l);
+		Operand res = ir_gen_expr(func, cn->var_mut.exp->exp_binary.r);
+		da_append(&func->body, ((Instruction){
+			.op = OP_ASSIGN,
+			.arg1 = res,
+			.dst = dst,
+		}));
+	}
 }
 
 void ir_gen_func_call(Func *func, AST_Node *cn) {
@@ -293,7 +251,7 @@ void ir_gen_func_call(Func *func, AST_Node *cn) {
 	assert(cn->func_call.args.count < 7);
 	for (size_t i = 0; i < cn->func_call.args.count; i++) {
 		AST_Node *arg = da_get(&cn->func_call.args, i);
-		func_call.args[i] = ir_gen_expr(func, arg, NULL);
+		func_call.args[i] = ir_gen_expr(func, arg);
 	}
 
 	func_call.args[cn->func_call.args.count] = (Operand) {.type = OPR_NULL};
@@ -304,16 +262,11 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 	for (size_t i = 0; i < fn->body.stmts.count; i++) {
 		AST_Node *cn = da_get(&fn->body.stmts, i);
 		switch (cn->kind) {
-			case AST_VAR_DEF:
-				ir_gen_var_def(func, cn);
-				break;
-
-			case AST_FUNC_CALL:
-				ir_gen_func_call(func, cn);
-				break;
+			case AST_VAR_DEF: ir_gen_var_def(func, cn); break;
+			case AST_FUNC_CALL: ir_gen_func_call(func, cn); break;
 
 			case AST_FUNC_RET: {
-				Operand res = ir_gen_expr(func, cn->func_ret.exp, NULL);
+				Operand res = ir_gen_expr(func, cn->func_ret.exp);
 				switch (res.type) {
 					case OPR_LITERAL: {
 						da_append(&func->body, ((Instruction){
@@ -343,7 +296,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 
 
 			case AST_IF_STMT: {
-				Operand res = ir_gen_expr(func, cn->stmt_if.exp, NULL);
+				Operand res = ir_gen_expr(func, cn->stmt_if.exp);
 				size_t lbl = label_index++;
 
 				da_append(&func->body, ((Instruction){
@@ -377,7 +330,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 					},
 				}));
 
-				Operand res = ir_gen_expr(func, cn->stmt_while.exp, NULL);
+				Operand res = ir_gen_expr(func, cn->stmt_while.exp);
 
 				size_t lbl_ex = label_index++;
 
@@ -426,7 +379,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 					},
 				}));
 
-				Operand res = ir_gen_expr(func, cn->stmt_for.exp, NULL);
+				Operand res = ir_gen_expr(func, cn->stmt_for.exp);
 
 				size_t lbl_ex = label_index++;
 
@@ -483,7 +436,7 @@ void ir_gen_func(Program *prog, AST_Node *fn) {
 				.var.index = var_index,
 			},
 		}));
-		vt_add((Var) {
+		vt_add((Variable) {
 			.type = cn->func_def_arg.type,
 			.index = var_index++,
 			.name = cn->func_def_arg.id,

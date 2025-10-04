@@ -24,7 +24,7 @@ typedef struct {
 
 typedef struct {
 	TokenType type;
-	Location location;
+	Location loc;
 	char *data;
 } Token;
 

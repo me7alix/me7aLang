@@ -28,7 +28,7 @@ void add_token(Lexer *lexer, TokenType type, char *data) {
 	da_append(&lexer->tokens, ((Token) {
 		.type = type,
 		.data = data,
-		.location = lexer->cur_loc,
+		.loc = lexer->cur_loc,
 	}));
 }
 
@@ -57,10 +57,8 @@ void lexer_error(Location loc, char *error) {
 	while (*loc.line_char != '\n' && *loc.line_char != '\0'){
 		printf("%c", *loc.line_char);
 		if (cnt < chars_num - 1) {
-			if (*loc.line_char != '\t')
-				error_pointer[cnt++] = ' ';
-			else
-				error_pointer[cnt++] = '\t';
+			if (*loc.line_char != '\t') error_pointer[cnt++] = ' ';
+			else                        error_pointer[cnt++] = '\t';
 		}
 		loc.line_char++;
 	}
@@ -79,16 +77,17 @@ void lexer_lex(Lexer *lexer, char *code) {
 		lexer->cur_loc.line_char = lexer->cur_char;
 		switch (*lexer->cur_char) {
 			case ' ': case '\t': break;
-			case '{': add_token(lexer, TOK_OBRA, "{"); break;
-			case '}': add_token(lexer, TOK_CBRA, "}"); break;
-			case '(': add_token(lexer, TOK_OPAR, "("); break;
-			case ')': add_token(lexer, TOK_CPAR, ")"); break;
-			case '+': add_token(lexer, TOK_PLUS, "+"); break;
+			case '{': add_token(lexer, TOK_OBRA,  "{"); break;
+			case '}': add_token(lexer, TOK_CBRA,  "}"); break;
+			case '(': add_token(lexer, TOK_OPAR,  "("); break;
+			case ')': add_token(lexer, TOK_CPAR,  ")"); break;
+			case '+': add_token(lexer, TOK_PLUS,  "+"); break;
 			case '-': add_token(lexer, TOK_MINUS, "-"); break;
-			case '*': add_token(lexer, TOK_STAR, "*"); break;
-			case ';': add_token(lexer, TOK_SEMI, ";"); break;
-			case '.': add_token(lexer, TOK_DOT, "."); break;
-			case ',': add_token(lexer, TOK_COM, ","); break;
+			case '*': add_token(lexer, TOK_STAR,  "*"); break;
+			case ';': add_token(lexer, TOK_SEMI,  ";"); break;
+			case '.': add_token(lexer, TOK_DOT,   "."); break;
+			case ',': add_token(lexer, TOK_COM,   ","); break;
+			case '[': add_token(lexer, TOK_COM,   ","); break;
 
 			case '!': {
 				if (lexer->cur_char[1] == '=') {

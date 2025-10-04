@@ -91,6 +91,7 @@ typedef enum {
 	AST_OP_CAST,
 	AST_OP_REF,
 	AST_OP_DEREF,
+	AST_OP_VAR_EQ,
 } AST_ExprOp;
 
 typedef enum {
@@ -109,6 +110,7 @@ typedef da(AST_Node*) AST_Nodes;
 
 struct AST_Node {
 	AST_NodeKind kind;
+	Location loc;
 
 	union {
 		struct {

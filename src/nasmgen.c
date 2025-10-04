@@ -15,10 +15,10 @@
 void ir_dump_opr(Operand opr, char *buf);
 void ir_dump_inst(Instruction inst, char *res);
 
-static char *argreg8[] = {"dil", "sil", "dl", "cl", "r8b", "r9b"};
-static char *argreg16[] = {"di", "si", "dx", "cx", "r8w", "r9w"};
+static char *argreg8[]  = {"dil", "sil", "dl",  "cl",  "r8b", "r9b"};
+static char *argreg16[] = {"di",  "si",  "dx",  "cx",  "r8w", "r9w"};
 static char *argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
-static char *argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+static char *argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8",  "r9" };
 
 da(struct {
 	size_t index;
@@ -41,6 +41,7 @@ size_t total_offset = 0;
 
 void type_to_stack(Type type, char *buf) {
 	switch (type.kind) {
+		case TYPE_POINTER:
 		case TYPE_I64: sprintf(buf, "qword"); break;
 		case TYPE_INT:
 		case TYPE_I32: sprintf(buf, "dword"); break;
@@ -59,9 +60,18 @@ char *opr_to_nasm(Operand opr) {
 		} break;
 
 		case OPR_VAR: {
-			size_t off = iot_get(opr.var.index); assert(off);
 			char ts[32]; type_to_stack(opr.var.type, ts);
-			sprintf(opr_to_nasm_buf, "%s [rbp - %zu]", ts, off);
+
+			if (!opr.var.is_mem_addr) {
+				size_t off = iot_get(opr.var.index); assert(off != -1);
+				sprintf(opr_to_nasm_buf, "%s [rbp - %zu]", ts, off);
+			} else {
+				printf("here we are\n");
+				size_t off = iot_get(opr.var.index); assert(off != -1);
+				sb_append_strf(&body, TAB"mov rdx, qword [rbp - %zu]\n", off);
+				// type_to_stack(opr.var.type, ts); // (Type) {.kind = TYPE_POINTER, .size = 8}
+				sprintf(opr_to_nasm_buf, "%s [rdx]", ts);
+			}
 		} break;
 
 		case OPR_LITERAL: {
@@ -70,6 +80,7 @@ char *opr_to_nasm(Operand opr) {
 				case TYPE_FLOAT: sprintf(opr_to_nasm_buf, "%f", (float) opr.literal.lfloat); break;
 				case TYPE_BOOL:
 				case TYPE_I8:    sprintf(opr_to_nasm_buf, "%d", (int8_t) opr.literal.lint); break;
+				case TYPE_POINTER:
 				case TYPE_I64:   sprintf(opr_to_nasm_buf, "%li", opr.literal.lint); break;
 				default: unreachable;
 			}
@@ -81,6 +92,7 @@ char *opr_to_nasm(Operand opr) {
 				case TYPE_FLOAT: unreachable;
 				case TYPE_BOOL:
 				case TYPE_I8:    sprintf(opr_to_nasm_buf, "al"); break;
+				case TYPE_POINTER:
 				case TYPE_I64:   sprintf(opr_to_nasm_buf, "rax"); break;
 				default: unreachable;
 			}
@@ -110,7 +122,7 @@ void type_to_reg(Type type, char *arg1, char *arg2) {
 			sprintf(arg2, "bl");
 			break;
 
-		case TYPE_I64:
+		case TYPE_I64: case TYPE_POINTER:
 			sprintf(arg1, "rax");
 			sprintf(arg2, "rcx");
 			break;
@@ -154,11 +166,12 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 		char arg1[64], arg2[64], dst[64];
 		Instruction ci = da_get(&func.body, i);
 
-		/*{ // log information
+		{ // debug information
 			char res[256];
 			ir_dump_inst(ci, res);
+			printf("%s\n", res);
 			sb_append_strf(&body, ";%s\n", res);
-		}*/
+		}
 
 		switch (ci.op) {
 			case OP_ADD: case OP_SUB:
@@ -265,22 +278,42 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 				} else if (dst_type.kind == TYPE_INT && arg1_type.kind == TYPE_I8) {
 					sb_append_strf(&body, TAB"movsx eax, %s\n", opr_to_nasm(ci.arg1));
 					sb_append_strf(&body, TAB"mov %s, eax\n", opr_to_nasm(ci.dst));
+				} else if (dst_type.kind == TYPE_I64 && arg1_type.kind == TYPE_INT) {
+					sb_append_strf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
+					sb_append_strf(&body, TAB"movsxd rax, eax\n");
+					sb_append_strf(&body, TAB"mov %s, rax\n", opr_to_nasm(ci.dst));
+				} else if (dst_type.kind == TYPE_POINTER && arg1_type.kind == TYPE_INT) {
+					sb_append_strf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
+					sb_append_strf(&body, TAB"movsxd rax, eax\n", opr_to_nasm(ci.dst));
+					sb_append_strf(&body, TAB"mov %s, rax\n", opr_to_nasm(ci.dst));
+				} else if (dst_type.kind == TYPE_INT && arg1_type.kind == TYPE_I64) {
+					sb_append_strf(&body, TAB"mov rax, %s\n", opr_to_nasm(ci.arg1));
+					sb_append_strf(&body, TAB"mov eax, eax\n");
+					sb_append_strf(&body, TAB"movsx rax, eax\n");
+					sb_append_strf(&body, TAB"mov %s, eax\n", opr_to_nasm(ci.dst));
 				} else {
 					assert(!"unreachable");
 				}
 			} break;
 
 			case OP_ASSIGN: {
-				char ts[32]; type_to_stack(ci.dst.var.type, ts);
-				size_t off = iot_get(ci.dst.var.index);
-				if (!off) {
-					total_offset += ci.dst.var.type.size;
-					off = total_offset;
-					iot_add(ci.dst.var.index, off);
-				}
+				if (ci.dst.var.is_mem_addr) {
+					size_t off = iot_get(ci.dst.var.index); assert(off);
 
-				sprintf(dst, "%s [rbp - %zu]", ts, off);
-				reg_alloc(ci, arg1, arg2);
+					sprintf(dst, "%s", opr_to_nasm(ci.dst));
+					reg_alloc(ci, arg1, arg2);
+				} else {
+					size_t off = iot_get(ci.dst.var.index);
+
+					if (off == 0) {
+						total_offset += ci.dst.var.type.size;
+						off = total_offset;
+						iot_add(ci.dst.var.index, off);
+					}
+
+					sprintf(dst, "%s", opr_to_nasm(ci.dst));
+					reg_alloc(ci, arg1, arg2);
+				}
 
 				sb_append_strf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
 				sb_append_strf(&body, TAB"mov %s, %s\n", dst, arg1);
@@ -297,6 +330,11 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 
 			case OP_JUMP: {
 				sb_append_strf(&body, TAB"jmp %s\n", opr_to_nasm(ci.dst));
+			} break;
+
+			case OP_REF: {
+				sb_append_strf(&body, TAB"mov rdx, %s\n", opr_to_nasm(ci.arg1));
+				sb_append_strf(&body, TAB"mov rdx, %s\n", opr_to_nasm(ci.dst));
 			} break;
 
 			case OP_RETURN: {
@@ -325,6 +363,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 					}
 
 					switch (type.kind) {
+						case TYPE_POINTER:
 						case TYPE_I64:
 							sb_append_strf(&body, TAB"mov %s, %s\n", argreg64[i], opr_to_nasm(ci.args[i]));
 							break;

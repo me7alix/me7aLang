@@ -1,0 +1,20 @@
+extern print_int()
+extern malloc(): *int
+extern free()
+
+func main(): int {
+	int_size: i64 = 4
+	nums := malloc(int_size * 10:i64)
+
+	for i := 0; i < 10; i=i+1 {
+		*(nums + i:i64 * int_size) = i * i
+	}
+
+	for i := 0; i < 10; i=i+1 {
+		num := *(nums + i:i64 * int_size)
+		print_int(num)
+	}
+
+	free(nums)
+	return 0
+}
