@@ -26,7 +26,7 @@ func main(): int {
 	ball_x := GetRandomValue(100, SCREEN_WIDTH - 100)
 	ball_y := GetRandomValue(100, SCREEN_HEIGHT/2)
 	ball_dir_x := GetRandomValue(0, 1) * 2 - 1
-	ball_dir_y := 0-1
+	ball_dir_y := -1
 	
 	paddle_speed := 4
 	paddle_w := 100
@@ -46,11 +46,11 @@ func main(): int {
 		}
 
 		if ball_x < 0 || ball_x > SCREEN_WIDTH - ball_r * 2 {
-			ball_dir_x = 0 - ball_dir_x
+			ball_dir_x = -ball_dir_x
 		}
 
 		if ball_y < 0 {
-			ball_dir_y = 0 - ball_dir_y
+			ball_dir_y = -ball_dir_y
 		}
 
 		if IsKeyDown(KEY_D) && paddle_x < SCREEN_WIDTH - paddle_w {
