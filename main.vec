@@ -1,4 +1,0 @@
-func main() {
-	num: i32 = 32 - 5 * 2
-	printf("%i\n", num)
-}

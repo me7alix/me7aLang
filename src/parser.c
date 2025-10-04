@@ -8,12 +8,22 @@
 #include "../include/parser.h"
 #include "../src/parser_expr.c"
 
-Symbol st_get(SymbolTable st, char *id) {
-	return *((Symbol*) hm_get(st.hm, hm_strhash(id)));
+bool check_nested(int pn[16], int n[16]) {
+	for (size_t i = 0; n[i] != 0; i++) {
+		if (pn[i] != n[i]) return false;
+	}
+
+	return true;
 }
 
-void st_add(SymbolTable st, char *id, Symbol s) {
-	hm_put(st.hm, hm_strhash(id), hm_struct_dup(&s, sizeof s));
+Symbol *st_get(SymbolTable *st, int nested[16], const char *id) {
+	for (size_t i = st->count - 1; i >= 0; i--) {
+		if (strcmp(da_get(st, i).id, id) == 0 && check_nested(da_get(st, i).nested, nested)) {
+			return &da_get(st, i);
+		}
+	}
+
+	return NULL;
 }
 
 AST_Node *ast_alloc(AST_Node node) {
@@ -86,8 +96,11 @@ void parse_function(Parser *parser) {
 	expect_token(parser->cur_token+1, TOK_LBRA);
 	int br_cnt = 0;
 
+	AST_Node *func_def = ast_alloc((AST_Node){0});
+	func_def->type = AST_FUNC_DEF;
+
 	while (true) {
-		switch (parser->cur_token->type) {
+		switch (parser->cur_token->type++) {
 			case TOK_LBRA:
 				br_cnt++;
 				break;
@@ -99,16 +112,25 @@ void parse_function(Parser *parser) {
 				break;
 
 			case TOK_ID:
-				// func main(x: i32, y: i32)
 				expect_token(parser->cur_token+1, TOK_TYPE);
+				func_def->payload.func_def.args = ast_alloc((AST_Node){
+						.type = AST_FUNC_DEF_ARG,
+						.payload.func_def_arg.name = parser->cur_token->data,
+						.payload.func_def_arg.type = (parser->cur_token+1)->data,
+						});
 				break;
-
 
 			default:
 				// TODO: error handling
 				break;
 		}
 	}
+
+	da_append(&parser->st, ((Symbol){
+			.type = SBL_FUNC_DEF,
+			.id = func_def->payload.func_def.name,
+			.payload.func_def.args = func_def->payload.func_def.args,
+			}));
 }
 
 void parser_parse(Parser *parser) {

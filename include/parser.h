@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <threads.h>
+#include <stdbool.h>
 
-#include "../thirdparty/hashmap.h"
+#include "../thirdparty/da.h"
 #include "../include/lexer.h"
 
 typedef enum {
@@ -14,14 +15,11 @@ typedef enum {
 
 typedef struct {
 	SymbolType type;
-	uint32_t nested[16];
-	size_t nested_cnt;
+	char *id;
+	int nested[16];
 	union {
 		struct {
-			struct {
-				char *name;
-				char *type;
-			} *args;
+			struct AST_Node *args;
 		} func_def;
 		struct {
 			char *type;
@@ -29,12 +27,9 @@ typedef struct {
 	} payload;
 } Symbol;
 
-typedef struct {
-	HashMap *hm;
-} SymbolTable;
+typedef da(Symbol) SymbolTable;
 
-//Symbol st_get(SymbolTable st, char *id);
-//void st_add(SymbolTable st, char *id, Symbol s);
+Symbol *st_get(SymbolTable *st, int nested[16], const char *id);
 
 typedef enum {
 	EXPR_PARSING_VAR, EXPR_PARSING_FUNC_CALL,
@@ -42,12 +37,12 @@ typedef enum {
 
 typedef enum {
 	AST_IF_STMT, AST_BIN_EXP, AST_UN_EXP,
-	AST_VARIABLE, AST_INT, AST_FUNC_ARG,
+	AST_VARIABLE, AST_INT, AST_FUNC_CALL_ARG,
 	AST_FUNC_CALL, AST_ID, AST_FLOAT,
 	AST_STRING, AST_TYPE, AST_OP_PLUS,
-	AST_FUNC_DEF, AST_FUNC_RET_TYPE,
-	AST_FOR_STMT, AST_FUNC_DEF_ARG,
-	AST_UN_OP, AST_BIN_OP,
+	AST_FUNC_DEF, AST_FUNC_DEF_ARG,
+	AST_FUNC_RET_TYPE, AST_FOR_STMT,
+	AST_UN_OP, AST_BIN_OP, AST_PROG,
 } AST_NodeType;
 
 typedef struct AST_Node {
@@ -59,12 +54,15 @@ typedef struct AST_Node {
 			char *name;
 			struct AST_Node *args;
 			struct AST_Node *block;
-		} function;
+		} func_def;
+		struct {
+			struct AST_Node *head;
+			struct AST_Node *tail;
+		} program;
 		struct {
 			char *name;
-			// args should be expressions
-			struct AST_Node *args;
-		} function_call;
+			struct AST_Node *args; // args should be expressions
+		} func_call;
 		struct {
 			struct AST_Node *head;
 			struct AST_Node *tail;
@@ -92,7 +90,7 @@ typedef struct AST_Node {
 		struct {
 			char *name;
 			char *type;
-		} function_def_arg;
+		} func_def_arg;
 		int64_t num_int;
 		double num_float;
 	} payload;
@@ -100,8 +98,10 @@ typedef struct AST_Node {
 
 typedef struct {
 	Token *cur_token;
-	AST_Node *tail;
-	AST_Node *head;
+	SymbolTable st;
+	int nested[16];
+	size_t nested_ptr;
+	AST_Node *program;
 } Parser;
 
 void parser_alloc();

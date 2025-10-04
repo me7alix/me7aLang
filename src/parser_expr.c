@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+
 #include "../include/parser.h"
 
 int64_t parse_int(char *data) {
@@ -30,7 +31,6 @@ float op_cost(char op, bool is_left) {
 }
 
 // TODO: add func call and variables supporting
-
 typedef struct ExprNode {
 	Token *tok;
 	struct ExprNode *l, *r;
@@ -138,7 +138,6 @@ ExprNode *parse_expression_r(ExprNode **head) {
 					expr->prev = NULL;
 				}
 
-
 				expr->next = cur_node->next;
 				if (cur_node->next != NULL) {
 					cur_node->next->prev = expr;
@@ -195,8 +194,6 @@ ExprNode *parse_expression_r(ExprNode **head) {
 	return parse_expression_r(head);
 }
 
-// sum (10 + 3, 8, a - c);
-
 AST_Node *parse_expression(Parser *parser, ExprParsingType type) {
 	ExprNode *cur_node = malloc(sizeof(ExprNode));
 	ExprNode *head = cur_node;
@@ -208,7 +205,7 @@ AST_Node *parse_expression(Parser *parser, ExprParsingType type) {
 		if (parser->cur_token->type == TOK_RBRA) br_cnt--;
 
 		if (type == EXPR_PARSING_FUNC_CALL) {
-			if (br_cnt == 0 && parser->cur_token->type == TOK_COM) break; // TODO: check if TOK_COM is ,
+			if (br_cnt == 0 && parser->cur_token->type == TOK_COM) break;
 			if (br_cnt == -1) break;
 		} else if (type == EXPR_PARSING_VAR) {
 			if (parser->cur_token->type == TOK_SEMI) break;
