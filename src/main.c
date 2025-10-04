@@ -127,32 +127,21 @@ int main(int argc, char **argv) {
 			input_file = argv[i];
 		}
 	}
-
+	char buf[512];
+	char output_file[256];
 	char *code = read_file(input_file);
 	if (code == NULL) {
 		perror("error while opening file\n");
 		return 1;
 	}
 
-	Lexer lexer = {0};
-	lexer_lex(&lexer, code);
-
-	Parser parser = {0};
-	parser_parse(&parser, lexer.tokens.items);
-
-	char buf[512];
-	char output_file[256];
-
+	Lexer lexer = lexer_lex(code);
+	Parser parser = parser_parse(lexer.tokens.items);
 	Program prog = ir_gen_prog(&parser);
-	if (save_ir_output) {
-		sprintf(buf, "%s.ir", output_bin);
-		ir_dump_prog(&prog, buf);
-	}
-
-	StringBuilder cg = nasm_gen_prog(&prog);
+	const char *cg = nasm_gen_prog(&prog);
 
 	sprintf(output_file, "%s.asm", output_bin);
-	write_to_file(output_file, sb_to_str(cg));
+	write_to_file(output_file, cg);
 
 	sprintf(buf, "nasm -f elf64 %s", output_file);
 	system(buf); printf("[INFO] %s\n", buf);
@@ -161,6 +150,10 @@ int main(int argc, char **argv) {
 	sprintf(buf, "rm %s.o", output_bin);
 	system(buf);  printf("[INFO] %s\n", buf);
 	if (!save_asm_output) { sprintf(buf, "rm %s", output_file); system(buf); }
+	if (save_ir_output) {
+		sprintf(buf, "%s.ir", output_bin);
+		ir_dump_prog(&prog, buf);
+	}
 
 	lexer_free(&lexer);
 	da_free(&prog.funcs);

@@ -66,7 +66,6 @@ char *opr_to_nasm(Operand opr) {
 				size_t off = iot_get(opr.var.index); assert(off != -1);
 				sprintf(opr_to_nasm_buf, "%s [rbp - %zu]", ts, off);
 			} else {
-				printf("here we are\n");
 				size_t off = iot_get(opr.var.index); assert(off != -1);
 				sb_append_strf(&body, TAB"mov rdx, qword [rbp - %zu]\n", off);
 				// type_to_stack(opr.var.type, ts); // (Type) {.kind = TYPE_POINTER, .size = 8}
@@ -104,6 +103,7 @@ char *opr_to_nasm(Operand opr) {
 				case TYPE_FLOAT: unreachable;
 				case TYPE_BOOL:
 				case TYPE_I8:    sprintf(opr_to_nasm_buf, "%s", argreg8[opr.func_inp.arg_ind]); break;
+				case TYPE_POINTER:
 				case TYPE_I64:   sprintf(opr_to_nasm_buf, "%s", argreg64[opr.func_inp.arg_ind]); break;
 				default: unreachable;
 			}
@@ -166,12 +166,12 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 		char arg1[64], arg2[64], dst[64];
 		Instruction ci = da_get(&func.body, i);
 
-		{ // debug information
+		/*{ // debug information
 			char res[256];
 			ir_dump_inst(ci, res);
 			printf("%s\n", res);
 			sb_append_strf(&body, ";%s\n", res);
-		}
+		}*/
 
 		switch (ci.op) {
 			case OP_ADD: case OP_SUB:
@@ -353,16 +353,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 
 			case OP_FUNC_CALL: {
 				for (size_t i = 0; ci.args[i].type != OPR_NULL; i++) {
-					Type type;
-					switch (ci.args[i].type) {
-						case OPR_LITERAL:  type = ci.args[i].literal.type;  break;
-						case OPR_VAR:      type = ci.args[i].var.type;      break;
-						case OPR_FUNC_RET: type = ci.args[i].func_ret.type; break;
-						case OPR_FUNC_INP: type = ci.args[i].func_inp.type; break;
-						default: unreachable;
-					}
-
-					switch (type.kind) {
+					switch (ir_get_opr_type(ci.args[i]).kind) {
 						case TYPE_POINTER:
 						case TYPE_I64:
 							sb_append_strf(&body, TAB"mov %s, %s\n", argreg64[i], opr_to_nasm(ci.args[i]));
@@ -376,7 +367,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 							sb_append_strf(&body, TAB"mov %s, %s\n", argreg8[i], opr_to_nasm(ci.args[i]));
 							break;
 
-						default: printf("%d\n", type.kind); unreachable;
+						default: unreachable;
 					}
 				}
 
@@ -404,7 +395,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 	sb_append_strf(code, "\n");
 }
 
-StringBuilder nasm_gen_prog(Program *prog) {
+const char *nasm_gen_prog(Program *prog) {
 	StringBuilder code = {0};
 
 	for (size_t i = 0; i < prog->externs.count; i++) {
@@ -418,5 +409,5 @@ StringBuilder nasm_gen_prog(Program *prog) {
 		nasm_gen_func(&code, da_get(&prog->funcs, i));
 	}
 
-	return code;
+	return sb_to_str(code);
 }

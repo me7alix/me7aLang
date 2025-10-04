@@ -3,18 +3,16 @@ extern malloc(): *int
 extern free()
 
 func main(): int {
-	int_size: i64 = 4
-	nums := malloc(int_size * 10:i64)
+	nums := malloc(40:i64)
 
-	for i := 0; i < 10; i=i+1 {
-		*(nums + i:i64 * int_size) = i * i
+	for i: i64 = 0; i < 10; i=i+1 {
+		*(nums + i) = (i * i):int
 	}
 
-	for i := 0; i < 10; i=i+1 {
-		num := *(nums + i:i64 * int_size)
-		print_int(num)
+	for i: i64 = 0; i < 10; i=i+1 {
+		print_int(*(nums + i))
 	}
-
+	
 	free(nums)
 	return 0
 }

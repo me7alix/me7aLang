@@ -11,27 +11,27 @@ bool tok_compare(Token a, Token b) {
 	if (a.type == b.type) {
 		if (a.type == TOK_STRING || a.type == TOK_INT ||
 			a.type == TOK_FLOAT || a.type == TOK_ID ||
-			a.type == TOK_CHAR || a.type == TOK_TYPE) {
-			if (strcmp(a.data, b.data))	{
+			a.type == TOK_CHAR || a.type == TOK_COL) {
+			if (strcmp(a.data, b.data)) {
 				return false;
 			}
 		}
+
 		return true;
 	}
+
 	return false;
 }
 
-
 bool test_lexer(char *code, Token *tokens, size_t tokens_num) {
-	Lexer lexer = {0};
-	lexer_lex(&lexer, code);
+	Lexer lexer = lexer_lex(code);
 
 	if (tokens_num != lexer.tokens.count) 
 		return false;
 
 	for (size_t i = 0; i < lexer.tokens.count; i++) {
 		if (!tok_compare(da_get(&lexer.tokens, i), tokens[i])) {
-			printf("error: %s | %s\n", tok_to_str(da_get(&lexer.tokens, i).type), tok_to_str(tokens[i].type));
+			printf("error");
 			return false;
 		}
 	}
@@ -57,7 +57,8 @@ int main() {
 		{ .type = TOK_CPAR },
 		{ .type = TOK_OBRA },
 		{ .type = TOK_ID, .data = "a" },
-		{ .type = TOK_TYPE, .data = "i32" },
+		{ .type = TOK_COL },
+		{ .type = TOK_ID, .data = "i32" },
 		{ .type = TOK_EQ },
 		{ .type = TOK_INT, .data = "10" },
 		{ .type = TOK_PLUS },
@@ -91,22 +92,20 @@ int main() {
 
 	run_test(test_code_2, test_tokens_2, ARR_LEN(test_tokens_2), 2);
 
-	char *test_code_3 = "if (a == b && c != true || 10 == 10)";
+	char *test_code_3 = "if a == b && c != true || 10 == 10";
 	Token test_tokens_3[] = {
 		{ .type = TOK_IF_SYM },
-		{ .type = TOK_OPAR },
 		{ .type = TOK_ID, .data = "a" },
 		{ .type = TOK_EQ_EQ },
 		{ .type = TOK_ID, .data = "b" },
 		{ .type = TOK_AND },
 		{ .type = TOK_ID, .data = "c" },
 		{ .type = TOK_NOT_EQ },
-		{ .type = TOK_ID, .data = "true" },
+		{ .type = TOK_TRUE },
 		{ .type = TOK_OR },
 		{ .type = TOK_INT, .data = "10" },
 		{ .type = TOK_EQ_EQ },
 		{ .type = TOK_INT, .data = "10" },
-		{ .type = TOK_CPAR },
 		{ .type = TOK_EOF },
 	};
 

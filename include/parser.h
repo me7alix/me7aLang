@@ -214,13 +214,13 @@ typedef struct {
 
 Type parse_type(Parser *parser);
 void parser_st_add(Parser *parser, Symbol smbl);
-Symbol *parser_st_get(Parser *parser, const char *id);
+Symbol *parser_st_get(Parser *parser, const char *id, Location loc);
 
 Symbol *st_get(SymbolTable *st, const char *id);
 void expect_token(Token *token, TokenType type);
 void unexpect_token(Token *token, TokenType type);
 void parser_alloc();
-void parser_parse(Parser *parser, Token *tokens);
+Parser parser_parse(Token *tokens);
 void parser_free(Parser parser);
 void expect_token(Token *token, TokenType type);
 AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart);

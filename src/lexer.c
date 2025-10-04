@@ -70,223 +70,188 @@ void lexer_error(Location loc, char *error) {
 	exit(1);
 }
 
-void lexer_lex(Lexer *lexer, char *code) {
-	lexer->cur_char = code;
+Lexer lexer_lex(char *code) {
+	Lexer lexer = {0};
+	lexer.cur_char = code;
 
-	while (*lexer->cur_char != '\0') {
-		lexer->cur_loc.line_char = lexer->cur_char;
-		switch (*lexer->cur_char) {
+	while (*lexer.cur_char != '\0') {
+		lexer.cur_loc.line_char = lexer.cur_char;
+		switch (*lexer.cur_char) {
 			case ' ': case '\t': break;
-			case '{': add_token(lexer, TOK_OBRA,  "{"); break;
-			case '}': add_token(lexer, TOK_CBRA,  "}"); break;
-			case '(': add_token(lexer, TOK_OPAR,  "("); break;
-			case ')': add_token(lexer, TOK_CPAR,  ")"); break;
-			case '+': add_token(lexer, TOK_PLUS,  "+"); break;
-			case '-': add_token(lexer, TOK_MINUS, "-"); break;
-			case '*': add_token(lexer, TOK_STAR,  "*"); break;
-			case ';': add_token(lexer, TOK_SEMI,  ";"); break;
-			case '.': add_token(lexer, TOK_DOT,   "."); break;
-			case ',': add_token(lexer, TOK_COM,   ","); break;
-			case '[': add_token(lexer, TOK_COM,   ","); break;
+			case '{': add_token(&lexer, TOK_OBRA,  "{"); break;
+			case '}': add_token(&lexer, TOK_CBRA,  "}"); break;
+			case '(': add_token(&lexer, TOK_OPAR,  "("); break;
+			case ')': add_token(&lexer, TOK_CPAR,  ")"); break;
+			case '+': add_token(&lexer, TOK_PLUS,  "+"); break;
+			case '-': add_token(&lexer, TOK_MINUS, "-"); break;
+			case '*': add_token(&lexer, TOK_STAR,  "*"); break;
+			case ';': add_token(&lexer, TOK_SEMI,  ";"); break;
+			case '.': add_token(&lexer, TOK_DOT,   "."); break;
+			case ',': add_token(&lexer, TOK_COM,   ","); break;
+			//case '[': add_token(&lexer, TOK_OT,   ","); break;
+			//case ']': add_token(&lexer, TOK_OT,   ","); break;
 
 			case '!': {
-				if (lexer->cur_char[1] == '=') {
-					add_token(lexer, TOK_NOT_EQ, "!=");
-					lexer->cur_char++;
+				if (lexer.cur_char[1] == '=') {
+					add_token(&lexer, TOK_NOT_EQ, "!=");
+					lexer.cur_char++;
 				} else {
-					add_token(lexer, TOK_EXC, "!"); 
+					add_token(&lexer, TOK_EXC, "!"); 
 				}
 			} break;
 
 			case '&': {
-				if (lexer->cur_char[1] == '&') {
-					add_token(lexer, TOK_AND, "&&"); 
-					lexer->cur_char++;
+				if (lexer.cur_char[1] == '&') {
+					add_token(&lexer, TOK_AND, "&&"); 
+					lexer.cur_char++;
 				} else {
-					add_token(lexer, TOK_AMP, "&"); 
+					add_token(&lexer, TOK_AMP, "&"); 
 				}
 			} break;
 
 			case '|': {
-				if (lexer->cur_char[1] == '|') {
-					add_token(lexer, TOK_OR, "||");
-					lexer->cur_char++;
+				if (lexer.cur_char[1] == '|') {
+					add_token(&lexer, TOK_OR, "||");
+					lexer.cur_char++;
 				} else {
-					add_token(lexer, TOK_PIPE, "|");
+					add_token(&lexer, TOK_PIPE, "|");
 				}
 			} break;
 
 			case '>': {
-				if (lexer->cur_char[1] == '=') {
-					add_token(lexer, TOK_GREAT_EQ, ">=");
-					lexer->cur_char++;
+				if (lexer.cur_char[1] == '=') {
+					add_token(&lexer, TOK_GREAT_EQ, ">=");
+					lexer.cur_char++;
 				} else {
-					add_token(lexer, TOK_GREAT, ">");
+					add_token(&lexer, TOK_GREAT, ">");
 				}
 			} break;
 
 			case '<': {
-				if (lexer->cur_char[1] == '=') {
-					add_token(lexer, TOK_LESS_EQ, "<=");
-					lexer->cur_char++;
+				if (lexer.cur_char[1] == '=') {
+					add_token(&lexer, TOK_LESS_EQ, "<=");
+					lexer.cur_char++;
 				} else {
-					add_token(lexer, TOK_LESS, "<");
+					add_token(&lexer, TOK_LESS, "<");
 				}
 			} break;
 
 			case '=': {
-				if (lexer->cur_char[1] == '=') {
-					add_token(lexer, TOK_EQ_EQ, "==");
-					lexer->cur_char++;
+				if (lexer.cur_char[1] == '=') {
+					add_token(&lexer, TOK_EQ_EQ, "==");
+					lexer.cur_char++;
 				} else {
-					add_token(lexer, TOK_EQ, "=");
+					add_token(&lexer, TOK_EQ, "=");
 				}
 			} break;
 
 			case '\n':
-				if (da_last(&lexer->tokens).type != TOK_SEMI &&
-					da_last(&lexer->tokens).type != TOK_CBRA &&
-					da_last(&lexer->tokens).type != TOK_OBRA &&
-					da_last(&lexer->tokens).type != TOK_COM)
-					add_token(lexer, TOK_SEMI, ";");
-				lexer->cur_loc.line_num++;
-				lexer->cur_loc.line_start = lexer->cur_char + 1;
+				if (da_last(&lexer.tokens).type != TOK_SEMI &&
+					da_last(&lexer.tokens).type != TOK_CBRA &&
+					da_last(&lexer.tokens).type != TOK_OBRA &&
+					da_last(&lexer.tokens).type != TOK_COM)
+					add_token(&lexer, TOK_SEMI, ";");
+				lexer.cur_loc.line_num++;
+				lexer.cur_loc.line_start = lexer.cur_char + 1;
 				break;
 
 			case ':': {
-				if (lexer->cur_char[1] == '=') {
-					add_token(lexer, TOK_ASSIGN, ":=");
-					lexer->cur_char++;
+				if (lexer.cur_char[1] == '=') {
+					add_token(&lexer, TOK_ASSIGN, ":=");
+					lexer.cur_char++;
 				} else {
-					add_token(lexer, TOK_COL, ":");
+					add_token(&lexer, TOK_COL, ":");
 				}
 			} break;
 
 			case '/': {
-				if (*(lexer->cur_char + 1) == '/') {
-					while (*(lexer->cur_char) != '\n')
-						lexer->cur_char += 1;
+				if (lexer.cur_char[1] == '/') {
+					while (*lexer.cur_char != '\n')
+						lexer.cur_char += 1;
 					break;
 				}
-				add_token(lexer, TOK_SLASH, "/");
+				add_token(&lexer, TOK_SLASH, "/");
 			} break;
 
 			default: {
-				if (isdigit(*lexer->cur_char)) {
-					char *start = lexer->cur_char;
+				if (isdigit(*lexer.cur_char)) {
+					char *start = lexer.cur_char;
 					bool isFloat = 0;
 					while (true) {
-						if (*(lexer->cur_char) == '.')
+						if (*lexer.cur_char == '.')
 							isFloat = 1;
-						if (!(isdigit(*(lexer->cur_char+1)) || *(lexer->cur_char+1) == '.'))
+						if (!(isdigit(lexer.cur_char[1]) || lexer.cur_char[1] == '.'))
 							break;
-						lexer->cur_char++;
+						lexer.cur_char++;
 					}
 
-					size_t l = lexer->cur_char - start + 1;
+					size_t l = lexer.cur_char - start + 1;
 					char *num = malloc(sizeof(char) * (l+1));
 					memcpy(num, start, l); num[l] = '\0';
-					if (isFloat) add_token(lexer, TOK_FLOAT, num);
-					else add_token(lexer, TOK_INT, num);
+					if (isFloat) add_token(&lexer, TOK_FLOAT, num);
+					else add_token(&lexer, TOK_INT, num);
 				}
 
-				else if (*(lexer->cur_char) == '"') {
-					char *lmark = lexer->cur_char++;
-					char *start = lexer->cur_char;
-					while (!(*(lexer->cur_char+1) == '\"' && *(lexer->cur_char) != '\\')) {
-						if (*(lexer->cur_char++) == '\0') {
-							lexer->cur_char = lmark;
-							lexer_error(lexer->cur_loc, "lexer error: unclosed string");
+				else if (*(lexer.cur_char) == '"') {
+					char *lmark = lexer.cur_char++;
+					char *start = lexer.cur_char;
+					while (!(lexer.cur_char[1] == '\"' && *lexer.cur_char != '\\')) {
+						if (*(lexer.cur_char++) == '\0') {
+							lexer.cur_char = lmark;
+							lexer_error(lexer.cur_loc, "lexer error: unclosed string");
 						}
 					}
 
-					size_t l = lexer->cur_char - start + 1;
+					size_t l = lexer.cur_char - start + 1;
 					char *str = malloc(sizeof(char) * (l+1));
 					memcpy(str, start, l); str[l] = '\0';
-					add_token(lexer, TOK_STRING, str);
-					lexer->cur_char++;
+					add_token(&lexer, TOK_STRING, str);
+					lexer.cur_char++;
 				}
 
-				else if (*lexer->cur_char == '\'') {
-					lexer->cur_char++;
-					if (*lexer->cur_char == '\\') {
-						lexer->cur_char++;
-						if (*lexer->cur_char == 'n') add_token(lexer, TOK_CHAR, "\n");
-						else lexer_error(lexer->cur_loc, "lexer error: wrong character");
-						lexer->cur_char++;
+				else if (*lexer.cur_char == '\'') {
+					lexer.cur_char++;
+					if (*lexer.cur_char == '\\') {
+						lexer.cur_char++;
+						if (*lexer.cur_char == 'n') add_token(&lexer, TOK_CHAR, "\n");
+						else lexer_error(lexer.cur_loc, "lexer error: wrong character");
+						lexer.cur_char++;
 					} else {
-						add_token(lexer, TOK_CHAR, lexer->cur_char);
-						lexer->cur_char++;
+						add_token(&lexer, TOK_CHAR, lexer.cur_char);
+						lexer.cur_char++;
 					}
 
-					if (*lexer->cur_char != '\'') {
-						lexer_error(lexer->cur_loc, "lexer error: ' expected");
+					if (*lexer.cur_char != '\'') {
+						lexer_error(lexer.cur_loc, "lexer error: ' expected");
 					}
 				}
 
-				else if (is_tok(lexer, "for", TOK_FOR_SYM, lexer->cur_char)) {
-				} else if (is_tok(lexer, "while", TOK_WHILE_SYM, lexer->cur_char)) {
-				} else if (is_tok(lexer, "if", TOK_IF_SYM, lexer->cur_char)) {
-				} else if (is_tok(lexer, "func", TOK_FUNC, lexer->cur_char)) {
-				} else if (is_tok(lexer, "struct", TOK_STRUCT, lexer->cur_char)) {
-				} else if (is_tok(lexer, "extern", TOK_EXTERN, lexer->cur_char)) {
-				} else if (is_tok(lexer, "true", TOK_TRUE, lexer->cur_char)) {
-				} else if (is_tok(lexer, "false", TOK_FALSE, lexer->cur_char)) {
-				} else if (is_tok(lexer, "return", TOK_RET, lexer->cur_char)) {}
+				else if (is_tok(&lexer, "for", TOK_FOR_SYM, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "while", TOK_WHILE_SYM, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "if", TOK_IF_SYM, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "func", TOK_FUNC, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "struct", TOK_STRUCT, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "extern", TOK_EXTERN, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "true", TOK_TRUE, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "false", TOK_FALSE, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "return", TOK_RET, lexer.cur_char)) {}
 
-				else if (isalpha(*lexer->cur_char)) {
-					char *id = get_word(lexer);
-					add_token(lexer, TOK_ID, id);
+				else if (isalpha(*lexer.cur_char)) {
+					char *id = get_word(&lexer);
+					add_token(&lexer, TOK_ID, id);
 				}
 
-				else lexer_error(lexer->cur_loc, "lexer error: unknown token");
+				else lexer_error(lexer.cur_loc, "lexer error: unknown token");
 			} break;
 		}
 
-		lexer->cur_char++;
+		lexer.cur_char++;
 	}
 
-	add_token(lexer, TOK_EOF, "EOF");
+	add_token(&lexer, TOK_EOF, "EOF");
+	return lexer;
 }
 
 void lexer_free(Lexer *lexer) {
 	da_free(&lexer->tokens);
-}
-
-const char *tok_to_str(TokenType tok_type) {
-	switch (tok_type) {
-		case TOK_FUNC:      return "TOK_FUNC";
-		case TOK_CPAR:      return "TOK_CPAR";
-		case TOK_OPAR:      return "TOK_OPAR";
-		case TOK_ID:        return "TOK_ID";
-		case TOK_SEMI:      return "TOK_SEMI";
-		case TOK_EQ:        return "TOK_EQ";
-		case TOK_LESS:      return "TOK_LESS";
-		case TOK_GREAT:     return "TOK_GREAT";
-		case TOK_STRUCT:    return "TOK_STRUCT";
-		case TOK_STRING:    return "TOK_STRING";
-		case TOK_LPAR:      return "TOK_LPAR";
-		case TOK_RPAR:      return "TOK_RPAR";
-		case TOK_PLUS:      return "TOK_PLUS";
-		case TOK_MINUS:     return "TOK_MINUS";
-		case TOK_FOR_SYM:   return "TOK_FOR_SYM";
-		case TOK_IF_SYM:    return "TOK_IF_SYM";
-		case TOK_WHILE_SYM: return "TOK_WHILE_SYM";
-		case TOK_STAR:      return "TOK_STAR";
-		case TOK_SLASH:     return "TOK_SLASH";
-		case TOK_INT:       return "TOK_INT";
-		case TOK_FLOAT:     return "TOK_FLOAT";
-		case TOK_OBRA:      return "TOK_OBRA";
-		case TOK_CBRA:      return "TOK_CBRA";
-		case TOK_COL:       return "TOK_COL";
-		case TOK_DOT:       return "TOK_DOT";
-		case TOK_COM:       return "TOK_COM";
-		case TOK_RET:       return "TOK_RET";
-		case TOK_AMP:       return "TOK_AMP";
-		case TOK_PIPE:      return "TOK_PIPE";
-		case TOK_EXC:       return "TOK_EXC";
-		case TOK_CHAR:      return "TOK_CHAR";
-		case TOK_EOF:       return "TOK_EOF";
-		default:            return "UNKNOWN_TOKEN";
-	}
 }

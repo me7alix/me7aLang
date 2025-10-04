@@ -52,20 +52,12 @@ AST_Node *parse_func_call(Parser *parser) {
 	parser->cur_token++;
 
 	while (parser->cur_token->type != TOK_CPAR) {
-		switch (parser->cur_token->type) {
-			case TOK_ID: case TOK_OPAR:
-			case TOK_FLOAT: case TOK_INT: case TOK_CHAR: case TOK_STAR:
-				da_append(&fcn->func_call.args, parse_expr(parser, EXPR_PARSING_FUNC_CALL, NULL));
-				break;
-			default: unexpect_token(parser->cur_token, parser->cur_token->type); break;
-		}
-
+		da_append(&fcn->func_call.args, parse_expr(parser, EXPR_PARSING_FUNC_CALL, NULL));
 		parser->cur_token++;
 	}
 
 	parser->cur_token++;
-
-	Symbol *fc = parser_st_get(parser, fcn->func_call.id);
+	Symbol *fc = parser_st_get(parser, fcn->func_call.id, fcn->loc);
 	switch (fc->type) {
 		case SBL_FUNC_DEF:    fcn->func_call.type = fc->func_def.type;    break;
 		case SBL_FUNC_EXTERN: fcn->func_call.type = fc->func_extern.type; break;
@@ -101,12 +93,12 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 				switch (da_get(nodes, i+1)->kind) {
 					case AST_BIN_EXP: r_cost = op_cost(da_get(nodes, i+1)->exp_binary.op, false); break;
 					case AST_UN_EXP:  r_cost = op_cost(da_get(nodes, i+1)->exp_unary.op, false);  break;
-					default: lexer_error(da_get(nodes, i+1)->loc, "unreachable"); unreachable;
+					default: lexer_error(da_get(nodes, i+1)->loc, "wrong"); unreachable;
 				}
 			}
 
 			if (l_cost > r_cost) is_lelf = true;
-			if (l_cost < -500 && r_cost < -500) lexer_error(da_get(nodes, i+1)->loc, "wrong expression");
+			if (l_cost < -500 && r_cost < -500) lexer_error(da_get(nodes, i)->loc, "parser error: wrong expression");
 
 			if (is_lelf) {
 				switch (da_get(nodes, i-1)->kind) {
@@ -122,7 +114,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 				}
 			}
 
-			da_ordered_remove(nodes, i);
+			da_remove_ordered(nodes, i);
 			i--;
 		}
 	}
@@ -132,11 +124,11 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 
 Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 	switch (expr->kind) {
-		case AST_VAR: return parser_st_get(parser, expr->var_id)->variable.type;
+		case AST_VAR: return parser_st_get(parser, expr->var_id, expr->loc)->variable.type;
 		case AST_FUNC_CALL: return expr->func_call.type;
 
 		case AST_LITERAL: {
-			if (vart != NULL) {
+			if (vart) {
 				expr->literal.type = *vart;
 			} else {
 				switch (expr->literal.kind) {
@@ -152,17 +144,17 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 
 		case AST_BIN_EXP: {
 			Type lt = expr_calc_types(parser, expr->exp_binary.l, vart);
+			if (expr->exp_binary.op == AST_OP_VAR_EQ) vart = &lt;
 			Type rt = expr_calc_types(parser, expr->exp_binary.r, vart);
-			expr->exp_binary.type = rt;
+			expr->exp_binary.type = lt;
 
 			if ((lt.kind == TYPE_I64 && rt.kind == TYPE_POINTER) ||
 				(lt.kind == TYPE_POINTER && rt.kind == TYPE_I64)) {
 				Type rest = lt.kind == TYPE_POINTER ? lt : rt;
 				expr->exp_binary.type = rest;
 				assert(rest.pointer.base);
-				printf("%d \n", rest.pointer.base->kind);
 			} else if (lt.kind != rt.kind) {
-				lexer_error(expr->loc, "operation on different types");
+				lexer_error(expr->loc, "parser error: operation on different types");
 			}
 
 			switch (expr->exp_binary.op) {
@@ -178,22 +170,29 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 		} break;
 
 		case AST_UN_EXP: {
-			if (expr->exp_unary.op == AST_OP_CAST) {
-				expr_calc_types(parser, expr->exp_unary.v, &expr->exp_unary.type);
-				return expr->exp_unary.type;
-			}
+			switch (expr->exp_unary.op) {
+				case AST_OP_CAST: {
+					expr_calc_types(parser, expr->exp_unary.v, &expr->exp_unary.type);
+				} break;
 
-			Type vt = expr_calc_types(parser, expr->exp_unary.v, vart);
-			expr->exp_unary.type = vt;
+				case AST_OP_REF: {
+					Type vt = expr_calc_types(parser, expr->exp_unary.v, vart);
+					expr->exp_unary.type = vt;
+					Type *base = malloc(sizeof(Type)); *base = vt;
+					expr->exp_unary.type = (Type) {.kind = TYPE_POINTER, .pointer.base = base, .size = 8 };
+				} break;
 
-			if (expr->exp_unary.op == AST_OP_REF) {
-				Type *base = malloc(sizeof(Type)); *base = vt;
-				expr->exp_unary.type = (Type) {.kind = TYPE_POINTER, .pointer.base = base, .size = 8 };
-			} else if (expr->exp_unary.op == AST_OP_DEREF) {
-				//printf("%d \n", rest.pointer.base->kind);
-				if (vt.kind != TYPE_POINTER)
-					lexer_error(expr->exp_unary.v->loc, "wrong type x");
-				expr->exp_unary.type = *vt.pointer.base;
+				case AST_OP_DEREF: {
+					Type vt = expr_calc_types(parser, expr->exp_unary.v, vart);
+					expr->exp_unary.type = vt;
+					if (vt.kind != TYPE_POINTER)
+						lexer_error(expr->exp_unary.v->loc, "parser error: pointer expected");
+					expr->exp_unary.type = *vt.pointer.base;
+				} break;
+
+				default: {
+					expr->exp_unary.type = expr_calc_types(parser, expr->exp_unary.v, vart);
+				} break;
 			}
 
 			return expr->exp_unary.type;
@@ -361,11 +360,10 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 				bool is_unary_op = false;
 				if (nodes.count == 0) {
 					is_unary_op = true;
-				} else if(false) {
+				} else {
 					bool is_bin_op = da_last(&nodes)->kind == AST_BIN_EXP;
 					if (is_bin_op && da_last(&nodes)->exp_binary.l && da_last(&nodes)->exp_binary.r) is_bin_op = false;
-					bool is_un_op = da_last(&nodes)->kind == AST_UN_EXP;
-					if (is_bin_op || is_un_op) {
+					if (is_bin_op) {
 						is_unary_op = true;
 					}
 				}
@@ -388,7 +386,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 				}
 			} break;
 
-			default: lexer_error(parser->cur_token->loc, "unexpected token"); break;
+			default: lexer_error(parser->cur_token->loc, "parser error: unexpected token");
 		}
 
 		parser->cur_token++;

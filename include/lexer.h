@@ -35,8 +35,7 @@ typedef struct {
 } Lexer;
 
 void lexer_error(Location loc, char *error);
-void lexer_lex(Lexer *lexer, char *code);
+Lexer lexer_lex(char *code);
 void lexer_free(Lexer *lexer);
-const char *tok_to_str(TokenType tok_type);
 
 #endif

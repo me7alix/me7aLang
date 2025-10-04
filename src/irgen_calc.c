@@ -1,6 +1,5 @@
 #include "../include/ir.h"
 
-
 Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 	*ret = true;
 	if (l.type == OPR_LITERAL && r.type == OPR_LITERAL && en->kind == AST_BIN_EXP) {
@@ -12,9 +11,9 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 					int32_t res;
 
 					switch (en->exp_binary.op) {
-						case AST_OP_ADD:  res = lv + rv; break;
+						case AST_OP_ADD: res = lv + rv; break;
 						case AST_OP_SUB: res = lv - rv; break;
-						case AST_OP_MUL:  res = lv * rv; break;
+						case AST_OP_MUL: res = lv * rv; break;
 						case AST_OP_DIV: res = lv / rv; break;
 						default: *ret = false; return (Operand) {};
 					}
@@ -36,9 +35,9 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 					int64_t res;
 
 					switch (en->exp_binary.op) {
-						case AST_OP_ADD:  res = lv + rv; break;
+						case AST_OP_ADD: res = lv + rv; break;
 						case AST_OP_SUB: res = lv - rv; break;
-						case AST_OP_MUL:  res = lv * rv; break;
+						case AST_OP_MUL: res = lv * rv; break;
 						case AST_OP_DIV: res = lv / rv; break;
 						default: *ret = false; return (Operand) {};
 					}
@@ -60,9 +59,9 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 					int8_t res;
 
 					switch (en->exp_binary.op) {
-						case AST_OP_ADD:  res = lv + rv; break;
+						case AST_OP_ADD: res = lv + rv; break;
 						case AST_OP_SUB: res = lv - rv; break;
-						case AST_OP_MUL:  res = lv * rv; break;
+						case AST_OP_MUL: res = lv * rv; break;
 						case AST_OP_DIV: res = lv / rv; break;
 						default: *ret = false; return (Operand) {};
 					}

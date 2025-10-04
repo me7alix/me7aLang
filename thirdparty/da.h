@@ -18,8 +18,8 @@
  *        - da_insert(&da, i, item)      // insert element at index
  *        - da_get(&da, i)               // access element at index (with bounds check in debug mode)
  *        - da_last(&da)                 // access the last element
- *        - da_unordered_remove(&da, i)  // remove element (fast, order not preserved)
- *        - da_ordered_remove(&da, i)    // remove element (order preserved, slower)
+ *        - da_remove_unordered(&da, i)  // remove element (fast, order not preserved)
+ *        - da_remove_ordered(&da, i)    // remove element (order preserved, slower)
  *        - da_free(&da)                 // release memory
  *
  *   Capacity management is handled automatically:
@@ -27,10 +27,8 @@
  *        - The array shrinks when usage falls below 25%.
  *
  * Debugging:
- *   Define DA_DEBUG before including this header to enable runtime 
- *   error checks (invalid indices, empty access, etc.). Error messages 
- *   are printed to stderr and abort the program. For release builds, 
- *   simply omit DA_DEBUG to remove these checks.
+ *   Define DA_RUNTIME_CHECKS before including this header to enable runtime
+ *   error checks (invalid indices, empty access, etc.)
  *
  * Features:
  *   - Minimal, single-header implementation
@@ -43,33 +41,45 @@
 #ifndef DA_H
 #define DA_H
 
-#include <stdlib.h>
-#include <string.h>
-#include <inttypes.h>
-#include <stdio.h>
+#ifndef DA_INIT_CAP
+#define DA_INIT_CAP 256
+#endif
 
-#ifdef DA_DEBUG
-#define _da_error_if(b, ...) \
-	if (b) { \
-		fprintf(stderr, "%s:%d: da error: ", __FILE__, __LINE__); \
-		fprintf(stderr, __VA_ARGS__); \
-		exit(1); \
-	}
+#ifndef DA_REALLOC
+#include <stdlib.h>
+#define DA_REALLOC realloc
+#endif
+
+#ifndef DA_FREE
+#include <stdlib.h>
+#define DA_FREE free
+#endif
+
+#ifndef DA_MEMCPY
+#include <string.h>
+#define DA_MEMCPY memcpy
+#endif
+
+#ifndef DA_RUNTIME_CHECKS
+#define DA_ASSERT(a) ((void)0)
 #else
-#define _da_error_if(...)
+#ifndef DA_ASSERT
+#include <assert.h>
+#define DA_ASSERT assert
+#endif
 #endif
 
 #define da(type) struct { type *items; size_t count, capacity; }
 
-#define _da_capacity_grow(da) \
+#define da_capacity_grow(da) \
 	do { \
 		if ((da)->capacity == 0) { \
 			if ((da)->count == 0) (da)->capacity = 8; \
 			else (da)->capacity = (da)->count * 2; \
-			(da)->items = malloc(sizeof(*(da)->items) * (da)->capacity); \
+			(da)->items = DA_REALLOC(NULL, sizeof(*(da)->items) * (da)->capacity); \
 		} else { \
 			if ((da)->count >= (da)->capacity) (da)->capacity = (da)->count * 2; \
-			(da)->items = realloc((da)->items, sizeof(*(da)->items) * (da)->capacity); \
+			(da)->items = DA_REALLOC((da)->items, sizeof(*(da)->items) * (da)->capacity); \
 		} \
 	} while(0)
 
@@ -77,52 +87,45 @@
 	do { \
 		if ((da)->capacity == 0) break; \
 		if ((da)->count <= (da)->capacity / 4) (da)->capacity = (da)->count * 2; \
-		(da)->items = realloc((da)->items, sizeof(*(da)->items) * (da)->capacity); \
+		(da)->items = DA_REALLOC((da)->items, sizeof(*(da)->items) * (da)->capacity); \
 	} while(0)
 
 #define da_append(da, item) \
 	do { \
-		_da_capacity_grow(da); \
+		da_capacity_grow(da); \
 		(da)->items[(da)->count++] = (item); \
 	} while(0)
 
 #define da_insert(da, index, item) \
-	do{ \
+	do { \
 		(da)->count++; \
-		_da_capacity_grow(da); \
-		memcpy((da)->items+(index)+1, (da)->items+(index), sizeof(*(da)->items)*((da)->count-index)); \
+		da_capacity_grow(da); \
+		DA_MEMCPY((da)->items+(index)+1, (da)->items+(index), sizeof(*(da)->items)*((da)->count-index)); \
 		da_get(da, (index)) = item; \
 	} while(0)
 
 #define da_get(da, index) \
-	(*({ \
-	   _da_error_if(index >= (da)->count || (index) < 0, "index %" PRId64 " is out of the range 0..%zu\n", \
-			   ((int64_t)(index)), (da)->count); \
-		(da)->items + index; \
-	})) \
+	(da)->items[DA_ASSERT((index) >= 0 && (index) < (da)->count), (index)]
 
 #define da_last(da) \
-	(*({ \
-		_da_error_if((da)->count == 0, "da_last on empty dynamic array\n"); \
-		(da)->items + ((da)->count - 1); \
-	}))
+	(da)->items[DA_ASSERT((da)->count > 0), ((da)->count - 1)]
 
 #define da_resize(da, cnt) \
 	do { \
 		(da)->count = (cnt); \
-		_da_capacity_grow(da); \
+		da_capacity_grow(da); \
 		da_shrink(da); \
 	} while(0)
 
-#define da_unordered_remove(da, index) \
+#define da_remove_unordered(da, index) \
 	do { \
 		da_get(da, (index)) = da_last(da); \
 		(da)->count--; \
 	} while(0)
 
-#define da_ordered_remove(da, index) \
+#define da_remove_ordered(da, index) \
 	do { \
-		da_get(da, (index)) = da_last(da); \
+		da_get(da, index) = da_last(da); \
 		memcpy((da)->items+(index), (da)->items+(index)+1, \
 				sizeof(*(da)->items)*((da)->count-index)); \
 		(da)->count--; \
@@ -131,14 +134,14 @@
 #define da_free(da) \
 	do { \
 		if ((da)->items) \
-			free((da)->items); \
+			DA_FREE((da)->items); \
 		(da)->count = 0; \
 		(da)->capacity = 0; \
 	} while(0)
 
 #define da_remove_last(da) \
 	do { \
-		_da_error_if((da)->count == 0, "da_remove_last on empty dynamic array\n"); \
+		DA_ASSERT((da)->count > 0); \
 		(da)->count--; \
 	} while (0)
 

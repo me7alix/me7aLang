@@ -76,7 +76,7 @@ func main(): int {
 		rect(paddle_x, paddle_y, paddle_w, paddle_h, WHITE)
 		EndDrawing()
 	}
-	
+
 	CloseWindow()
 	return 0
 }

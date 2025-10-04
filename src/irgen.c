@@ -7,6 +7,7 @@
 
 #include "../include/ir.h"
 #include "../include/parser.h"
+#include "irgen_calc.c"
 
 int64_t var_index = 0;
 size_t label_index = 0;
@@ -40,6 +41,16 @@ void vt_set(char *name, size_t index) {
 		if (strcmp(da_get(&vt, i).name, name) == 0) {
 			da_get(&vt, i).index = index;
 		}
+	}
+}
+
+Type ir_get_opr_type(Operand op) {
+	switch (op.type) {
+		case OPR_VAR:      return op.var.type;      break;
+		case OPR_LITERAL:  return op.literal.type;  break;
+		case OPR_FUNC_INP: return op.func_inp.type; break;
+		case OPR_FUNC_RET: return op.func_ret.type; break;
+		default: unreachable; return (Type){0};
 	}
 }
 
@@ -93,9 +104,9 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 			Operand l = ir_gen_expr(func, en->exp_binary.l);
 			Operand r = ir_gen_expr(func, en->exp_binary.r);
 
-			//bool ret;
-			//Operand calc = ir_opr_calc(en, l, r, &ret);
-			//if (ret) return calc;
+			bool ret;
+			Operand calc = ir_opr_calc(en, l, r, &ret);
+			if (ret) return calc;
 
 			Instruction inst = {
 				.arg1 = l,
@@ -120,7 +131,49 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 				case AST_OP_NOT_EQ:   inst.op = OP_NOT_EQ;   break;
 				case AST_OP_AND:      inst.op = OP_AND;      break;
 				case AST_OP_OR:       inst.op = OP_OR;       break;
-				default:              assert(!"unreachable");
+				default: unreachable;
+			}
+
+			// pointers arithmetic
+			if (inst.op == OP_ADD || inst.op == OP_SUB) {
+				Type lt = ir_get_opr_type(l);
+				Type rt = ir_get_opr_type(r);
+
+				if (lt.kind == TYPE_POINTER || rt.kind == TYPE_POINTER) {
+					Type ptr_base;
+					Operand tm;
+					if (lt.kind == TYPE_POINTER) {
+						ptr_base = *lt.pointer.base;
+						tm = r;
+					} else if (rt.kind == TYPE_POINTER) {
+						ptr_base = *rt.pointer.base;
+						tm = l;
+					}
+
+					Operand dst = (Operand){
+						.type = OPR_VAR,
+						.var.type = en->exp_binary.type,
+						.var.index = var_index++,
+					};
+
+					Instruction mult = {
+						.op = OP_MUL,
+						.arg1 = tm,
+						.arg2 = (Operand) {
+							.type = OPR_LITERAL,
+							.literal = (Literal){
+								.kind = LIT_INT,
+								.type = (Type) {.kind = TYPE_I64, .size = 8},
+								.lint = ptr_base.size,
+							},
+						},
+						.dst = dst,
+					};
+
+					da_append(&func->body, mult);
+					if (lt.kind == TYPE_POINTER) inst.arg2 = dst;
+					if (rt.kind == TYPE_POINTER) inst.arg1 = dst;
+				}
 			}
 
 			last_var = inst.dst.var.index;
@@ -293,7 +346,6 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 			case AST_VAR_MUT: {
 				ir_gen_var_mut(func, cn);
 			} break;
-
 
 			case AST_IF_STMT: {
 				Operand res = ir_gen_expr(func, cn->stmt_if.exp);
@@ -472,7 +524,6 @@ Program ir_gen_prog(Parser *parser) {
 			default: unreachable;
 		}
 	}
-
 
 	return prog;
 }
