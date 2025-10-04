@@ -467,6 +467,29 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 void ir_gen_func(Program *prog, AST_Node *fn) {
 	da_resize(&vt, 0);
 	Func func = {.name = fn->func_def.id, .ret_type = fn->func_def.type};
+
+	for (size_t i = 0; i < fn->func_def.args.count; i++) {
+		AST_Node *cn = da_get(&fn->func_def.args, i);
+		da_append(&func.body, ((Instruction) {
+			.op = OP_ASSIGN,
+			.arg1 = (Operand) {
+				.type = OPR_FUNC_INP,
+				.func_inp.type = cn->func_def_arg.type,
+				.func_inp.arg_ind = i,
+			},
+			.dst = (Operand) {
+				.type = OPR_VAR,
+				.var.type = cn->func_def_arg.type,
+				.var.index = var_index,
+			},
+		}));
+		vt_add((Var) {
+			.type = cn->func_def_arg.type,
+			.index = var_index++,
+			.name = cn->func_def_arg.id,
+		});
+	}
+
 	ir_gen_body(&func, fn->func_def.body);
 	da_append(&prog->funcs, func);
 }

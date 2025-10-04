@@ -8,7 +8,8 @@
 void ir_dump_opr(Operand opr, char *buf) {
 	switch (opr.type) {
 		case OPR_NULL:      sprintf(buf, "NULL"); break;
-		case OPR_FUNC_RET:  sprintf(buf, "fr:%d", opr.func_ret.type.kind); break;
+		case OPR_FUNC_INP:  sprintf(buf, "FI(%zu):%d", opr.func_inp.arg_ind, opr.func_ret.type.kind); break;
+		case OPR_FUNC_RET:  sprintf(buf, "FR:%d", opr.func_ret.type.kind); break;
 		case OPR_NAME:      sprintf(buf, "\"%s\"", opr.name); break;
 		case OPR_VAR:       sprintf(buf, "(%zu):%d", opr.var.index, opr.var.type.kind); break;
 

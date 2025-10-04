@@ -285,21 +285,24 @@ AST_Node *parse_function(Parser *parser) {
 
 	while (parser->cur_token->type != TOK_CPAR) {
 		switch (parser->cur_token->type) {
-			case TOK_COM:
-				unexpect_token(parser->cur_token+1, TOK_COM);
-				break;
-
+			case TOK_COM: break;
 			case TOK_ID:
 				expect_token(parser->cur_token+1, TOK_COL);
-				AST_Node *farg = ast_new({
+				AST_Node *arg = ast_new({
 					.kind = AST_FUNC_DEF_ARG,
 					.func_def_arg.id = parser->cur_token->data
 				});
 
 				parser->cur_token++;
-				farg->func_def_arg.type = parse_type(parser);
-				da_append(&fdn->func_def.args, farg);
-				parser->cur_token++;
+				arg->func_def_arg.type = parse_type(parser);
+				da_append(&fdn->func_def.args, arg);
+
+				parser_st_add(parser, (Symbol) {
+					.id = arg->func_def_arg.id,
+					.type = SBL_VAR,
+					.variable.type = arg->func_def_arg.type,
+				});
+
 				break;
 
 			default:

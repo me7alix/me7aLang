@@ -78,10 +78,21 @@ char *opr_to_nasm(Operand opr) {
 		case OPR_FUNC_RET: {
 			switch (opr.func_ret.type.kind) {
 				case TYPE_INT:   sprintf(opr_to_nasm_buf, "eax"); break;
-				case TYPE_FLOAT: sprintf(opr_to_nasm_buf, "xmm0"); break;
+				case TYPE_FLOAT: unreachable;
 				case TYPE_BOOL:
 				case TYPE_I8:    sprintf(opr_to_nasm_buf, "al"); break;
 				case TYPE_I64:   sprintf(opr_to_nasm_buf, "rax"); break;
+				default: unreachable;
+			}
+		} break;
+
+		case OPR_FUNC_INP: {
+			switch (opr.func_inp.type.kind) {
+				case TYPE_INT:   sprintf(opr_to_nasm_buf, "%s", argreg32[opr.func_inp.arg_ind]); break;
+				case TYPE_FLOAT: unreachable;
+				case TYPE_BOOL:
+				case TYPE_I8:    sprintf(opr_to_nasm_buf, "%s", argreg8[opr.func_inp.arg_ind]); break;
+				case TYPE_I64:   sprintf(opr_to_nasm_buf, "%s", argreg64[opr.func_inp.arg_ind]); break;
 				default: unreachable;
 			}
 		} break;
@@ -120,6 +131,7 @@ void reg_alloc(Instruction inst, char *arg1, char *arg2) {
 			case OPR_LITERAL:  type = inst.arg1.literal.type;  break;
 			case OPR_VAR:      type = inst.arg1.var.type;      break;
 			case OPR_FUNC_RET: type = inst.arg1.func_ret.type; break;
+			case OPR_FUNC_INP: type = inst.arg1.func_inp.type; break;
 			default: unreachable;
 		}
 	}
@@ -308,6 +320,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 						case OPR_LITERAL:  type = ci.args[i].literal.type;  break;
 						case OPR_VAR:      type = ci.args[i].var.type;      break;
 						case OPR_FUNC_RET: type = ci.args[i].func_ret.type; break;
+						case OPR_FUNC_INP: type = ci.args[i].func_inp.type; break;
 						default: unreachable;
 					}
 

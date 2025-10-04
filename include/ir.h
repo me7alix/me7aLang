@@ -25,6 +25,7 @@ typedef enum {
 typedef enum {
 	OPR_NULL,
 	OPR_FUNC_RET,
+	OPR_FUNC_INP,
 	OPR_LITERAL,
 	OPR_LABEL,
 	OPR_NAME,
@@ -41,6 +42,10 @@ typedef struct {
 		struct {
 			Type type;
 		} func_ret;
+		struct {
+			size_t arg_ind;
+			Type type;
+		} func_inp;
 		struct {
 			Type type;
 			size_t index;
