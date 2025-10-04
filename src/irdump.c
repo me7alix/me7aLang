@@ -36,6 +36,7 @@ void ir_dump_inst(Instruction inst, char *res) {
 	switch (inst.op) {
 		case OP_ADD:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "+", arg2);  break;
 		case OP_EQ:     sprintf(res, "    var%s = %s %s %s", dst, arg1, "==", arg2); break;
+		case OP_NOT:    sprintf(res, "    var%s = !%s", dst, arg1); break;
 		case OP_OR:     sprintf(res, "    var%s = %s %s %s", dst, arg1, "||", arg2); break;
 		case OP_AND:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "&&", arg2); break;
 		case OP_GREAT:  sprintf(res, "    var%s = %s %s %s", dst, arg1, ">", arg2);  break;

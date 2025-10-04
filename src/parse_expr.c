@@ -28,6 +28,9 @@ float op_cost(TokenType op, bool is_left) {
 		case TOK_COL:
 			if (is_left) return 0.0;
 			else         return 3.0;
+		case TOK_EXC:
+			if (is_left) return 3.0;
+			else         return 0.0;
 		default:         break;
 	}
 
@@ -163,14 +166,13 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 
 		case AST_UN_EXP: {
 			Type vt = expr_calc_types(parser, expr->exp_unary.v, &expr->exp_unary.type);
-			(void) vt;
 
 			if (expr->exp_unary.op == TOK_COL) {
 				return expr->exp_unary.type;
 			}
 
-			unreachable;
-			return (Type) {0};
+			expr->exp_unary.type = vt;
+			return vt;
 		} break;
 
 		default: unreachable;
@@ -202,7 +204,10 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 				break;
 			}
 		} else if (type == EXPR_PARSING_STMT) {
-			if (parser->cur_token->type == TOK_OBRA) break;
+			if (parser->cur_token->type == TOK_OBRA) {
+				parser->cur_token--;
+				break;
+			}
 		}
 
 		switch (parser->cur_token->type) {
@@ -268,6 +273,13 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 				}));
 			} break;
 
+			case TOK_EXC:
+				da_append(&nodes, ast_new({
+					.type = AST_UN_EXP,
+					.exp_unary.op = parser->cur_token->type,
+					.exp_unary.v = NULL
+				}));
+				break;
 			case TOK_NOT_EQ: case TOK_OR:
 			case TOK_LESS: case TOK_GREAT:
 			case TOK_LESS_EQ: case TOK_GREAT_EQ:

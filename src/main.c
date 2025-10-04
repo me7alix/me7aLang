@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 
 #define DA_DEBUG
 #include "../include/lexer.h"
@@ -137,12 +138,16 @@ int main(int argc, char **argv) {
 	sprintf(output_file, "%s.asm", output_bin);
 	write_to_file(output_file, sb_to_str(cg));
 
-	sprintf(buf, "nasm -f elf64 %s", output_file); system(buf); printf("info: %s\n", buf);
-	sprintf(buf, "gcc -no-pie ./examples/runtime.o %s.o -o %s -lraylib", output_bin, output_bin); system(buf); printf("info: %s\n", buf);
-	sprintf(buf, "rm %s.o", output_bin); system(buf);  printf("info: %s\n", buf);
+	sprintf(buf, "nasm -f elf64 %s", output_file);
+	system(buf); printf("[INFO] %s\n", buf);
+	sprintf(buf, "gcc -no-pie ./examples/runtime.o %s.o -o %s -lraylib", output_bin, output_bin);
+	system(buf); printf("[INFO] %s\n", buf);
+	sprintf(buf, "rm %s.o", output_bin);
+	system(buf);  printf("[INFO] %s\n", buf);
 	if (!save_asm_output) { sprintf(buf, "rm %s", output_file); system(buf); }
 
 	lexer_free(&lexer);
 	da_free(&prog.funcs);
+	da_free(&prog.externs);
 	return 0;
 }

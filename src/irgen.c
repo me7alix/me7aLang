@@ -166,7 +166,6 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 			};
 
 			da_append(&func->body, inst);
-
 			return inst.dst;
 		} break;
 
@@ -220,6 +219,7 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 
 			switch (en->exp_unary.op) {
 				case TOK_COL: inst.op = OP_CAST; break;
+				case TOK_EXC: inst.op = OP_NOT;  break;
 				default: unreachable;
 			}
 
@@ -237,42 +237,44 @@ void ir_dump_opr(Operand opr, char *buf);
 
 void ir_gen_var_def(Func *func, AST_Node *cn) {
 	Operand res = ir_gen_expr(func, cn->var_def.exp);
-	da_append(&func->body, ((Instruction){
-		.op = OP_ASSIGN,
-		.arg1 = res,
-		.dst = (Operand) {
-			.type = OPR_VAR,
-			.var.type = cn->var_def.type,
-			.var.index = var_index,
-		},
-	}));
+	if (res.type == OPR_LITERAL) {
+		da_append(&func->body, ((Instruction){
+			.op = OP_ASSIGN,
+			.arg1 = res,
+			.dst = (Operand) {
+				.type = OPR_VAR,
+				.var.type = cn->var_def.type,
+				.var.index = var_index,
+			},
+		}));
 
-	vt_add((Var){
-		.name = cn->var_def.id,
-		.type = cn->var_def.type,
-		.index = var_index++,
-	});
+		vt_add((Var){
+			.name = cn->var_def.id,
+			.type = cn->var_def.type,
+			.index = var_index++,
+		});
+	} else if (res.type == OPR_VAR) {
+		vt_add((Var){
+			.name = cn->var_def.id,
+			.type = cn->var_def.type,
+			.index = var_index-1,
+		});
+	} else unreachable;
 }
 
 void ir_gen_var_mut(Func *func, AST_Node *cn) {
 	Var v = vt_get(cn->var_mut.id);
 	Operand res = ir_gen_expr(func, cn->var_mut.exp);
 
-	switch (res.type) {
-		case OPR_LITERAL: case OPR_VAR: {
-			da_append(&func->body, ((Instruction){
-				.op = OP_ASSIGN,
-				.arg1 = res,
-				.dst = (Operand) {
-					.type = OPR_VAR,
-					.var.type = cn->var_mut.type,
-					.var.index = v.index,
-				},
-			}));
-		} break;
-
-		default: unreachable;
-	}
+	da_append(&func->body, ((Instruction){
+		.op = OP_ASSIGN,
+		.arg1 = res,
+		.dst = (Operand) {
+			.type = OPR_VAR,
+			.var.type = cn->var_mut.type,
+			.var.index = v.index,
+		},
+	}));
 }
 
 void ir_gen_func_call(Func *func, AST_Node *cn) {
@@ -291,7 +293,6 @@ void ir_gen_func_call(Func *func, AST_Node *cn) {
 	}
 
 	func_call.args[cn->func_call.args.count] = (Operand) {.type = OPR_NULL};
-
 	da_append(&func->body,  func_call);
 }
 

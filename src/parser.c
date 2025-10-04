@@ -149,7 +149,7 @@ AST_Node *parse_var_assign(Parser *parser) {
 	return vdn;
 }
 
-AST_Node *parse_var_mut(Parser *parser) {
+AST_Node *parse_var_mut(Parser *parser, ExprParsingType pt) {
 	char *id = (parser->cur_token++)->data;
 	Symbol *s = parser_st_get(parser, id);
 	parser->cur_token++;
@@ -158,7 +158,7 @@ AST_Node *parse_var_mut(Parser *parser) {
 		.type = AST_VAR_MUT,
 		.var_mut.type = s->variable.type,
 		.var_mut.id = id,
-		.var_mut.exp = parse_expr(parser, EXPR_PARSING_VAR, &s->variable.type),
+		.var_mut.exp = parse_expr(parser, pt, &s->variable.type),
 	});
 
 	return vmn;
@@ -179,6 +179,7 @@ AST_Node *parse_if_stmt(Parser *parser, AST_Node *func) {
 	AST_Node *r = ast_new({.type = AST_IF_STMT});
 
 	r->stmt_if.exp = parse_expr(parser, EXPR_PARSING_STMT, NULL);
+	parser->cur_token++;
 	r->stmt_if.body = parse_body(parser, func);
 
 	return r;
@@ -189,6 +190,7 @@ AST_Node *parse_while_stmt(Parser *parser, AST_Node *func) {
 	AST_Node *r = ast_new({.type = AST_WHILE_STMT});
 
 	r->stmt_while.exp = parse_expr(parser, EXPR_PARSING_STMT, NULL);
+	parser->cur_token++;
 	r->stmt_while.body = parse_body(parser, func);
 
 	return r;
@@ -202,14 +204,14 @@ AST_Node *parse_for_stmt(Parser *parser, AST_Node *func) {
 	if ((parser->cur_token+1)->type == TOK_COL)
 		r->stmt_for.var = parse_var_def(parser);
 	else if ((parser->cur_token+1)->type == TOK_EQ)
-		r->stmt_for.var = parse_var_mut(parser);
+		r->stmt_for.var = parse_var_mut(parser, EXPR_PARSING_VAR);
 	else if ((parser->cur_token+1)->type == TOK_ASSIGN)
 		r->stmt_for.var = parse_var_assign(parser);
 	parser->cur_token++;
 
 	r->stmt_for.exp = parse_expr(parser, EXPR_PARSING_VAR, &r->stmt_for.var->var_def.type);
 	parser->cur_token++;
-	r->stmt_for.mut = parse_var_mut(parser);
+	r->stmt_for.mut = parse_var_mut(parser, EXPR_PARSING_STMT);
 	parser->cur_token++;
 	r->stmt_for.body = parse_body(parser, func);
 	return r;
@@ -235,7 +237,7 @@ AST_Node *parse_body(Parser *parser, AST_Node *func) {
 				if ((parser->cur_token+1)->type == TOK_COL)
 					da_append(&body->body.stmts, parse_var_def(parser));
 				else if ((parser->cur_token+1)->type == TOK_EQ)
-					da_append(&body->body.stmts, parse_var_mut(parser));
+					da_append(&body->body.stmts, parse_var_mut(parser, EXPR_PARSING_VAR));
 				else if ((parser->cur_token+1)->type == TOK_ASSIGN)
 					da_append(&body->body.stmts, parse_var_assign(parser));
 				else if ((parser->cur_token+1)->type == TOK_OPAR)
