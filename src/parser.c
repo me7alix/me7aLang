@@ -244,9 +244,10 @@ AST_Node *parse_function(Parser *parser) {
 	return fdn;
 }
 
-void parser_parse(Parser *parser) {
+void parser_parse(Parser *parser, Token *tokens) {
 	AST_Node *prog = ast_alloc((AST_Node){.type = AST_PROG});
 	parser->program = prog;
+	parser->cur_token = tokens;
 
 	while (parser->cur_token->type != TOK_EOF) {
 		switch (parser->cur_token->type) {

@@ -158,7 +158,7 @@ Symbol *parser_st_get(Parser *parser, const char *id);
 
 Symbol *st_get(SymbolTable *st, const char *id);
 void parser_alloc();
-void parser_parse(Parser *parser);
+void parser_parse(Parser *parser, Token *tokens);
 void parser_free(Parser parser);
 void expect_token(Token *token, TokenType type);
 AST_Node *parse_expr(Parser *parser, ExprParsingType type);

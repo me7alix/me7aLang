@@ -2,7 +2,7 @@
 #include "../include/lexer.h"
 #include "../include/parser.h"
 
-#include "nasm_codegen.c"
+#include "codegen.c"
 
 char *read_file(const char *filename) {
 	FILE* file = fopen(filename, "rb");
@@ -68,26 +68,16 @@ int main(void) {
 	Lexer lexer = lexer_alloc(code);
 	lexer_lex(&lexer);
 
-	for (size_t i = 0; i < lexer.tokens_num; i++) {
-		printf("%s\n", tok_to_str(lexer.tokens[i].type));
-	}
-
-	Parser parser = {
-		.cur_token = lexer.tokens,
-	};
-
-	parser_parse(&parser);
+	Parser parser = {0};
+	parser_parse(&parser, lexer.tokens);
 
 	NASM_Codegen cg = {0};
-	cg.st = parser.st;
+	nasm_codegen(&cg, &parser);
 
-	printf("codegen get started\n");
-	nasm_codegen(&cg, parser.program);
-
-	printf("%s", sb_to_str(cg.code));
+	printf("NASM output:\n%s", sb_to_str(cg.code));
 	write_to_file("prog.asm", sb_to_str(cg.code));
 	system("nasm -f elf64 prog.asm");
-	system("gcc -no-pie prog.o -o prog");	
+	system("gcc -no-pie prog.o -o prog");
 	system("rm prog.asm");
 	system("rm prog.o");
 

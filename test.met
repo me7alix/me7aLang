@@ -1,10 +1,5 @@
 func main(): int {
-	a: int
+	b: int = 12
 
-	b: int = 12 - 3
-	c: int = 7
-
-	a = c + b
-
-	return c * (a + b)
+	return (100 + 44) / b
 }
