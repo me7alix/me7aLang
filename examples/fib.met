@@ -1,5 +1,5 @@
-extern print_int()
-extern print_char()
+extern print_int(var: int)
+extern print_char(var: i8)
 extern input_int(): int
 
 func main(): int {

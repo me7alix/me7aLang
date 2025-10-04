@@ -1,52 +1,49 @@
-extern InitWindow()
-extern SetTargetFPS()
-extern DrawRectangleLines()
-extern IsKeyPressed(): bool
-extern IsKeyDown(): bool
-extern WindowShouldClose(): bool
-extern ClearBackground()
-extern BeginDrawing()
-extern EndDrawing()
-extern CloseWindow()
-extern GetRandomValue(): int
-
-func rect(x: int, y: int, w: int, h: int, c: int) {
-	DrawRectangleLines(x, y, w, h, c)
-}
+extern InitWindow         rl_init_window(width: int, height: int, title: *i8)
+extern SetTargetFPS       rl_set_target_fps(fps: int)
+extern DrawRectangleLines rl_draw_rect_lines(x: int, y: int, w: int, h: int, clr: int)
+extern GetRandomValue     rl_get_rand_val(from: int, to: int): int
+extern IsKeyDown          rl_is_key_down(key: int): bool
+extern WindowShouldClose  rl_window_should_close(): bool
+extern ClearBackground    rl_clear_bg(clr: int)
+extern BeginDrawing       rl_begin_drawing()
+extern EndDrawing         rl_end_drawing()
+extern CloseWindow        rl_close_window()
 
 func main(): int {
 	WHITE := 4126537215
 
-	SCREEN_WIDTH := 800
+	SCREEN_WIDTH  := 800
 	SCREEN_HEIGHT := 600
 
 	KEY_D := 68; KEY_A := 65
 
-	InitWindow(800, 600, 0:i64)
-	SetTargetFPS(60)
+	rl_init_window(800, 600, 0:*i8)
+	rl_set_target_fps(60)
 
-	ball_speed := 5
-	ball_r := 15
-	ball_x := GetRandomValue(100, SCREEN_WIDTH - 100)
-	ball_y := GetRandomValue(100, SCREEN_HEIGHT/2)
-	ball_dir_x := GetRandomValue(0, 1) * 2 - 1
-	ball_dir_y := -1
+	// Ball
+	ball_speed   := 5
+	ball_r       := 15
+	ball_x       := rl_get_rand_val(100, SCREEN_WIDTH - 100)
+	ball_y       := rl_get_rand_val(100, SCREEN_HEIGHT/2)
+	ball_dir_x   := rl_get_rand_val(0, 1) * 2 - 1
+	ball_dir_y   := -1
 	
+	// Paddle
 	paddle_speed := 4
-	paddle_w := 100
-	paddle_h := 15
-	paddle_x := SCREEN_WIDTH / 2 - paddle_w / 2
-	paddle_y := SCREEN_HEIGHT - paddle_h * 2
+	paddle_w     := 100
+	paddle_h     := 15
+	paddle_x     := SCREEN_WIDTH / 2 - paddle_w / 2
+	paddle_y     := SCREEN_HEIGHT - paddle_h * 2
 
-	while !WindowShouldClose() {
-		BeginDrawing()
-		ClearBackground(0)
+	while !rl_window_should_close() {
+		rl_begin_drawing()
+		rl_clear_bg(0)
 
 		ball_x = ball_x + ball_dir_x * ball_speed
 		ball_y = ball_y + ball_dir_y * ball_speed
 
 		if ball_y > SCREEN_HEIGHT - ball_r * 2 {
-			CloseWindow()
+			rl_close_window()
 		}
 
 		if ball_x < 0 || ball_x > SCREEN_WIDTH - ball_r * 2 {
@@ -57,11 +54,11 @@ func main(): int {
 			ball_dir_y = -ball_dir_y
 		}
 
-		if IsKeyDown(KEY_D) && paddle_x < SCREEN_WIDTH - paddle_w {
+		if rl_is_key_down(KEY_D) && paddle_x < SCREEN_WIDTH - paddle_w {
 			paddle_x = paddle_x + paddle_speed
 		}
 
-		if IsKeyDown(KEY_A) && paddle_x > 0 {
+		if rl_is_key_down(KEY_A) && paddle_x > 0 {
 			paddle_x = paddle_x - paddle_speed
 		}
 		
@@ -72,11 +69,11 @@ func main(): int {
 			ball_dir_y = -ball_dir_y
 		}
 
-		rect(ball_x, ball_y, ball_r*2, ball_r*2, WHITE)
-		rect(paddle_x, paddle_y, paddle_w, paddle_h, WHITE)
-		EndDrawing()
+		rl_draw_rect_lines(ball_x, ball_y, ball_r*2, ball_r*2, WHITE)
+		rl_draw_rect_lines(paddle_x, paddle_y, paddle_w, paddle_h, WHITE)
+		rl_end_drawing()
 	}
 
-	CloseWindow()
+	rl_close_window()
 	return 0
 }
