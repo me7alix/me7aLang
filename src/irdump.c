@@ -5,11 +5,12 @@
 
 void ir_dump_opr(Operand opr, char *buf) {
 	switch (opr.type) {
+		case OPR_NULL:      sprintf(buf, "NO");                     break;
+		case OPR_NAME:      sprintf(buf, "\"%s\"", opr.name);       break;
 		case OPR_VAR:       sprintf(buf, "(%zu)", opr.var.index);   break;
 		case OPR_IMM_INT:   sprintf(buf, "%li", opr.imm_int);       break;
 		case OPR_IMM_FLOAT: sprintf(buf, "%lf", opr.imm_float);     break;
-		case OPR_LABEL:     sprintf(buf, "L%zu", opr.label_index); break;
-		default: assert(!"unreachable");
+		case OPR_LABEL:     sprintf(buf, "L%zu", opr.label_index);  break;
 	}
 }
 
@@ -96,6 +97,18 @@ void ir_dump_func(Func func, FILE *fl) {
 				ir_dump_opr(inst.arg1, arg1);
 				ir_dump_opr(inst.dst, dst);
 				fprintf(fl, "    RETURN %s\n", arg1);
+				break;
+
+			case OP_FUNC_CALL:
+				ir_dump_opr(inst.dst, dst);
+				fprintf(fl, "    CALL   %s", dst);
+
+				for (size_t i = 0; i < inst.args[i].type != OPR_NULL; i++) {
+					ir_dump_opr(inst.args[i], arg1);
+					fprintf(fl, " %s", arg1);
+				}
+
+				fprintf(fl, "\n");
 				break;
 
 			default: assert(!"unreachable");

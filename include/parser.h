@@ -45,7 +45,7 @@ struct Type {
 
 typedef enum {
 	EXPR_PARSING_VAR, EXPR_PARSING_FUNC_CALL,
-	EXPR_PARSING_BRA, EXPR_PARSING_STMT,
+	EXPR_PARSING_PAR, EXPR_PARSING_STMT,
 } ExprParsingType;
 
 typedef enum {
@@ -163,6 +163,7 @@ void parser_parse(Parser *parser, Token *tokens);
 void parser_free(Parser parser);
 void expect_token(Token *token, TokenType type);
 AST_Node *parse_expr(Parser *parser, ExprParsingType type);
+AST_Node *parse_func_call(Parser *parser);
 AST_Node *ast_alloc(AST_Node node);
 
 #endif

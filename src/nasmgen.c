@@ -10,6 +10,11 @@
 
 #define TAB "    "
 
+static char *argreg8[] = {"dil", "sil", "dl", "cl", "r8b", "r9b"};
+static char *argreg16[] = {"di", "si", "dx", "cx", "r8w", "r9w"};
+static char *argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
+static char *argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+
 da(struct {
 	size_t index;
 	size_t stack_off;
@@ -33,6 +38,7 @@ char opr_to_nasm_buf[64];
 
 char *opr_to_nasm(Operand opr) {
 	switch (opr.type) {
+		case OPR_NULL: case OPR_NAME: assert(!"unreachable"); 
 		case OPR_IMM_FLOAT: sprintf(opr_to_nasm_buf, "%lf", opr.imm_float);     break;
 		case OPR_IMM_INT:   sprintf(opr_to_nasm_buf, "%li", opr.imm_int);       break;
 		case OPR_LABEL:     sprintf(opr_to_nasm_buf, ".L%zu", opr.label_index); break;
@@ -96,7 +102,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 
 	sb_reset(&body);
 
-	total_offset = 0;
+	total_offset = 8;
 
 	for (size_t i = 0; i < func.body.count; i++) {
 		Instruction ci = da_get(&func.body, i);
@@ -113,8 +119,6 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 						iot_add(ci.dst.var.index, total_offset);
 						sprintf(dst, "byte [rbp - %zu]", total_offset);
 						reg_alloc(ci, arg1, arg2);
-						//sprintf(arg1, "eax");
-						//sprintf(arg2, "ecx");
 						break;
 
 					case TYPE_INT:
@@ -122,8 +126,6 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 						iot_add(ci.dst.var.index, total_offset);
 						sprintf(dst, "dword [rbp - %zu]", total_offset);
 						reg_alloc(ci, arg1, arg2);
-						//sprintf(arg1, "eax");
-						//sprintf(arg2, "ecx");
 						break;
 
 					default: assert(!"unreachable");
@@ -143,7 +145,6 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 				else if (ci.op == OP_EQ) {
 					sb_append_strf(&body, TAB"cmp %s, %s\n", arg1, arg2);
 					sb_append_strf(&body, TAB"sete al\n");
-					//sb_append_strf(&body, TAB"movzx eax, al\n");
 					sprintf(arg1, "al");
 				}
 
@@ -209,10 +210,19 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 				sb_append_strf(&body, TAB"ret\n");
 			} break;
 
+			case OP_FUNC_CALL: {
+				for (size_t i = 0; i < ci.args[i].type != OPR_NULL; i++) {
+					sb_append_strf(&body, TAB"mov %s, %s\n", argreg32[i], opr_to_nasm(ci.args[i]));
+				}
+
+				sb_append_strf(&body, TAB"call %s\n", ci.dst.name);
+			} break;
+
 			default: assert(!"unreachable");
 		}
 	}
 
+	sb_append_strf(code, TAB"sub rsp, %zu\n", total_offset);
 	sb_append_strf(code, sb_to_str(body));
 	if (da_last(&func.body).op != OP_RETURN) {
 		sb_append_strf(code, TAB"mov rsp, rbp\n");
@@ -225,6 +235,9 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 
 StringBuilder nasm_gen_prog(Program *prog) {
 	StringBuilder code = {0};
+
+	// runtime
+	sb_append_str(&code, "extern print_int\n");
 
 	sb_append_str(&code, "section .text\n");
 

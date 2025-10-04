@@ -208,6 +208,8 @@ AST_Node *parse_body(Parser *parser, AST_Node *func) {
 					da_append(&body->body.stmts, parse_var_mut(parser));
 				else if ((parser->cur_token+1)->type == TOK_ASSIGN)
 					da_append(&body->body.stmts, parse_var_assign(parser));
+				else if ((parser->cur_token+1)->type == TOK_OPAR)
+					da_append(&body->body.stmts, parse_func_call(parser));
 				break;
 
 			case TOK_IF_SYM:

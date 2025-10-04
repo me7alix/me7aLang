@@ -9,7 +9,6 @@
 #define SB_IMPLEMENTATION
 #include "irdump.c"
 #include "nasmgen.c"
-//#include "codegen.c"
 
 char *read_file(const char *filename) {
 	FILE* file = fopen(filename, "rb");
@@ -127,22 +126,23 @@ int main(int argc, char **argv) {
 	char buf[512];
 	char output_file[256];
 
-	Program *prog = ir_gen_prog(parser.program);
-	if (save_ir_output) {
-		sprintf(buf, "%s.ir", output_bin);
-		ir_dump_prog(prog, buf);
-	}
-
-	StringBuilder cg = nasm_gen_prog(prog);
+	Program prog = ir_gen_prog(parser.program);
+	StringBuilder cg = nasm_gen_prog(&prog);
 
 	sprintf(output_file, "%s.asm", output_bin);
 	write_to_file(output_file, sb_to_str(cg));
 
-	sprintf(buf, "nasm -f elf64 %s", output_file); system(buf);
-	sprintf(buf, "gcc -no-pie %s.o -o %s", output_bin, output_bin); system(buf);
-	sprintf(buf, "rm %s.o", output_bin); system(buf);
+	sprintf(buf, "nasm -f elf64 %s", output_file); system(buf); printf("info: %s\n", buf);
+	sprintf(buf, "gcc -no-pie ./examples/runtime.o %s.o -o %s", output_bin, output_bin); system(buf); printf("info: %s\n", buf);
+	sprintf(buf, "rm %s.o", output_bin); system(buf);  printf("info: %s\n", buf);
 	if (!save_asm_output) { sprintf(buf, "rm %s", output_file); system(buf); }
+	if (save_ir_output) {
+		sprintf(buf, "%s.ir", output_bin);
+		ir_dump_prog(&prog, buf);
+	}
 
 	lexer_free(&lexer);
+	//parser_free(parser);
+	da_free(&prog.funcs);
 	return 0;
 }

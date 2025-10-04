@@ -23,9 +23,11 @@ typedef enum {
 } OpCode;
 
 typedef enum {
+	OPR_NULL,
 	OPR_IMM_INT,
 	OPR_IMM_FLOAT,
 	OPR_LABEL,
+	OPR_NAME,
 	OPR_VAR,
 } OperandType;
 
@@ -36,6 +38,7 @@ typedef struct {
 		int64_t imm_int;
 		double_t imm_float;
 		size_t label_index;
+		char *name;
 		struct {
 			Type type;
 			size_t index;
@@ -45,9 +48,15 @@ typedef struct {
 
 typedef struct {
 	OpCode op;
-	Operand arg1;
-	Operand arg2;
 	Operand dst;
+
+	union {
+		Operand args[8];
+		struct {
+			Operand arg1;
+			Operand arg2;
+		};
+	};
 } Instruction;
 
 typedef struct {
@@ -66,6 +75,6 @@ typedef struct {
 	da(Func) funcs;
 } Program;
 
-Program *ir_gen_prog(AST_Node *pn);
+Program ir_gen_prog(AST_Node *pn);
 
 #endif // IR_H

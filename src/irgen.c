@@ -148,6 +148,26 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 				}
 			} break;
 
+			case AST_FUNC_CALL: {
+				Instruction func_call = {
+					.op = OP_FUNC_CALL,
+					.dst = (Operand) {
+						.type = OPR_NAME,
+						.name = cn->func_call.id,
+					},
+				};
+
+				assert(cn->func_call.args.count < 6);
+				for (size_t i = 0; i < cn->func_call.args.count; i++) {
+					AST_Node *arg = da_get(&cn->func_call.args, i);
+					func_call.args[i] = ir_gen_expr(func, arg);
+				}
+
+				func_call.args[cn->func_call.args.count] = (Operand) {.type = OPR_NULL};
+
+				da_append(&func->body,  func_call);
+			} break;
+
 			case AST_FUNC_RET: {
 				Operand res = ir_gen_expr(func, cn->func_ret.exp);
 				switch (res.type) {
@@ -275,15 +295,15 @@ void ir_gen_func(Program *prog, AST_Node *fn) {
 	da_append(&prog->funcs, func);
 }
 
-Program *ir_gen_prog(AST_Node *pn) {
-	Program *prog = calloc(1, sizeof(Program));
+Program ir_gen_prog(AST_Node *pn) {
+	Program prog = {0};
 	label_index = 0;
 
 	for (size_t i = 0; i < pn->program.stmts.count; i++) {
 		AST_Node *cn = da_get(&pn->program.stmts, i);
 		switch (cn->type) {
 			case AST_FUNC_DEF:
-				ir_gen_func(prog, cn);
+				ir_gen_func(&prog, cn);
 				break;
 
 			default: assert(!"unreachable");

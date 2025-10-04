@@ -36,18 +36,25 @@ float op_cost(TokenType op, bool is_left) {
 AST_Node *parse_func_call(Parser *parser) {
 	AST_Node *fcn = ast_alloc((AST_Node){.type = AST_FUNC_CALL});
 	fcn->func_call.id = parser->cur_token->data;
-	expect_token(parser->cur_token++, TOK_OPAR);
+	expect_token(++parser->cur_token, TOK_OPAR);
+	parser->cur_token++;
 
 	while (parser->cur_token->type != TOK_EOF) {
-		switch ((parser->cur_token++)->type) {
+		printf("%s\n", parser->cur_token->data);
+		switch (parser->cur_token->type) {
 			case TOK_CPAR:
+				parser->cur_token++;
+				printf("here\n");
 				return fcn;
 			case TOK_ID: case TOK_OPAR:
 			case TOK_FLOAT: case TOK_INT:
+				printf("start\n");
 				da_append(&fcn->func_call.args, parse_expr(parser, EXPR_PARSING_FUNC_CALL));
 				break;
 			default: /* TODO: error handling */ break;
 		}
+
+		parser->cur_token++;
 	}
 
 	return fcn;
@@ -135,19 +142,20 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type) {
 	while (true) {
 		if (parser->cur_token->type == TOK_OPAR) {
 			parser->cur_token++;
-			da_append(&nodes, parse_expr(parser, EXPR_PARSING_BRA));
+			da_append(&nodes, parse_expr(parser, EXPR_PARSING_PAR));
 		}
 
 		if (type == EXPR_PARSING_FUNC_CALL) {
-			if (parser->cur_token->type == TOK_COM ||
-				parser->cur_token->type == TOK_CPAR) {
+			if (parser->cur_token->type == TOK_COM) break;
+			else if (parser->cur_token->type == TOK_CPAR) {
+				parser->cur_token--;
 				break;
 			}
 		} else if (type == EXPR_PARSING_VAR) {
 			if (parser->cur_token->type == TOK_SEMI) {
 				break;
 			}
-		} else if (type == EXPR_PARSING_BRA) {
+		} else if (type == EXPR_PARSING_PAR) {
 			if (parser->cur_token->type == TOK_CPAR) {
 				parser->cur_token++;
 				break;
