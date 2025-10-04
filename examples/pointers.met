@@ -10,12 +10,12 @@ func change_fifth(nums: [10]int) {
 func main(): int {
 	nums: [10]int
 
-	for i: iptr = 0; i < 10; i=i+1 {
+	for i: iptr = 0; i < 10; i+=1 {
 		*(nums + i) = (i * i):int
 	}
 
 	change_fifth(nums)
-	for i: iptr = 0; i < 10; i=i+1 {
+	for i: iptr = 0; i < 10; i+=1 {
 		print_int(*(nums + i))
 	}
 
@@ -26,11 +26,11 @@ func main(): int {
 
 	nums2: *int = malloc(sizeof:int * 10)
 
-	for i: iptr = 0; i < 10; i=i+1 {
+	for i: iptr = 0; i < 10; i+=1 {
 		*(nums2 + i) = *(nums + i)
 	}
 
-	for i: iptr = 0; i < 10; i=i+1 {
+	for i: iptr = 0; i < 10; i+=1 {
 		print_int(*(nums2 + i))
 	}
 

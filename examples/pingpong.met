@@ -43,8 +43,8 @@ func main(): int {
 		rl_begin_drawing()
 		rl_clear_bg(0xFF000000)
 
-		ball_x = ball_x + ball_dir_x * ball_speed
-		ball_y = ball_y + ball_dir_y * ball_speed
+		ball_x += ball_dir_x * ball_speed
+		ball_y += ball_dir_y * ball_speed
 
 		if ball_y > SCREEN_HEIGHT - ball_r * 2 {
 			rl_close_window()
@@ -59,11 +59,11 @@ func main(): int {
 		}
 
 		if rl_is_key_down(KEY_D) && paddle_x < SCREEN_WIDTH - paddle_w {
-			paddle_x = paddle_x + paddle_speed
+			paddle_x += paddle_speed
 		}
 
 		if rl_is_key_down(KEY_A) && paddle_x > 0 {
-			paddle_x = paddle_x - paddle_speed
+			paddle_x -= paddle_speed
 		}
 		
 		x_check := paddle_x + paddle_w > ball_x && paddle_x < ball_x + ball_r * 2
