@@ -8,18 +8,31 @@
 int64_t parse_int(char *data) { return atol(data); }
 double parse_float(char *data) { return atof(data); }
 
-float op_cost(char op, bool is_left) {
-	switch (op) {
+float op_cost(char *op, bool is_left) {
+	switch (*op) {
 		case '+': case '-':
-			if (is_left)
-				return 1.1;
-			else
-				return 1.0;
+			if (is_left) return 1.1;
+			else         return 1.0;
 		case '*': case '/':
-			if (is_left)
-				return 2.1;
-			else
-				return 2.0;
+			if (is_left) return 2.1;
+			else         return 2.0;
+	}
+
+	if (strcmp(op, "==") == 0) {
+		if (is_left) return 0.9;
+		else         return 0.9;
+	} else if (strcmp(op, ">=") == 0) {
+		if (is_left) return 0.9;
+		else         return 0.9;
+	} else if (strcmp(op, "<=") == 0) {
+		if (is_left) return 0.9;
+		else         return 0.9;
+	} else if (strcmp(op, "&&") == 0) {
+		if (is_left) return 0.9;
+		else         return 0.9;
+	} else if (strcmp(op, "||") == 0) {
+		if (is_left) return 0.9;
+		else         return 0.9;
 	}
 
 	return 0.0;
@@ -166,7 +179,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type) {
 			case TOK_STAR: case TOK_SLASH:
 				da_append(&nodes, ast_alloc((AST_Node){
 							.type = AST_BIN_EXP,
-							.exp_binary.op = parser->cur_token->data[0],
+							.exp_binary.op = parser->cur_token->data,
 							.exp_binary.l = NULL,
 							.exp_binary.r = NULL
 							}));

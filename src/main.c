@@ -58,28 +58,66 @@ int write_to_file(const char *filename, const char *text) {
 }
 
 
-int main(void) {
-	char *code = read_file("test.met");
-	if (code == NULL) {
-		perror("error while opening file\n");
+int main(int argc, char **argv) {
+	char *input_file = NULL;
+	char *output_bin = NULL;
+	bool save_asm_output = false;
+
+	if (argc == 1) {
+		printf(
+			"Usage: options file...\n"
+			"Options:\n"
+			"  -o   Output file path\n"
+			"  -asm Returns asm output");
 		return 0;
 	}
 
-	Lexer lexer = lexer_alloc(code);
-	lexer_lex(&lexer);
+	for (size_t i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "-o") == 0) {
+			if (i >= argc) {
+				fprintf(stderr, "invalid -o argument\n");
+				return 1;
+			}
+
+			output_bin = argv[i+1];
+			i++;
+		} else if (strcmp(argv[i], "-asm") == 0) {
+			save_asm_output = true;
+		} else {
+			if (argv[i][0] == '-') {
+				fprintf(stderr, "invalid option\n");
+				return 1;
+			}
+
+			input_file = argv[i];
+		}
+	}
+
+	char *code = read_file(input_file);
+	if (code == NULL) {
+		perror("error while opening file\n");
+		return 1;
+	}
+
+	Lexer lexer = {0};
+	lexer_lex(&lexer, code);
 
 	Parser parser = {0};
-	parser_parse(&parser, lexer.tokens);
+	parser_parse(&parser, lexer.tokens.items);
 
 	NASM_Codegen cg = {0};
 	nasm_codegen(&cg, &parser);
 
-	printf("NASM output:\n%s", sb_to_str(cg.code));
-	write_to_file("prog.asm", sb_to_str(cg.code));
-	system("nasm -f elf64 prog.asm");
-	system("gcc -no-pie prog.o -o prog");
-	system("rm prog.asm");
-	system("rm prog.o");
+	char buf[512];
+	char output_file[256];
+
+	sprintf(output_file, "%s.asm", output_bin);
+	write_to_file(output_file, sb_to_str(cg.code));
+
+	sprintf(buf, "nasm -f elf64 %s", output_file); system(buf);
+	sprintf(buf, "gcc -no-pie %s.o -o %s", output_bin, output_bin); system(buf);
+	sprintf(buf, "rm %s.o", output_bin); system(buf);
+	if (!save_asm_output) { sprintf(buf, "rm %s", output_file); system(buf); }
 
 	lexer_free(&lexer);
 	return 0;

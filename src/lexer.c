@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <threads.h>
 #include "../include/lexer.h"
 
 char *get_word(Lexer *lexer) {
@@ -24,16 +25,11 @@ char *get_word(Lexer *lexer) {
 }
 
 void add_token(Lexer *lexer, TokenType type, char *data) {
-	if (lexer->tokens_num >= lexer->tokens_cap) {
-		lexer->tokens_cap *= 2;
-		lexer->tokens = realloc(lexer->tokens, lexer->tokens_cap * sizeof(Token));
-	}
-
-	lexer->tokens[lexer->tokens_num++] = (Token) {
+	da_append(&lexer->tokens, ((Token) {
 		.type = type,
 		.data = data,
 		.location = lexer->cur_loc,
-	};
+	}));
 }
 
 bool is_tok(Lexer *lexer, char *tok, TokenType type, char *str) {
@@ -47,16 +43,6 @@ bool is_tok(Lexer *lexer, char *tok, TokenType type, char *str) {
 		lexer->cur_char++;
 
 	return true;
-}
-
-Lexer lexer_alloc(char *code) {
-	return (Lexer) {
-		.cur_char = code,
-		.tokens = malloc(sizeof(Token) * 32),
-		.tokens_num = 0,
-		.tokens_cap = 32,
-		.cur_loc = (Location) {0, code},
-	};
 }
 
 void lexer_error(Lexer *lexer, char *error) {
@@ -88,7 +74,9 @@ void lexer_error(Lexer *lexer, char *error) {
 	exit(1);
 }
 
-void lexer_lex(Lexer *lexer) {
+void lexer_lex(Lexer *lexer, char *code) {
+	lexer->cur_char = code;
+
 	while (*lexer->cur_char != '\0') {
 		switch (*lexer->cur_char) {
 			case ' ': case '\t': break;
@@ -99,9 +87,6 @@ void lexer_lex(Lexer *lexer) {
 			case '+': add_token(lexer, TOK_PLUS, "+"); break;
 			case '-': add_token(lexer, TOK_MINUS, "-"); break;
 			case '*': add_token(lexer, TOK_STAR, "*"); break;
-			case '=': add_token(lexer, TOK_EQ, "="); break;
-			case '>': add_token(lexer, TOK_GREAT, ">"); break;
-			case '<': add_token(lexer, TOK_LESS, "<"); break;
 			case ';': add_token(lexer, TOK_SEMI, ";"); break;
 			case '.': add_token(lexer, TOK_DOT, "."); break;
 			case '&': add_token(lexer, TOK_AMP, "&"); break;
@@ -109,11 +94,38 @@ void lexer_lex(Lexer *lexer) {
 			case ',': add_token(lexer, TOK_COM, ","); break;
 			case '|': add_token(lexer, TOK_PIPE, "|"); break;
 
+			case '>': {
+				if (lexer->cur_char[1] == '=') {
+					add_token(lexer, TOK_GREAT_EQ, ">=");
+					lexer->cur_char++;
+				} else {
+					add_token(lexer, TOK_GREAT, ">");
+				}
+			} break;
+
+			case '<': {
+				if (lexer->cur_char[1] == '=') {
+					add_token(lexer, TOK_LESS_EQ, "<=");
+					lexer->cur_char++;
+				} else {
+					add_token(lexer, TOK_LESS, "<");
+				}
+			} break;
+
+			case '=': {
+				if (lexer->cur_char[1] == '=') {
+					add_token(lexer, TOK_EQ_EQ, "==");
+					lexer->cur_char++;
+				} else {
+					add_token(lexer, TOK_EQ, "=");
+				}
+			} break;
+
 			case '\n':
-				if (lexer->tokens[lexer->tokens_num-1].type != TOK_SEMI &&
-					lexer->tokens[lexer->tokens_num-1].type != TOK_CBRA &&
-					lexer->tokens[lexer->tokens_num-1].type != TOK_OBRA &&
-					lexer->tokens[lexer->tokens_num-1].type != TOK_COM)
+				if (da_last(&lexer->tokens).type != TOK_SEMI &&
+					da_last(&lexer->tokens).type != TOK_CBRA &&
+					da_last(&lexer->tokens).type != TOK_OBRA &&
+					da_last(&lexer->tokens).type != TOK_COM)
 					add_token(lexer, TOK_SEMI, ";");
 				lexer->cur_loc.line_num++;
 				lexer->cur_loc.line_start = lexer->cur_char + 1;
@@ -204,7 +216,7 @@ void lexer_lex(Lexer *lexer) {
 }
 
 void lexer_free(Lexer *lexer) {
-	free(lexer->tokens);
+	da_free(&lexer->tokens);
 }
 
 const char *tok_to_str(TokenType tok_type) {

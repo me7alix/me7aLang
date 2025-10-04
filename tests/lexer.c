@@ -23,15 +23,15 @@ bool tok_compare(Token a, Token b) {
 
 
 bool test_lexer(char *code, Token *tokens, size_t tokens_num) {
-	Lexer lexer = lexer_alloc(code);
-	lexer_lex(&lexer);
+	Lexer lexer = {0};
+	lexer_lex(&lexer, code);
 
-	if (tokens_num != lexer.tokens_num) 
+	if (tokens_num != lexer.tokens.count) 
 		return false;
 
-	for (size_t i = 0; i < lexer.tokens_num; i++) {
-		if (!tok_compare(lexer.tokens[i], tokens[i])) {
-			printf("error: %s | %s\n", tok_to_str(lexer.tokens[i].type), tok_to_str(tokens[i].type));
+	for (size_t i = 0; i < lexer.tokens.count; i++) {
+		if (!tok_compare(da_get(&lexer.tokens, i), tokens[i])) {
+			printf("error: %s | %s\n", tok_to_str(da_get(&lexer.tokens, i).type), tok_to_str(tokens[i].type));
 			return false;
 		}
 	}
@@ -67,7 +67,7 @@ int main() {
 		{ .type = TOK_EOF },
 	};
 
-	run_test(test_code_1, test_tokens_1, ARR_LEN(test_tokens_1), 1);	
+	run_test(test_code_1, test_tokens_1, ARR_LEN(test_tokens_1), 1);
 
 	char *test_code_2 = "func print_hi() {\n println(\"hi\")\n}";
 	Token test_tokens_2[] = {
@@ -85,15 +85,14 @@ int main() {
 		{ .type = TOK_EOF },
 	};
 
-	run_test(test_code_2, test_tokens_2, ARR_LEN(test_tokens_2), 2);	
+	run_test(test_code_2, test_tokens_2, ARR_LEN(test_tokens_2), 2);
 
 	char *test_code_3 = "if (a == b && c != true || 10 == 10)";
 	Token test_tokens_3[] = {
 		{ .type = TOK_IF_SYM },
 		{ .type = TOK_OPAR },
 		{ .type = TOK_ID, .data = "a" },
-		{ .type = TOK_EQ },
-		{ .type = TOK_EQ },
+		{ .type = TOK_EQ_EQ },
 		{ .type = TOK_ID, .data = "b" },
 		{ .type = TOK_AMP },
 		{ .type = TOK_AMP },
@@ -104,14 +103,13 @@ int main() {
 		{ .type = TOK_PIPE },
 		{ .type = TOK_PIPE },	
 		{ .type = TOK_INT, .data = "10" },
-		{ .type = TOK_EQ },
-		{ .type = TOK_EQ },
+		{ .type = TOK_EQ_EQ },
 		{ .type = TOK_INT, .data = "10" },
 		{ .type = TOK_CPAR },
 		{ .type = TOK_EOF },
 	};
 
-	run_test(test_code_3, test_tokens_3, ARR_LEN(test_tokens_3), 3);	
+	run_test(test_code_3, test_tokens_3, ARR_LEN(test_tokens_3), 3);
 
 	printf("\n");
 	return 0;

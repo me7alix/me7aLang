@@ -10,7 +10,6 @@ build:
 tests: build
 	./build/lexer_tests
 	./build/parser_expr_tests
-	./build/main
 
 clean:
 	rm -rf build

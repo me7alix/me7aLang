@@ -104,7 +104,7 @@ struct AST_Node {
 			AST_Node *v;
 		} exp_unary;
 		struct {
-			char op;
+			char *op;
 			Type *type;
 			AST_Node *l, *r;
 		} exp_binary;

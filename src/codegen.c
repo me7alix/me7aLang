@@ -1,4 +1,3 @@
-#include <stdint.h>
 #define SB_IMPLEMENTATION
 #include "../thirdparty/sb.h"
 #include "../include/parser.h"
@@ -41,7 +40,7 @@ void nasm_codegen_expr_int(NASM_Codegen *cg, Type *type, AST_Node *exp, char *ad
 	bool isLv = exp->exp_binary.l->type != AST_BIN_EXP;
 	bool isRv = exp->exp_binary.r->type != AST_BIN_EXP;
 
-	switch (exp->exp_binary.op) {
+	switch (*exp->exp_binary.op) {
 		case '+': {
 			if (isLv && isRv) {
 				nasm_codegen_expr_get_val(cg, src_buf, exp->exp_binary.l);

@@ -16,7 +16,7 @@ double calculate_expr(AST_Node *exp) {
 	double a = calculate_expr(exp->exp_binary.l);
 	double b = calculate_expr(exp->exp_binary.r);
 
-	switch (exp->exp_binary.op) {
+	switch (*exp->exp_binary.op) {
 		case '+':
 			return a + b;
 		case '*':
@@ -31,9 +31,9 @@ double calculate_expr(AST_Node *exp) {
 }
 
 void test_expression(int test_num, char *expr_str, double result) {
-	Lexer lexer = lexer_alloc(expr_str);
-	lexer_lex(&lexer);
-	Parser parser = {.cur_token = lexer.tokens};
+	Lexer lexer = {0};
+	lexer_lex(&lexer, expr_str);
+	Parser parser = {.cur_token = lexer.tokens.items};
 
 	AST_Node *res = parse_expr(&parser, EXPR_PARSING_VAR);
 	double res_val = calculate_expr(res);

@@ -1,5 +1,8 @@
 func main(): int {
-	b: int = 12
+	c: int
+	a: int = 5
+	b: int = 20
+	c = 20 / 5
 
-	return (100 + 44) / b
+	return c * 2
 }
