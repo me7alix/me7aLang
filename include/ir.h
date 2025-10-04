@@ -24,6 +24,7 @@ typedef enum {
 
 typedef enum {
 	OPR_NULL,
+	OPR_FUNC_RET,
 	OPR_LITERAL,
 	OPR_LABEL,
 	OPR_NAME,
@@ -37,6 +38,9 @@ typedef struct {
 		Literal literal;
 		size_t label_index;
 		char *name;
+		struct {
+			Type type;
+		} func_ret;
 		struct {
 			Type type;
 			size_t index;
@@ -70,9 +74,16 @@ typedef struct {
 } Func;
 
 typedef struct {
+	char *name;
+	Type ret_type;
+	da(FuncArg) args;
+} Extern;
+
+typedef struct {
+	da(Extern) externs;
 	da(Func) funcs;
 } Program;
 
-Program ir_gen_prog(AST_Node *pn);
+Program ir_gen_prog(Parser *parser);
 
 #endif // IR_H

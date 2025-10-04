@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
 	char buf[512];
 	char output_file[256];
 
-	Program prog = ir_gen_prog(parser.program);
+	Program prog = ir_gen_prog(&parser);
 	if (save_ir_output) {
 		sprintf(buf, "%s.ir", output_bin);
 		ir_dump_prog(&prog, buf);
@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
 	write_to_file(output_file, sb_to_str(cg));
 
 	sprintf(buf, "nasm -f elf64 %s", output_file); system(buf); printf("info: %s\n", buf);
-	sprintf(buf, "gcc -no-pie ./examples/runtime.o %s.o -o %s", output_bin, output_bin); system(buf); printf("info: %s\n", buf);
+	sprintf(buf, "gcc -no-pie ./examples/runtime.o %s.o -o %s -lraylib", output_bin, output_bin); system(buf); printf("info: %s\n", buf);
 	sprintf(buf, "rm %s.o", output_bin); system(buf);  printf("info: %s\n", buf);
 	if (!save_asm_output) { sprintf(buf, "rm %s", output_file); system(buf); }
 

@@ -67,6 +67,8 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 	return (Operand) {0};
 }
 
+void ir_gen_func_call(Func *func, AST_Node *cn);
+
 Operand ir_gen_expr(Func *func, AST_Node *en) {
 	switch (en->type) {
 		case AST_LITERAL: {
@@ -84,16 +86,24 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 				.var.type = v.type,
 				.var.index = v.index,
 			};
+		} break;
 
+		case AST_FUNC_CALL: {
+			ir_gen_func_call(func, en);
+
+			return (Operand) {
+				.type = OPR_FUNC_RET,
+				.func_ret.type = en->func_call.type,
+			};
 		} break;
 
 		case AST_BIN_EXP: {
 			Operand l = ir_gen_expr(func, en->exp_binary.l);
 			Operand r = ir_gen_expr(func, en->exp_binary.r);
 
-			bool ret;
-			Operand calc = ir_opr_calc(en, l, r, &ret);
-			if (ret) return calc;
+			//bool ret;
+			//Operand calc = ir_opr_calc(en, l, r, &ret);
+			//if (ret) return calc;
 
 			Instruction inst = {
 				.arg1 = l,
@@ -198,33 +208,37 @@ void ir_gen_var_mut(Func *func, AST_Node *cn) {
 	}
 }
 
+void ir_gen_func_call(Func *func, AST_Node *cn) {
+	Instruction func_call = {
+		.op = OP_FUNC_CALL,
+		.dst = (Operand) {
+			.type = OPR_NAME,
+			.name = cn->func_call.id,
+		},
+	};
+
+	assert(cn->func_call.args.count < 7);
+	for (size_t i = 0; i < cn->func_call.args.count; i++) {
+		AST_Node *arg = da_get(&cn->func_call.args, i);
+		func_call.args[i] = ir_gen_expr(func, arg);
+	}
+
+	func_call.args[cn->func_call.args.count] = (Operand) {.type = OPR_NULL};
+
+	da_append(&func->body,  func_call);
+}
+
 void ir_gen_body(Func *func, AST_Node *fn) {
 	for (size_t i = 0; i < fn->body.stmts.count; i++) {
 		AST_Node *cn = da_get(&fn->body.stmts, i);
 		switch (cn->type) {
-			case AST_VAR_DEF: {
+			case AST_VAR_DEF:
 				ir_gen_var_def(func, cn);
-			} break;
+				break;
 
-			case AST_FUNC_CALL: {
-				Instruction func_call = {
-					.op = OP_FUNC_CALL,
-					.dst = (Operand) {
-						.type = OPR_NAME,
-						.name = cn->func_call.id,
-					},
-				};
-
-				assert(cn->func_call.args.count < 7);
-				for (size_t i = 0; i < cn->func_call.args.count; i++) {
-					AST_Node *arg = da_get(&cn->func_call.args, i);
-					func_call.args[i] = ir_gen_expr(func, arg);
-				}
-
-				func_call.args[cn->func_call.args.count] = (Operand) {.type = OPR_NULL};
-
-				da_append(&func->body,  func_call);
-			} break;
+			case AST_FUNC_CALL:
+				ir_gen_func_call(func, cn);
+				break;
 
 			case AST_FUNC_RET: {
 				Operand res = ir_gen_expr(func, cn->func_ret.exp);
@@ -385,10 +399,21 @@ void ir_gen_func(Program *prog, AST_Node *fn) {
 	da_append(&prog->funcs, func);
 }
 
-Program ir_gen_prog(AST_Node *pn) {
+Program ir_gen_prog(Parser *parser) {
 	Program prog = {0};
 	label_index = 0;
 
+	for (size_t i = 0; i < parser->st.count; i++) {
+		Symbol cs = da_get(&parser->st, i);
+		if (cs.type == SBL_FUNC_EXTERN) {
+			da_append(&prog.externs, ((Extern){
+				.name = cs.id,
+				.ret_type = cs.func_extern.type,
+			}));
+		}
+	}
+
+	AST_Node *pn = parser->program;
 	for (size_t i = 0; i < pn->program.stmts.count; i++) {
 		AST_Node *cn = da_get(&pn->program.stmts, i);
 		switch (cn->type) {
@@ -399,6 +424,7 @@ Program ir_gen_prog(AST_Node *pn) {
 			default: unreachable;
 		}
 	}
+
 
 	return prog;
 }

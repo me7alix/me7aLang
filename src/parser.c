@@ -22,6 +22,7 @@ void set_nested(int pn[16], int n[16]) {
 }
 
 void parser_st_add(Parser *parser, Symbol smbl) {
+	printf("%d : %s\n", smbl.type, smbl.id);
 	set_nested(parser->nested, smbl.nested);
 	da_append(&parser->st, smbl);
 }
@@ -57,6 +58,9 @@ Type parse_type(Parser *parser) {
 	} else if (strcmp(type_name, "i8") == 0) {
 		type.kind = TYPE_I8;
 		type.size = 1;
+	} else if (strcmp(type_name, "i64") == 0) {
+		type.kind = TYPE_I64;
+		type.size = 8;
 	}
 
 	return type;
@@ -91,12 +95,12 @@ AST_Node *parse_var_def(Parser *parser) {
 	Type type = parse_type(parser);
 	parser->cur_token++;
 
-	AST_Node *vdn = ast_new(
+	AST_Node *vdn = ast_new({
 		.type = AST_VAR_DEF,
-	.var_def.id = id,
-	.var_def.type = type,
-	.var_def.exp = NULL,
-);
+		.var_def.id = id,
+		.var_def.type = type,
+		.var_def.exp = NULL,
+	});
 
 	if (parser->cur_token->type == TOK_EQ) {
 		parser->cur_token++;
@@ -104,6 +108,7 @@ AST_Node *parse_var_def(Parser *parser) {
 	}
 
 	parser_st_add(parser, (Symbol) {
+		.type = SBL_VAR,
 		.id = vdn->var_def.id,
 		.variable.type = type,
 	});
@@ -117,11 +122,11 @@ AST_Node *parse_var_assign(Parser *parser) {
 
 	AST_Node *exp = parse_expr(parser, EXPR_PARSING_VAR, NULL);
 
-	AST_Node *vdn = ast_new(
+	AST_Node *vdn = ast_new({
 		.type = AST_VAR_DEF,
 		.var_def.id = id,
 		.var_def.exp = exp,
-	);
+	});
 
 	switch (exp->type) {
 		case AST_BIN_EXP: vdn->var_def.type = exp->exp_binary.type; break;
@@ -136,6 +141,7 @@ AST_Node *parse_var_assign(Parser *parser) {
 
 	assert(vdn->var_def.type.kind);
 	parser_st_add(parser, (Symbol) {
+		.type = SBL_VAR,
 		.id = vdn->var_def.id,
 		.variable.type = vdn->var_def.type,
 	});
@@ -148,18 +154,18 @@ AST_Node *parse_var_mut(Parser *parser) {
 	Symbol *s = parser_st_get(parser, id);
 	parser->cur_token++;
 
-	AST_Node *vmn = ast_new(
+	AST_Node *vmn = ast_new({
 		.type = AST_VAR_MUT,
-	.var_mut.type = s->variable.type,
-	.var_mut.id = id,
-	.var_mut.exp = parse_expr(parser, EXPR_PARSING_VAR, &s->variable.type),
-);
+		.var_mut.type = s->variable.type,
+		.var_mut.id = id,
+		.var_mut.exp = parse_expr(parser, EXPR_PARSING_VAR, &s->variable.type),
+	});
 
 	return vmn;
 }
 
 AST_Node *parse_func_return(Parser *parser, AST_Node *func) {
-	AST_Node *ret = ast_new(.type = AST_FUNC_RET);
+	AST_Node *ret = ast_new({.type = AST_FUNC_RET});
 	parser->cur_token++;
 	ret->func_ret.exp = parse_expr(parser, EXPR_PARSING_VAR, &func->func_def.type);
 	ret->func_ret.type = func->func_def.type;
@@ -170,7 +176,7 @@ AST_Node *parse_body(Parser *parser, AST_Node *func);
 
 AST_Node *parse_if_stmt(Parser *parser, AST_Node *func) {
 	parser->cur_token++;
-	AST_Node *r = ast_new(.type = AST_IF_STMT);
+	AST_Node *r = ast_new({.type = AST_IF_STMT});
 
 	r->stmt_if.exp = parse_expr(parser, EXPR_PARSING_STMT, NULL);
 	r->stmt_if.body = parse_body(parser, func);
@@ -180,7 +186,7 @@ AST_Node *parse_if_stmt(Parser *parser, AST_Node *func) {
 
 AST_Node *parse_while_stmt(Parser *parser, AST_Node *func) {
 	parser->cur_token++;
-	AST_Node *r = ast_new(.type = AST_WHILE_STMT);
+	AST_Node *r = ast_new({.type = AST_WHILE_STMT});
 
 	r->stmt_while.exp = parse_expr(parser, EXPR_PARSING_STMT, NULL);
 	r->stmt_while.body = parse_body(parser, func);
@@ -191,7 +197,7 @@ AST_Node *parse_while_stmt(Parser *parser, AST_Node *func) {
 AST_Node *parse_for_stmt(Parser *parser, AST_Node *func) {
 	parser->cur_token++;
 
-	AST_Node *r = ast_new(.type = AST_FOR_STMT);
+	AST_Node *r = ast_new({.type = AST_FOR_STMT});
 
 	if ((parser->cur_token+1)->type == TOK_COL)
 		r->stmt_for.var = parse_var_def(parser);
@@ -210,7 +216,7 @@ AST_Node *parse_for_stmt(Parser *parser, AST_Node *func) {
 }
 
 AST_Node *parse_body(Parser *parser, AST_Node *func) {
-	AST_Node *body = ast_new(.type = AST_BODY);
+	AST_Node *body = ast_new({.type = AST_BODY});
 	int br_cnt = 0;
 
 	while (true) {
@@ -268,14 +274,13 @@ AST_Node *parse_function(Parser *parser) {
 	parser->cur_token++;
 
 	expect_token(parser->cur_token, TOK_ID);
-	AST_Node *fdn = ast_new(
+	AST_Node *fdn = ast_new({
 		.type = AST_FUNC_DEF,
-	.func_def.id = parser->cur_token->data,
-);
+		.func_def.id = parser->cur_token->data
+	});
 
 	parser->cur_token++;
 	expect_token(parser->cur_token++, TOK_OPAR);
-
 
 	while (parser->cur_token->type != TOK_CPAR) {
 		switch (parser->cur_token->type) {
@@ -285,10 +290,10 @@ AST_Node *parse_function(Parser *parser) {
 
 			case TOK_ID:
 				expect_token(parser->cur_token+1, TOK_COL);
-				AST_Node *farg = ast_new(
+				AST_Node *farg = ast_new({
 					.type = AST_FUNC_DEF_ARG,
-				.func_def_arg.id = parser->cur_token->data,
-			);
+					.func_def_arg.id = parser->cur_token->data
+				});
 
 				parser->cur_token++;
 				farg->func_def_arg.type = parse_type(parser);
@@ -305,14 +310,19 @@ AST_Node *parse_function(Parser *parser) {
 	}
 
 	parser->cur_token++;
+
 	if (parser->cur_token->type == TOK_COL) {
 		fdn->func_def.type = parse_type(parser);
 		parser->cur_token++;
+	} else {
+		fdn->func_def.type = (Type) {.kind = TYPE_NULL};
 	}
+
 
 	Symbol fds = {
 		.type = SBL_FUNC_DEF,
 		.id = fdn->func_def.id,
+		.func_def.type = fdn->func_def.type,
 	};
 
 	for (size_t i = 0; i < fdn->func_def.args.count; i++)
@@ -323,8 +333,61 @@ AST_Node *parse_function(Parser *parser) {
 	return fdn;
 }
 
+void parse_extern(Parser *parser) {
+	parser->cur_token++;
+
+	expect_token(parser->cur_token, TOK_ID);
+
+	Symbol fes = {
+		.type = SBL_FUNC_EXTERN,
+		.id = parser->cur_token->data,
+	};
+
+	parser->cur_token++;
+	expect_token(parser->cur_token++, TOK_OPAR);
+
+	while (parser->cur_token->type != TOK_CPAR) {
+		switch (parser->cur_token->type) {
+			case TOK_COM:
+				unexpect_token(parser->cur_token+1, TOK_COM);
+				break;
+
+			case TOK_ID:
+				expect_token(parser->cur_token+1, TOK_COL);
+				AST_Node *farg = ast_new({
+					.type = AST_FUNC_DEF_ARG,
+					.func_def_arg.id = parser->cur_token->data
+				});
+
+				parser->cur_token++;
+				farg->func_def_arg.type = parse_type(parser);
+				da_append(&fes.func_extern.args, farg);
+				parser->cur_token++;
+				break;
+
+			default:
+				unexpect_token(parser->cur_token, parser->cur_token->type);
+				break;
+		}
+
+		parser->cur_token++;
+	}
+
+	parser->cur_token++;
+
+	if (parser->cur_token->type == TOK_COL) {
+		fes.func_extern.type = parse_type(parser);
+		parser->cur_token++;
+	} else {
+		fes.func_extern.type = (Type) {.kind = TYPE_NULL};
+	}
+
+	parser_st_add(parser, fes);
+	expect_token(parser->cur_token, TOK_SEMI);
+}
+
 void parser_parse(Parser *parser, Token *tokens) {
-	AST_Node *prog = ast_new(.type = AST_PROG);
+	AST_Node *prog = ast_new({.type = AST_PROG});
 	parser->program = prog;
 	parser->cur_token = tokens;
 
@@ -334,7 +397,11 @@ void parser_parse(Parser *parser, Token *tokens) {
 				da_append(&prog->program.stmts, parse_function(parser));
 				break;
 
-				default: unreachable;
+			case TOK_EXTERN:
+				parse_extern(parser);
+				break;
+
+			default: unreachable;
 		}
 
 		parser->cur_token++;

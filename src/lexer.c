@@ -230,6 +230,7 @@ void lexer_lex(Lexer *lexer, char *code) {
 				} else if (is_tok(lexer, "if", TOK_IF_SYM, lexer->cur_char)) {
 				} else if (is_tok(lexer, "func", TOK_FUNC, lexer->cur_char)) {
 				} else if (is_tok(lexer, "struct", TOK_STRUCT, lexer->cur_char)) {
+				} else if (is_tok(lexer, "extern", TOK_EXTERN, lexer->cur_char)) {
 				} else if (is_tok(lexer, "return", TOK_RET, lexer->cur_char)) {}
 
 				else if (isalpha(*lexer->cur_char)) {

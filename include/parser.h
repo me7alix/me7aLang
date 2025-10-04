@@ -98,6 +98,7 @@ struct AST_Node {
 		struct {
 			char *id;
 			AST_Nodes args;
+			Type type;
 		} func_call;
 		struct {
 			AST_Nodes stmts;
@@ -153,6 +154,7 @@ struct AST_Node {
 
 typedef enum {
 	SBL_FUNC_DEF, SBL_VAR,
+	SBL_FUNC_EXTERN,
 } SymbolType;
 
 typedef struct {
@@ -162,8 +164,12 @@ typedef struct {
 	union {
 		struct {
 			AST_Nodes args;
-			AST_Node *type;
+			Type type;
 		} func_def;
+		struct {
+			AST_Nodes args;
+			Type type;
+		} func_extern;
 		struct {
 			Type type;
 		} variable;
@@ -196,6 +202,6 @@ AST_Node *ast_alloc(AST_Node node);
 
 #define unreachable assert(!"unreachable")
 #define ast_new(...) \
-	ast_alloc((AST_Node) { __VA_ARGS__ })
+	ast_alloc((AST_Node) __VA_ARGS__ )
 
 #endif

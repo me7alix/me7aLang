@@ -7,16 +7,19 @@
 
 void ir_dump_opr(Operand opr, char *buf) {
 	switch (opr.type) {
-		case OPR_NULL:      sprintf(buf, "NULL");                   break;
-		case OPR_NAME:      sprintf(buf, "\"%s\"", opr.name);       break;
-		case OPR_VAR:       sprintf(buf, "(%zu):%d", opr.var.index, opr.var.type.kind);   break;
+		case OPR_NULL:      sprintf(buf, "NULL"); break;
+		case OPR_FUNC_RET:  sprintf(buf, "fr:%d", opr.func_ret.type.kind); break;
+		case OPR_NAME:      sprintf(buf, "\"%s\"", opr.name); break;
+		case OPR_VAR:       sprintf(buf, "(%zu):%d", opr.var.index, opr.var.type.kind); break;
 
 		case OPR_LITERAL: {
 			switch (opr.literal.type.kind) {
 				case TYPE_INT:   sprintf(buf, "%d:%d", (int32_t) opr.literal.lint, opr.literal.type.kind); break;
-				case TYPE_I8:    sprintf(buf, "%d:%d", (int8_t) opr.literal.lint, opr.literal.type.kind); break;
+				case TYPE_I8:
+				case TYPE_BOOL:  sprintf(buf, "%d:%d", (int8_t) opr.literal.lint, opr.literal.type.kind); break;
+				case TYPE_I64:   sprintf(buf, "%li:%d", opr.literal.lint, opr.literal.type.kind); break;
 				case TYPE_FLOAT: sprintf(buf, "%f:%d", (float) opr.literal.lfloat, opr.literal.type.kind); break;
-				default: unreachable;
+				default: sprintf(buf, "ERR\n"); break;
 			}
 		} break;
 		case OPR_LABEL:     sprintf(buf, ".L%zu", opr.label_index);  break;
