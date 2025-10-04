@@ -19,6 +19,7 @@ typedef enum {
 typedef struct {
 	size_t line_num;
 	char *line_start;
+	char *line_char;
 } Location;
 
 typedef struct {
@@ -33,6 +34,7 @@ typedef struct {
 	Location cur_loc;
 } Lexer;
 
+void lexer_error(Location loc, char *error);
 void lexer_lex(Lexer *lexer, char *code);
 void lexer_free(Lexer *lexer);
 const char *tok_to_str(TokenType tok_type);

@@ -24,8 +24,7 @@ typedef enum {
 
 typedef enum {
 	OPR_NULL,
-	OPR_IMM_INT,
-	OPR_IMM_FLOAT,
+	OPR_LITERAL,
 	OPR_LABEL,
 	OPR_NAME,
 	OPR_VAR,
@@ -35,8 +34,7 @@ typedef struct {
 	OperandType type;
 
 	union {
-		int64_t imm_int;
-		double_t imm_float;
+		Literal literal;
 		size_t label_index;
 		char *name;
 		struct {

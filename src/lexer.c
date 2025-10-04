@@ -45,26 +45,24 @@ bool is_tok(Lexer *lexer, char *tok, TokenType type, char *str) {
 	return true;
 }
 
-void lexer_error(Lexer *lexer, char *error) {
-	size_t lines_num = lexer->cur_loc.line_num + 1;
-	size_t chars_num = lexer->cur_char-lexer->cur_loc.line_start + 1;
-	printf("%zu:%zu lexer error: %s\n", lines_num, chars_num, error);
+void lexer_error(Location loc, char *error) {
+	size_t lines_num = loc.line_num + 1;
+	size_t chars_num = loc.line_char-loc.line_start + 1;
+	printf("%zu:%zu %s\n", lines_num, chars_num, error);
 
-	lexer->cur_char = lexer->cur_loc.line_start;
+	loc.line_char = loc.line_start;
 	char error_pointer[128];
 	size_t cnt = 0;
 
-	while (*lexer->cur_char != '\n' && *lexer->cur_char != '\0'){
-		printf("%c", *lexer->cur_char);
-
+	while (*loc.line_char != '\n' && *loc.line_char != '\0'){
+		printf("%c", *loc.line_char);
 		if (cnt < chars_num - 1) {
-			if (*lexer->cur_char != '\t')
+			if (*loc.line_char != '\t')
 				error_pointer[cnt++] = ' ';
 			else
 				error_pointer[cnt++] = '\t';
 		}
-
-		lexer->cur_char++;
+		loc.line_char++;
 	}
 
 	printf("\n");
@@ -78,6 +76,7 @@ void lexer_lex(Lexer *lexer, char *code) {
 	lexer->cur_char = code;
 
 	while (*lexer->cur_char != '\0') {
+		lexer->cur_loc.line_char = lexer->cur_char;
 		switch (*lexer->cur_char) {
 			case ' ': case '\t': break;
 			case '{': add_token(lexer, TOK_OBRA, "{"); break;
@@ -200,7 +199,7 @@ void lexer_lex(Lexer *lexer, char *code) {
 					while (!(*(lexer->cur_char+1) == '\"' && *(lexer->cur_char) != '\\')) {
 						if (*(lexer->cur_char++) == '\0') {
 							lexer->cur_char = lmark;
-							lexer_error(lexer, "unclosed string");
+							lexer_error(lexer->cur_loc, "lexer error: unclosed string");
 						}
 					}
 
@@ -211,15 +210,21 @@ void lexer_lex(Lexer *lexer, char *code) {
 					lexer->cur_char++;
 				}
 
-				else if (*(lexer->cur_char) == '\'') {
+				else if (*lexer->cur_char == '\'') {
 					lexer->cur_char++;
-					if ((*(lexer->cur_char + 1) != '\'')) {
+					if (*lexer->cur_char == '\\') {
 						lexer->cur_char++;
-						lexer_error(lexer, "' expected");
+						if (*lexer->cur_char == 'n') add_token(lexer, TOK_CHAR, "\n");
+						else lexer_error(lexer->cur_loc, "lexer error: wrong character");
+						lexer->cur_char++;
+					} else {
+						add_token(lexer, TOK_CHAR, lexer->cur_char);
+						lexer->cur_char++;
 					}
 
-					add_token(lexer, TOK_CHAR, lexer->cur_char);
-					lexer->cur_char++;
+					if (*lexer->cur_char != '\'') {
+						lexer_error(lexer->cur_loc, "lexer error: ' expected");
+					}
 				}
 
 				else if (is_tok(lexer, "for", TOK_FOR_SYM, lexer->cur_char)) {
@@ -234,7 +239,7 @@ void lexer_lex(Lexer *lexer, char *code) {
 					add_token(lexer, TOK_ID, id);
 				}
 
-				else lexer_error(lexer, "unknown token");
+				else lexer_error(lexer->cur_loc, "lexer error: unknown token");
 			} break;
 		}
 

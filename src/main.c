@@ -142,7 +142,6 @@ int main(int argc, char **argv) {
 	}
 
 	lexer_free(&lexer);
-	//parser_free(parser);
 	da_free(&prog.funcs);
 	return 0;
 }

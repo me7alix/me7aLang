@@ -40,18 +40,15 @@ AST_Node *parse_func_call(Parser *parser) {
 	parser->cur_token++;
 
 	while (parser->cur_token->type != TOK_EOF) {
-		printf("%s\n", parser->cur_token->data);
 		switch (parser->cur_token->type) {
 			case TOK_CPAR:
 				parser->cur_token++;
-				printf("here\n");
 				return fcn;
 			case TOK_ID: case TOK_OPAR:
-			case TOK_FLOAT: case TOK_INT:
-				printf("start\n");
-				da_append(&fcn->func_call.args, parse_expr(parser, EXPR_PARSING_FUNC_CALL));
+			case TOK_FLOAT: case TOK_INT: case TOK_CHAR:
+				da_append(&fcn->func_call.args, parse_expr(parser, EXPR_PARSING_FUNC_CALL, NULL));
 				break;
-			default: /* TODO: error handling */ break;
+			default: unexpect_token(parser->cur_token, parser->cur_token->type); break;
 		}
 
 		parser->cur_token++;
@@ -92,32 +89,30 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 	return expr_expand(nodes);
 }
 
-Type expr_calc_types(Parser *parser, AST_Node *expr) {
-	if (expr->type == AST_INT) {
-		return (Type) {
-			.kind = TYPE_INT,
-			.size = 4,
-		};
-	}
-
-	if (expr->type == AST_FLOAT) {
-		return (Type) {
-			.kind = TYPE_FLOAT,
-			.size = 4,
-		};
-	}
-
+Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 	if (expr->type == AST_VAR) {
 		Symbol *v = parser_st_get(parser, expr->var_id);
 		return v->variable.type;
+	} else if (expr->type == AST_LITERAL) {
+		if (vart != NULL) {
+			expr->literal.type = *vart;
+		} else {
+			switch (expr->literal.kind) {
+				case LIT_INT:   expr->literal.type = (Type) {.kind = TYPE_INT, .size = 4}; break;
+				case LIT_CHAR:  expr->literal.type = (Type) {.kind = TYPE_I8, .size = 1}; break;
+				case LIT_FLOAT: expr->literal.type = (Type) {.kind = TYPE_FLOAT, .size = 4}; break;
+				case LIT_BOOL:  expr->literal.type = (Type) {.kind = TYPE_BOOL, .size = 1}; break;
+			}
+		}
+
+		return expr->literal.type;
 	}
 
-	Type lt = expr_calc_types(parser, expr->exp_binary.l);
-	Type rt = expr_calc_types(parser, expr->exp_binary.r);
+	Type lt = expr_calc_types(parser, expr->exp_binary.l, vart);
+	Type rt = expr_calc_types(parser, expr->exp_binary.r, vart);
 
 	if (lt.kind != rt.kind) {
 		fprintf(stderr, "wrong types in exression\n");
-		fprintf(stderr, "%d %d\n", lt.kind, rt.kind);
 		exit(1);
 	}
 
@@ -136,13 +131,13 @@ Type expr_calc_types(Parser *parser, AST_Node *expr) {
 	return lt;
 }
 
-AST_Node *parse_expr(Parser *parser, ExprParsingType type) {
+AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 	AST_Nodes nodes = {0};
 
 	while (true) {
 		if (parser->cur_token->type == TOK_OPAR) {
 			parser->cur_token++;
-			da_append(&nodes, parse_expr(parser, EXPR_PARSING_PAR));
+			da_append(&nodes, parse_expr(parser, EXPR_PARSING_PAR, vart));
 		}
 
 		if (type == EXPR_PARSING_FUNC_CALL) {
@@ -178,16 +173,27 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type) {
 
 			case TOK_INT:
 				da_append(&nodes, ast_alloc((AST_Node){
-					.type = AST_INT,
-					.num_int = parse_int(parser->cur_token->data)
+					.type = AST_LITERAL,
+					.literal.kind = LIT_INT,
+					.literal.lint = parse_int(parser->cur_token->data),
+				}));
+				break;
+
+			case TOK_CHAR:
+				da_append(&nodes, ast_alloc((AST_Node){
+					.type = AST_LITERAL,
+					.literal.kind = LIT_CHAR,
+					.literal.lint = parser->cur_token->data[0],
 				}));
 				break;
 
 			case TOK_FLOAT:
 				da_append(&nodes, ast_alloc((AST_Node){
-					.type = AST_FLOAT,
-					.num_float = parse_float(parser->cur_token->data)
+					.type = AST_LITERAL,
+					.literal.kind = LIT_FLOAT,
+					.literal.lfloat = parse_float(parser->cur_token->data),
 				}));
+
 				break;
 
 			case TOK_TYPE:
@@ -213,7 +219,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type) {
 				break;
 
 			default:
-				printf("expression parsing error: wrong token %s\n", parser->cur_token->data);
+				unexpect_token(parser->cur_token, parser->cur_token->type);
 				break;
 		}
 
@@ -221,7 +227,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type) {
 	}
 
 	AST_Node *expr = expr_expand(&nodes);
-	expr_calc_types(parser, expr);
+	expr_calc_types(parser, expr, vart);
 	da_free(&nodes);
 	return expr;
 }

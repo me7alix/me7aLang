@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <threads.h>
@@ -39,14 +40,21 @@ char opr_to_nasm_buf[64];
 char *opr_to_nasm(Operand opr) {
 	switch (opr.type) {
 		case OPR_NULL: case OPR_NAME: assert(!"unreachable"); 
-		case OPR_IMM_FLOAT: sprintf(opr_to_nasm_buf, "%lf", opr.imm_float);     break;
-		case OPR_IMM_INT:   sprintf(opr_to_nasm_buf, "%li", opr.imm_int);       break;
 		case OPR_LABEL:     sprintf(opr_to_nasm_buf, ".L%zu", opr.label_index); break;
 		case OPR_VAR: {
 			size_t off = iot_get(opr.var.index);
 			switch (opr.var.type.kind) {
 				case TYPE_INT:  sprintf(opr_to_nasm_buf, "dword [rbp - %zu]", off); break;
 				case TYPE_BOOL: sprintf(opr_to_nasm_buf, "byte [rbp - %zu]", off); break;
+				case TYPE_I8: sprintf(opr_to_nasm_buf, "byte [rbp - %zu]", off); break;
+				default: assert(!"unreachable");
+			}
+		} break;
+		case OPR_LITERAL: {
+			switch (opr.literal.type.kind) {
+				case TYPE_INT:   sprintf(opr_to_nasm_buf, "%d", (int32_t) opr.literal.lint); break;
+				case TYPE_FLOAT: sprintf(opr_to_nasm_buf, "%f", (float) opr.literal.lfloat); break;
+				case TYPE_I8:    sprintf(opr_to_nasm_buf, "%d", (int8_t) opr.literal.lint); break;
 				default: assert(!"unreachable");
 			}
 		} break;
@@ -57,6 +65,11 @@ char *opr_to_nasm(Operand opr) {
 
 void reg_alloc(Instruction inst, char *arg1, char *arg2) {
 	switch (inst.dst.var.type.kind) {
+		case TYPE_I8:
+			sprintf(arg1, "al");
+			sprintf(arg2, "bl");
+			break;
+
 		case TYPE_INT:
 			sprintf(arg1, "eax");
 			sprintf(arg2, "ecx");
@@ -66,24 +79,29 @@ void reg_alloc(Instruction inst, char *arg1, char *arg2) {
 			switch (inst.arg1.type) {
 				case OPR_VAR:
 					switch (inst.arg1.var.type.kind) {
+						case TYPE_BOOL: case TYPE_I8:
+							sprintf(arg1, "al");
+							sprintf(arg2, "bl");
+							break;
+
 						case TYPE_INT:
 							sprintf(arg1, "eax");
 							sprintf(arg2, "ecx");
 							break;
-
-						case TYPE_BOOL:
-							sprintf(arg1, "al");
-							sprintf(arg2, "bl");
-
 						default: assert(!"unreachable");
 					}
 
 					break;
 
-				case OPR_IMM_INT:
-					sprintf(arg1, "eax");
-					sprintf(arg2, "ecx");
-					break;
+				case OPR_LITERAL: {
+					switch (inst.arg1.literal.type.kind) {
+						case TYPE_INT:
+							sprintf(arg1, "eax");
+							sprintf(arg2, "ecx");
+							break;
+						default: assert(!"unreachable");
+					}
+				} break;
 
 				default: assert(!"unreachable");
 			}
@@ -114,7 +132,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			case OP_EQ: case OP_NOT_EQ:
 			case OP_AND: {
 				switch (ci.dst.var.type.kind) {
-					case TYPE_BOOL:
+					case TYPE_BOOL: case TYPE_I8:
 						total_offset += 1;
 						iot_add(ci.dst.var.index, total_offset);
 						sprintf(dst, "byte [rbp - %zu]", total_offset);
@@ -164,7 +182,20 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 
 			case OP_ASSIGN: {
 				switch (ci.dst.var.type.kind) {
-					case TYPE_INT: case TYPE_BOOL: {
+					case TYPE_BOOL: case TYPE_I8: {
+						size_t off = iot_get(ci.dst.var.index);
+						if (off == 0) { // no value
+							total_offset += 1;
+							off = total_offset;
+							iot_add(ci.dst.var.index, off);
+						}
+
+						sprintf(arg1, "al");
+						sprintf(dst, "byte [rbp - %zu]", off);
+						sb_append_strf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
+					} break;
+
+					case TYPE_INT: {
 						size_t off = iot_get(ci.dst.var.index);
 						if (off == 0) { // no value
 							total_offset += 4;
@@ -172,8 +203,8 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 							iot_add(ci.dst.var.index, off);
 						}
 
-						sprintf(dst, "dword [rbp - %zu]", off);
 						sprintf(arg1, "eax");
+						sprintf(dst, "dword [rbp - %zu]", off);
 						sb_append_strf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
 					} break;
 
@@ -212,7 +243,34 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 
 			case OP_FUNC_CALL: {
 				for (size_t i = 0; i < ci.args[i].type != OPR_NULL; i++) {
-					sb_append_strf(&body, TAB"mov %s, %s\n", argreg32[i], opr_to_nasm(ci.args[i]));
+					switch (ci.args[i].type) {
+						case OPR_LITERAL: {
+							switch (ci.args[i].literal.type.kind) {
+								case TYPE_INT:
+									sb_append_strf(&body, TAB"mov %s, %s\n", argreg32[i], opr_to_nasm(ci.args[i]));
+									break;
+								case TYPE_I8:
+									sb_append_strf(&body, TAB"mov %s, %s\n", argreg8[i], opr_to_nasm(ci.args[i]));
+									break;
+								default: assert(!"unreachable");
+							}
+						} break;
+
+						case OPR_VAR: {
+							switch (ci.args[i].var.type.kind) {
+								case TYPE_INT:
+									sb_append_strf(&body, TAB"mov %s, %s\n", argreg32[i], opr_to_nasm(ci.args[i]));
+									break;
+								case TYPE_I8:
+									sb_append_strf(&body, TAB"mov %s, %s\n", argreg8[i], opr_to_nasm(ci.args[i]));
+									break;
+
+								default: assert(!"unreachable");
+							}
+						} break;
+
+						default: assert(!"unreachable");
+					}
 				}
 
 				sb_append_strf(&body, TAB"call %s\n", ci.dst.name);
@@ -237,7 +295,8 @@ StringBuilder nasm_gen_prog(Program *prog) {
 	StringBuilder code = {0};
 
 	// runtime
-	sb_append_str(&code, "extern print_int\n");
+	sb_append_str(&code, "extern print_char\n");
+	sb_append_str(&code, "extern print_int\n\n");
 
 	sb_append_str(&code, "section .text\n");
 

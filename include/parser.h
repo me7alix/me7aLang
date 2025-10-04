@@ -49,9 +49,27 @@ typedef enum {
 } ExprParsingType;
 
 typedef enum {
+	LIT_INT,
+	LIT_CHAR,
+	LIT_FLOAT,
+	LIT_BOOL,
+} LiteralKind;
+
+typedef struct {
+	LiteralKind kind;
+	Type type;
+
+	union {
+		int64_t lint;
+		double lfloat;
+		uint8_t lbool;
+	};
+} Literal;
+
+typedef enum {
 	AST_WHILE_STMT,
 	AST_IF_STMT, AST_BIN_EXP, AST_UN_EXP,
-	AST_VAR_DEF, AST_VAR, AST_INT, AST_FLOAT,
+	AST_VAR_DEF, AST_VAR, AST_LITERAL, //AST_INT, AST_FLOAT,
 	AST_FUNC_CALL_ARG,AST_FUNC_CALL, AST_BODY,
 	AST_FUNC_DEF, AST_FUNC_DEF_ARG, AST_FUNC_RET,
 	AST_STRING, AST_TYPE, AST_OP_PLUS, AST_VAR_MUT,
@@ -101,6 +119,12 @@ struct AST_Node {
 			AST_Node *body;
 		} stmt_while;
 		struct {
+			AST_Node *var;
+			AST_Node *exp;
+			AST_Node *mut;
+			AST_Node *body;
+		} stmt_for;
+		struct {
 			TokenType op;
 			Type type;
 			AST_Node *v;
@@ -118,11 +142,9 @@ struct AST_Node {
 			AST_Node *exp;
 			Type type;
 		} func_ret;
-
+		Literal literal;
 		AST_Node *func_ret_exp;
 		char *var_id;
-		int64_t num_int;
-		double num_float;
 	};
 };
 
@@ -158,11 +180,13 @@ void parser_st_add(Parser *parser, Symbol smbl);
 Symbol *parser_st_get(Parser *parser, const char *id);
 
 Symbol *st_get(SymbolTable *st, const char *id);
+void expect_token(Token *token, TokenType type);
+void unexpect_token(Token *token, TokenType type);
 void parser_alloc();
 void parser_parse(Parser *parser, Token *tokens);
 void parser_free(Parser parser);
 void expect_token(Token *token, TokenType type);
-AST_Node *parse_expr(Parser *parser, ExprParsingType type);
+AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart);
 AST_Node *parse_func_call(Parser *parser);
 AST_Node *ast_alloc(AST_Node node);
 

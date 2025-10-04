@@ -1,10 +1,13 @@
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 
 #include "../include/ir.h"
 #include "../include/parser.h"
 
-size_t var_index, label_index;
+size_t var_index = 0, label_index;
 
 typedef struct {
 	char *name;
@@ -37,19 +40,42 @@ void vt_set(char *name, size_t index) {
 	}
 }
 
+Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
+	*ret = true;
+	if (l.type == OPR_LITERAL && r.type == OPR_LITERAL) {
+		if (l.literal.type.kind == r.literal.type.kind) {
+			switch (l.literal.type.kind) {
+				case TYPE_INT: {
+					switch (en->exp_binary.op) {
+						case TOK_PLUS:
+							return (Operand) {.type = OPR_LITERAL, .literal.lint = (int32_t)l.literal.lint + (int32_t)r.literal.lint };
+						case TOK_MINUS:
+							return (Operand) {.type = OPR_LITERAL, .literal.lint = (int32_t)l.literal.lint - (int32_t)r.literal.lint };
+						case TOK_STAR:
+							return (Operand) {.type = OPR_LITERAL, .literal.lint = (int32_t)l.literal.lint * (int32_t)r.literal.lint };
+						case TOK_SLASH:
+							return (Operand) {.type = OPR_LITERAL, .literal.lint = (int32_t)l.literal.lint / (int32_t)r.literal.lint };
+						default: break;
+					}
+				} break;
+
+				default: break;
+			}
+		}
+	}
+
+	*ret = false;
+	return (Operand) {0};
+}
+
 Operand ir_gen_expr(Func *func, AST_Node *en) {
 	switch (en->type) {
-		case AST_INT:
+		case AST_LITERAL: {
 			return (Operand) {
-				.type = OPR_IMM_INT,
-				.imm_int = en->num_int,
+				.type = OPR_LITERAL,
+				.literal = en->literal,
 			};
-
-		case AST_FLOAT:
-			return (Operand) {
-				.type = OPR_IMM_FLOAT,
-				.imm_float = en->num_float,
-			};
+		};
 
 		case AST_VAR: {
 			Var v = vt_get(en->var_id);
@@ -66,20 +92,10 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 			Operand l = ir_gen_expr(func, en->exp_binary.l);
 			Operand r = ir_gen_expr(func, en->exp_binary.r);
 
-			// to make this work correctly, i need to have imm for each TYPE
-			if (l.type == OPR_IMM_INT && r.type == OPR_IMM_INT) {
-				switch (en->exp_binary.op) {
-					case TOK_PLUS:
-						return (Operand) {.type = OPR_IMM_INT, .imm_int = l.imm_int + r.imm_int };
-					case TOK_MINUS:
-						return (Operand) {.type = OPR_IMM_INT, .imm_int = l.imm_int - r.imm_int };
-					case TOK_STAR:
-						return (Operand) {.type = OPR_IMM_INT, .imm_int = l.imm_int * r.imm_int };
-					case TOK_SLASH:
-						return (Operand) {.type = OPR_IMM_INT, .imm_int = l.imm_int / r.imm_int };
-					default: break;
-				}
-			}
+			bool ret;
+			Operand calc = ir_opr_calc(en, l, r, &ret);
+			if (ret) return calc;
+
 
 			Instruction inst = {
 				.arg1 = l,
@@ -119,33 +135,58 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 	return (Operand){0};
 }
 
+void ir_gen_var_def(Func *func, AST_Node *cn) {
+	Operand res = ir_gen_expr(func, cn->var_def.exp);
+	switch (res.type) {
+		case OPR_LITERAL: case OPR_VAR: {
+			da_append(&func->body, ((Instruction){
+				.op = OP_ASSIGN,
+				.arg1 = res,
+				.dst = (Operand) {
+					.type = OPR_VAR,
+					.var.type = cn->var_def.type,
+					.var.index = var_index,
+				},
+			}));
+
+			vt_add((Var){
+				.name = cn->var_def.id,
+				.type = cn->var_def.type,
+				.index = var_index++,
+			});
+		} break;
+
+		default: assert(!"unreachable");
+	}
+}
+
+void ir_gen_var_mut(Func *func, AST_Node *cn) {
+	Var v = vt_get(cn->var_mut.id);
+	Operand res = ir_gen_expr(func, cn->var_mut.exp);
+
+	switch (res.type) {
+		case OPR_LITERAL: case OPR_VAR: {
+			da_append(&func->body, ((Instruction){
+				.op = OP_ASSIGN,
+				.arg1 = res,
+				.dst = (Operand) {
+					.type = OPR_VAR,
+					.var.type = cn->var_mut.type,
+					.var.index = v.index,
+				},
+			}));
+		} break;
+
+		default: assert(!"unreachable");
+	}
+}
+
 void ir_gen_body(Func *func, AST_Node *fn) {
 	for (size_t i = 0; i < fn->body.stmts.count; i++) {
 		AST_Node *cn = da_get(&fn->body.stmts, i);
 		switch (cn->type) {
 			case AST_VAR_DEF: {
-				Operand res = ir_gen_expr(func, cn->var_def.exp);
-				switch (res.type) {
-					case OPR_IMM_FLOAT: case OPR_IMM_INT: case OPR_VAR: {
-						da_append(&func->body, ((Instruction){
-							.op = OP_ASSIGN,
-							.arg1 = res,
-							.dst = (Operand) {
-								.type = OPR_VAR,
-								.var.type = cn->var_def.type,
-								.var.index = var_index,
-							},
-						}));
-
-						vt_add((Var){
-							.name = cn->var_def.id,
-							.type = cn->var_def.type,
-							.index = var_index++,
-						});
-					} break;
-
-					default: assert(!"unreachable");
-				}
+				ir_gen_var_def(func, cn);
 			} break;
 
 			case AST_FUNC_CALL: {
@@ -171,7 +212,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 			case AST_FUNC_RET: {
 				Operand res = ir_gen_expr(func, cn->func_ret.exp);
 				switch (res.type) {
-					case OPR_IMM_FLOAT: case OPR_IMM_INT: {
+					case OPR_LITERAL: {
 						da_append(&func->body, ((Instruction){
 							.op = OP_RETURN,
 							.arg1 = res,
@@ -194,24 +235,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 			} break;
 
 			case AST_VAR_MUT: {
-				Var v = vt_get(cn->var_mut.id);
-				Operand res = ir_gen_expr(func, cn->var_mut.exp);
-
-				switch (res.type) {
-					case OPR_IMM_FLOAT: case OPR_IMM_INT: case OPR_VAR: {
-						da_append(&func->body, ((Instruction){
-							.op = OP_ASSIGN,
-							.arg1 = res,
-							.dst = (Operand) {
-								.type = OPR_VAR,
-								.var.type = cn->var_mut.type,
-								.var.index = v.index,
-							},
-						}));
-					} break;
-
-					default: assert(!"unreachable");
-				}
+				ir_gen_var_mut(func, cn);
 			} break;
 
 
@@ -282,13 +306,63 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 				}));
 			} break;
 
+			case AST_FOR_STMT: {
+				switch (cn->stmt_for.var->type) {
+					case AST_VAR_MUT: ir_gen_var_mut(func, cn->stmt_for.var); break;
+					case AST_VAR_DEF: ir_gen_var_def(func, cn->stmt_for.var); break;
+					default: assert(!"unreachable");
+				}
+
+				size_t lbl_st = label_index++;
+
+				da_append(&func->body, ((Instruction){
+					.op = OP_LABEL,
+					.arg1 = (Operand) {
+						.type = OPR_LABEL,
+						.label_index = lbl_st,
+					},
+				}));
+
+				Operand res = ir_gen_expr(func, cn->stmt_for.exp);
+
+				size_t lbl_ex = label_index++;
+
+				da_append(&func->body, ((Instruction){
+					.op = OP_JUMP_IF_NOT,
+					.arg1 = res,
+					.dst = (Operand) {
+						.type = OPR_LABEL,
+						.label_index = lbl_ex,
+					},
+				}));
+
+				ir_gen_body(func, cn->stmt_for.body);
+				ir_gen_var_mut(func, cn->stmt_for.mut);
+
+				da_append(&func->body, ((Instruction){
+					.op = OP_JUMP,
+					.arg1 = (Operand) {
+						.type = OPR_LABEL,
+						.label_index = lbl_st,
+					},
+				}));
+
+				da_append(&func->body, ((Instruction){
+					.op = OP_LABEL,
+					.arg1 = (Operand) {
+						.type = OPR_LABEL,
+						.label_index = lbl_ex,
+					},
+				}));
+			} break;
+
 			default: assert(!"unreachable");
 		}
 	}
 }
 
 void ir_gen_func(Program *prog, AST_Node *fn) {
-	var_index = 0;
+	//var_index = 0;
 	da_resize(&vt, 0);
 	Func func = {.name = fn->func_def.id, .ret_type = fn->func_def.type};
 	ir_gen_body(&func, fn->func_def.body);

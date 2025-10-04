@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <assert.h>
 
@@ -8,8 +9,14 @@ void ir_dump_opr(Operand opr, char *buf) {
 		case OPR_NULL:      sprintf(buf, "NO");                     break;
 		case OPR_NAME:      sprintf(buf, "\"%s\"", opr.name);       break;
 		case OPR_VAR:       sprintf(buf, "(%zu)", opr.var.index);   break;
-		case OPR_IMM_INT:   sprintf(buf, "%li", opr.imm_int);       break;
-		case OPR_IMM_FLOAT: sprintf(buf, "%lf", opr.imm_float);     break;
+		case OPR_LITERAL: {
+			switch (opr.literal.type.kind) {
+				case TYPE_INT:   sprintf(buf, "%d", (int32_t) opr.literal.lint); break;
+				case TYPE_I8:    sprintf(buf, "%c", (int8_t) opr.literal.lint); break;
+				case TYPE_FLOAT: sprintf(buf, "%f", (float) opr.literal.lfloat); break;
+				default: assert(!"unreachable");
+			}
+		} break;
 		case OPR_LABEL:     sprintf(buf, "L%zu", opr.label_index);  break;
 	}
 }
