@@ -1,15 +1,14 @@
 extern print_int()
 extern print_char()
 
-func print_frame(): int {
-	for i := 0; i != 7; i=i+1; {
+func print_frame() {
+	for i := 0; i < 7; i=i+1 {
 		ch := (i + 65:int):i8
 		print_char(ch)
 		print_char(' ')
 	}
 
 	print_char('\n')
-	return 12
 }
 
 func main(): int {
@@ -19,7 +18,7 @@ func main(): int {
 	a: int = 1
 	b: int = 2
 
-	for i := 0; i != cnt; i=i+1; {
+	for i := 0; i < cnt; i=i+1 {
 		print_int(a)
 
 		l := b
@@ -27,7 +26,6 @@ func main(): int {
 		a = l
 	}
 
-	ret := print_frame() * 3
-	print_int(ret)
+	print_frame()
 	return 0
 }

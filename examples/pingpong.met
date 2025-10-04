@@ -1,0 +1,78 @@
+extern InitWindow()
+extern SetTargetFPS()
+extern DrawRectangleLines()
+extern IsKeyPressed(): bool
+extern IsKeyDown(): bool
+extern WindowShouldClose(): bool
+extern ClearBackground()
+extern BeginDrawing()
+extern EndDrawing()
+extern CloseWindow()
+extern GetRandomValue(): int
+
+func main(): int {
+	WHITE := 4126537215
+
+	SCREEN_WIDTH := 800
+	SCREEN_HEIGHT := 600
+
+	KEY_D := 68; KEY_A := 65
+
+	InitWindow(800, 600, 0:i64)
+	SetTargetFPS(60)
+
+	ball_speed := 5
+	ball_r := 15
+	ball_x := GetRandomValue(100, SCREEN_WIDTH - 100)
+	ball_y := GetRandomValue(100, SCREEN_HEIGHT/2)
+	ball_dir_x := GetRandomValue(0, 1) * 2 - 1
+	ball_dir_y := 0-1
+	
+	paddle_speed := 4
+	paddle_w := 100
+	paddle_h := 15
+	paddle_x := SCREEN_WIDTH / 2 - paddle_w / 2
+	paddle_y := SCREEN_HEIGHT - paddle_h * 2
+
+	while !WindowShouldClose() {
+		BeginDrawing()
+		ClearBackground(0)
+
+		ball_x = ball_x + ball_dir_x * ball_speed
+		ball_y = ball_y + ball_dir_y * ball_speed
+
+		if ball_y > SCREEN_HEIGHT - ball_r * 2 {
+			CloseWindow()
+		}
+
+		if ball_x < 0 || ball_x > SCREEN_WIDTH - ball_r * 2 {
+			ball_dir_x = 0 - ball_dir_x
+		}
+
+		if ball_y < 0 {
+			ball_dir_y = 0 - ball_dir_y
+		}
+
+		if IsKeyDown(KEY_D) && paddle_x < SCREEN_WIDTH - paddle_w {
+			paddle_x = paddle_x + paddle_speed
+		}
+
+		if IsKeyDown(KEY_A) && paddle_x > 0 {
+			paddle_x = paddle_x - paddle_speed
+		}
+		
+		x_check := paddle_x + paddle_w > ball_x && paddle_x < ball_x + ball_r * 2
+		y_check := paddle_y + paddle_h > ball_y && paddle_y < ball_y + ball_r * 2
+		
+		if x_check && y_check {
+			ball_dir_y = 0 - ball_dir_y
+		}
+
+		DrawRectangleLines(ball_x, ball_y, ball_r*2, ball_r*2, WHITE)
+		DrawRectangleLines(paddle_x, paddle_y, paddle_w, paddle_h, WHITE)
+		EndDrawing()
+	}
+	
+	CloseWindow()
+	return 0
+}
