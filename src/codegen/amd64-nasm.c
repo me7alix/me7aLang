@@ -333,12 +333,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 
 			case OP_ASSIGN: {
 				bool is_first_assign = false;
-				if (ci.dst.var.is_mem_addr) {
-					size_t off = iot_get(ci.dst.var.index); assert(off);
-
-					sprintf(dst, "%s", opr_to_nasm(ci.dst));
-					reg_alloc(ci, arg1, arg2);
-				} else {
+				if (!ci.dst.var.is_mem_addr) {
 					size_t off = iot_get(ci.dst.var.index);
 
 					if (off == 0) {
@@ -347,10 +342,10 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 						off = total_offset;
 						iot_add(ci.dst.var.index, off);
 					}
-
-					sprintf(dst, "%s", opr_to_nasm(ci.dst));
-					reg_alloc(ci, arg1, arg2);
 				}
+
+				sprintf(dst, "%s", opr_to_nasm(ci.dst));
+				reg_alloc(ci, arg1, arg2);
 
 				if (ci.dst.var.type.kind == TYPE_ARRAY && is_first_assign) {
 					total_offset += get_type_size(*ci.dst.var.type.array.elem) * ci.dst.var.type.array.length;
@@ -362,6 +357,22 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 					sb_append_strf(&body, TAB"mov %s, %s\n", arg2, opr_to_nasm(ci.arg1));
 					sb_append_strf(&body, TAB"mov %s, %s\n", dst, arg2);
 				}
+			} break;
+
+			case OP_REF: {
+				if (ci.arg1.var.is_mem_addr) {
+					size_t off = iot_get(ci.arg1.var.index);
+					size_t ptr_off = iot_get(off);
+					sprintf(arg1, "[rbp - %zu]", off);
+					sb_append_strf(&body, TAB"mov rax, %s\n", arg1);
+				} else {
+					size_t off = iot_get(ci.arg1.var.index);
+					sprintf(arg1, "[rbp - %zu]", off);
+					sb_append_strf(&body, TAB"lea rax, %s\n", arg1);
+				}
+
+				sprintf(dst, "%s", opr_to_nasm(ci.dst));
+				sb_append_strf(&body, TAB"mov %s, rax\n", dst);
 			} break;
 
 			case OP_JUMP_IF_NOT: {
@@ -377,13 +388,13 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 				sb_append_strf(&body, TAB"jmp %s\n", opr_to_nasm(ci.dst));
 			} break;
 
-			case OP_REF: {
-				sb_append_strf(&body, TAB"mov rdx, %s\n", opr_to_nasm(ci.arg1));
-				sb_append_strf(&body, TAB"mov rdx, %s\n", opr_to_nasm(ci.dst));
-			} break;
-
 			case OP_RETURN: {
 				switch (func.ret_type.kind) {
+					case TYPE_POINTER:
+					case TYPE_I64:
+						sb_append_strf(&body, TAB"mov rax, %s\n", opr_to_nasm(ci.arg1));
+						break;
+
 					case TYPE_INT:
 						sb_append_strf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
 						break;

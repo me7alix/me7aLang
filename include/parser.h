@@ -217,7 +217,7 @@ typedef struct {
 
 Type parse_type(Parser *parser);
 void parser_st_add(Parser *parser, Symbol smbl);
-Symbol *parser_st_get(Parser *parser, const char *id, Location loc);
+Symbol *parser_st_get(Parser *p, const char *id);
 
 Token *parser_peek(Parser *p);
 Token *parser_looknext(Parser *p);
@@ -234,6 +234,7 @@ AST_Node *parse_func_call(Parser *parser);
 AST_Node *ast_alloc(AST_Node node);
 
 #define is_pointer(t) ((t).kind == TYPE_ARRAY || (t).kind == TYPE_POINTER)
+#define get_pointer_base(t) ((t).kind == TYPE_POINTER ? (t).pointer.base : (t).array.elem)
 #define unreachable assert(!"unreachable")
 #define ast_new(...) \
 	ast_alloc((AST_Node) __VA_ARGS__ )

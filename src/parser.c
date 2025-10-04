@@ -25,7 +25,7 @@ void parser_st_add(Parser *p, Symbol smbl) {
 	da_append(&p->st, smbl);
 }
 
-Symbol *parser_st_get(Parser *p, const char *id, Location loc) {
+Symbol *parser_st_get(Parser *p, const char *id) {
 	for (int i = p->st.count - 1; i >= 0; i--) {
 		if (strcmp(da_get(&p->st, i).id, id) == 0) {
 			bool nst = check_nested(p->nested, da_get(&p->st, i).nested);
@@ -37,7 +37,6 @@ Symbol *parser_st_get(Parser *p, const char *id, Location loc) {
 		}
 	}
 
-	lexer_error(loc, "parser error: no such symbol in the scope");
 	return NULL;
 }
 
@@ -159,7 +158,7 @@ AST_Node *parse_var_assign(Parser *p) {
 		case AST_LITERAL:   vdn->var_def.type = exp->literal.type;    break;
 		case AST_FUNC_CALL: vdn->var_def.type = exp->func_call.type;  break;
 		case AST_VAR: {
-			Symbol *s = parser_st_get(p, exp->var_id, exp->loc);
+			Symbol *s = parser_st_get(p, exp->var_id);
 			vdn->var_def.type = s->variable.type;
 		} break;
 		default: unreachable;
@@ -310,11 +309,13 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 				arg->func_def_arg.type = parse_type(p);
 				da_append(fargs, arg);
 
+				p->nested[p->nptr++] = uniq;
 				parser_st_add(p, (Symbol) {
 					.id = arg->func_def_arg.id,
 					.type = SBL_VAR,
 					.variable.type = arg->func_def_arg.type,
 				});
+				p->nested[--p->nptr] = 0;
 
 				break;
 

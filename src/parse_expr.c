@@ -58,9 +58,10 @@ AST_Node *parse_func_call(Parser *p) {
 	expect_token(parser_peek(p), TOK_OPAR);
 	parser_next(p);
 
-	Symbol *fc = parser_st_get(p, fcn->func_call.id, fcn->loc);
-	AST_Nodes fargs;
+	Symbol *fc = parser_st_get(p, fcn->func_call.id);
+	if (!fc) lexer_error(fcn->loc, "parser error: calling an undeclared function");
 
+	AST_Nodes fargs;
 	switch (fc->type) {
 		case SBL_FUNC_DEF:
 			fcn->func_call.type = fc->func_def.type;
@@ -88,7 +89,7 @@ AST_Node *parse_func_call(Parser *p) {
 			case AST_UN_EXP:  expr_type = expr->exp_unary.type;  break;
 			case AST_LITERAL: expr_type = expr->literal.type;    break;
 			case AST_VAR: {
-				Symbol *var_smbl = parser_st_get(p, expr->var_id, expr->loc);
+				Symbol *var_smbl = parser_st_get(p, expr->var_id);
 				expr_type = var_smbl->variable.type;
 			} break;
 			default: unreachable;
@@ -96,8 +97,8 @@ AST_Node *parse_func_call(Parser *p) {
 
 		if (expr_type.kind != farg_type.kind) lexer_error(expr->loc, "parser error: wrong type");
 		if (is_pointer(expr_type) && is_pointer(farg_type)) {
-			if (expr_type.pointer.base->kind != farg_type.pointer.base->kind &&
-				!(expr_type.pointer.base->kind == TYPE_NULL || farg_type.pointer.base->kind == TYPE_NULL)) {
+			if (get_pointer_base(expr_type)->kind != get_pointer_base(farg_type)->kind &&
+				!(get_pointer_base(expr_type)->kind == TYPE_NULL || get_pointer_base(farg_type)->kind == TYPE_NULL)) {
 				lexer_error(expr->loc, "parser error: wrong type");
 			}
 		}
@@ -168,7 +169,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 
 Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 	switch (expr->kind) {
-		case AST_VAR: return parser_st_get(parser, expr->var_id, expr->loc)->variable.type;
+		case AST_VAR: return parser_st_get(parser, expr->var_id)->variable.type;
 		case AST_FUNC_CALL: return expr->func_call.type;
 
 		case AST_LITERAL: {
@@ -206,16 +207,18 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 
 			if ((lt.kind == TYPE_IPTR && is_pointer(rt)) ||
 				(is_pointer(lt) && rt.kind == TYPE_IPTR)) {
-				Type rest = is_pointer(lt) ? lt : rt;
-				expr->exp_binary.type = rest;
-				assert(rest.pointer.base);
+				Type ptr_type = is_pointer(lt) ? lt : rt;
+				expr->exp_binary.type = (Type) {
+					.kind = TYPE_POINTER,
+					.pointer.base = get_pointer_base(ptr_type)
+				};
 			} else if (lt.kind != rt.kind) {
 				lexer_error(expr->loc, "parser error: operation on different types");
 			}
 
 			if (is_pointer(lt) && is_pointer(rt)) {
-				if (lt.pointer.base->kind != rt.pointer.base->kind &&
-					!(lt.pointer.base->kind == TYPE_NULL || rt.pointer.base->kind == TYPE_NULL)) {
+				if (get_pointer_base(lt)->kind != get_pointer_base(rt)->kind &&
+					!(get_pointer_base(lt)->kind == TYPE_NULL || get_pointer_base(rt)->kind == TYPE_NULL)) {
 					lexer_error(expr->loc, "parser error: operation on different types");
 				}
 			}
@@ -241,7 +244,6 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 
 				case AST_OP_REF: {
 					Type vt = expr_calc_types(parser, expr->exp_unary.v, vart);
-					expr->exp_unary.type = vt;
 					Type *base = malloc(sizeof(Type)); *base = vt;
 					expr->exp_unary.type = (Type) {.kind = TYPE_POINTER, .pointer.base = base};
 				} break;
@@ -335,6 +337,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 		switch (parser_peek(p)->type) {
 			case TOK_ID:
 				if ((parser_peek(p)+1)->type != TOK_OPAR) {
+					if (!parser_st_get(p, parser_peek(p)->data))
+						lexer_error(parser_peek(p)->loc, "parser error: no such variable in the scope");
 					da_append(&nodes, ast_new({
 						.kind = AST_VAR,
 						.loc = parser_peek(p)->loc,
