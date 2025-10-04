@@ -39,6 +39,10 @@ float op_cost(AST_ExprOp op, bool is_left) {
 			if (is_left) return 3.0;
 			else         return 0.0;
 		case AST_OP_VAR_EQ:
+		case AST_OP_ADD_EQ:
+		case AST_OP_SUB_EQ:
+		case AST_OP_DIV_EQ:
+		case AST_OP_MUL_EQ:
 			if (is_left) return -1.0;
 			else         return -1.1;
 		default:         break;
@@ -188,6 +192,10 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 		case AST_BIN_EXP: {
 			Type lt = expr_calc_types(parser, expr->exp_binary.l, vart);
 			if (expr->exp_binary.op == AST_OP_VAR_EQ) vart = &lt;
+			else if (expr->exp_binary.op == AST_OP_ADD_EQ) vart = &lt;
+			else if (expr->exp_binary.op == AST_OP_SUB_EQ) vart = &lt;
+			else if (expr->exp_binary.op == AST_OP_MUL_EQ) vart = &lt;
+			else if (expr->exp_binary.op == AST_OP_DIV_EQ) vart = &lt;
 			else if (is_pointer(lt)) {
 				Type iptr = (Type) {.kind = TYPE_IPTR};
 				vart = &iptr;
@@ -259,6 +267,10 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 
 AST_ExprOp tok_to_binary_expr_op(TokenType tok) {
 	switch (tok) {
+		case TOK_PLUS_EQ:   return AST_OP_ADD_EQ;
+		case TOK_MINUS_EQ:  return AST_OP_SUB_EQ;
+		case TOK_STAR_EQ:   return AST_OP_MUL_EQ;
+		case TOK_SLASH_EQ:  return AST_OP_DIV_EQ;
 		case TOK_EQ_EQ:     return AST_OP_EQ;
 		case TOK_EQ:        return AST_OP_VAR_EQ;
 		case TOK_GREAT:     return AST_OP_GREAT;
@@ -431,6 +443,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				}));
 				break;
 
+			case TOK_PLUS_EQ: case TOK_MINUS_EQ:
+			case TOK_STAR_EQ: case TOK_SLASH_EQ:
 			case TOK_NOT_EQ: case TOK_OR:
 			case TOK_LESS: case TOK_GREAT:
 			case TOK_LESS_EQ: case TOK_GREAT_EQ:

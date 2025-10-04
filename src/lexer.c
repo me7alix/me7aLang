@@ -83,14 +83,42 @@ Lexer lexer_lex(char *code) {
 			case '}': add_token(&lexer, TOK_CBRA,  "}"); break;
 			case '(': add_token(&lexer, TOK_OPAR,  "("); break;
 			case ')': add_token(&lexer, TOK_CPAR,  ")"); break;
-			case '+': add_token(&lexer, TOK_PLUS,  "+"); break;
-			case '-': add_token(&lexer, TOK_MINUS, "-"); break;
-			case '*': add_token(&lexer, TOK_STAR,  "*"); break;
 			case ';': add_token(&lexer, TOK_SEMI,  ";"); break;
 			case '.': add_token(&lexer, TOK_DOT,   "."); break;
 			case ',': add_token(&lexer, TOK_COM,   ","); break;
 			case '[': add_token(&lexer, TOK_OSQBRA,"["); break;
 			case ']': add_token(&lexer, TOK_CSQBRA,"]"); break;
+
+			case '+': {
+				if (lexer.cur_char[1] == '=') {
+					add_token(&lexer, TOK_PLUS_EQ, "+=");
+					lexer.cur_char++;
+				} else add_token(&lexer, TOK_PLUS, "+");
+			} break;
+
+			case '-': {
+				if (lexer.cur_char[1] == '=') {
+					add_token(&lexer, TOK_MINUS_EQ, "-=");
+					lexer.cur_char++;
+				} else add_token(&lexer, TOK_MINUS, "-");
+			} break;
+
+			case '*': {
+				if (lexer.cur_char[1] == '=') {
+					add_token(&lexer, TOK_STAR_EQ, "*=");
+					lexer.cur_char++;
+				} else add_token(&lexer, TOK_STAR, "*");
+			} break;
+
+			case '/': {
+				if (lexer.cur_char[1] == '/') {
+					while (*lexer.cur_char != '\n')
+						lexer.cur_char += 1;
+				} else if (lexer.cur_char[1] == '=') {
+					add_token(&lexer, TOK_SLASH_EQ, "/=");
+					lexer.cur_char++;
+				} else add_token(&lexer, TOK_SLASH, "/");
+			} break;
 
 			case '!': {
 				if (lexer.cur_char[1] == '=') {
@@ -163,15 +191,6 @@ Lexer lexer_lex(char *code) {
 				} else {
 					add_token(&lexer, TOK_COL, ":");
 				}
-			} break;
-
-			case '/': {
-				if (lexer.cur_char[1] == '/') {
-					while (*lexer.cur_char != '\n')
-						lexer.cur_char += 1;
-					break;
-				}
-				add_token(&lexer, TOK_SLASH, "/");
 			} break;
 
 			default: {

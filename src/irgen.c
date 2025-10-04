@@ -287,28 +287,41 @@ void ir_gen_var_def(Func *func, AST_Node *cn) {
 }
 
 void ir_gen_var_mut(Func *func, AST_Node *cn) {
-	bool is_ptr_assign = false;
-	if (cn->kind == AST_UN_EXP) is_ptr_assign = true;
-	else if (cn->exp_binary.op != AST_OP_VAR_EQ) is_ptr_assign = true;
+	before_eq = false;
+	Operand dst = ir_gen_expr(func, cn->var_mut.exp->exp_binary.l);
+	before_eq = true;
+	Operand res = ir_gen_expr(func, cn->var_mut.exp->exp_binary.r);
+	before_eq = false;
 
-	if (!is_ptr_assign) {
-		Variable v = vt_get(cn->var_mut.exp->exp_binary.l->var_id);
-		Operand res = ir_gen_expr(func, cn->var_mut.exp);
-		da_append(&func->body, ((Instruction){
-			.op = OP_ASSIGN,
-			.arg1 = res,
+	OpCode op_eq;
+	bool is_op_eq;
+	switch (cn->var_mut.exp->exp_binary.op) {
+		case AST_OP_ADD_EQ: op_eq = OP_ADD; is_op_eq = true; break;
+		case AST_OP_SUB_EQ: op_eq = OP_SUB; is_op_eq = true; break;
+		case AST_OP_MUL_EQ: op_eq = OP_MUL; is_op_eq = true; break;
+		case AST_OP_DIV_EQ: op_eq = OP_DIV; is_op_eq = true; break;
+		default: is_op_eq = false;
+	}
+
+	if (is_op_eq) {
+		Instruction op_eq_res = {
+			.op = op_eq,
+			.arg1 = dst,
+			.arg2 = res,
 			.dst = (Operand) {
 				.type = OPR_VAR,
 				.var.type = cn->var_mut.type,
-				.var.index = v.index,
+				.var.index = var_index++,
 			},
+		};
+
+		da_append(&func->body, op_eq_res);
+		da_append(&func->body, ((Instruction){
+			.op = OP_ASSIGN,
+			.arg1 = op_eq_res.dst,
+			.dst = dst,
 		}));
 	} else {
-		before_eq = false;
-		Operand dst = ir_gen_expr(func, cn->var_mut.exp->exp_binary.l);
-		before_eq = true;
-		Operand res = ir_gen_expr(func, cn->var_mut.exp->exp_binary.r);
-		before_eq = false;
 		da_append(&func->body, ((Instruction){
 			.op = OP_ASSIGN,
 			.arg1 = res,

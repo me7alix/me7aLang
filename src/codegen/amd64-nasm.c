@@ -74,7 +74,6 @@ void type_to_stack(Type type, char *buf) {
 	}
 }
 
-bool deref_ptr;
 char opr_to_nasm_buf[64];
 char *opr_to_nasm(Operand opr) {
 	switch (opr.type) {
@@ -141,7 +140,6 @@ char *opr_to_nasm(Operand opr) {
 		default: unreachable;
 	}
 
-	deref_ptr = false;
 	return opr_to_nasm_buf;
 }
 
