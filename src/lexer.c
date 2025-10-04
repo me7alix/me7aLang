@@ -256,6 +256,8 @@ Lexer lexer_lex(char *code) {
 				} else if (is_tok(&lexer, "extern", TOK_EXTERN, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "true",   TOK_TRUE, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "false",  TOK_FALSE, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "break",  TOK_BREAK, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "continue",TOK_CONTINUE, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "null",   TOK_NULL, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "sizeof", TOK_SIZEOF, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "return", TOK_RET, lexer.cur_char)) {}

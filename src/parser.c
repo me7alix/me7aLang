@@ -270,8 +270,6 @@ AST_Node *parse_body(Parser *p, AST_Node *func) {
 			case TOK_ID: {
 				if ((parser_looknext(p))->type == TOK_COL)
 					da_append(&body->body.stmts, parse_var_def(p));
-					//else if ((parser_peek_next(p))->type == TOK_EQ)
-
 				else if ((parser_looknext(p))->type == TOK_ASSIGN)
 					da_append(&body->body.stmts, parse_var_assign(p));
 				else if ((parser_looknext(p))->type == TOK_OPAR)
@@ -279,10 +277,26 @@ AST_Node *parse_body(Parser *p, AST_Node *func) {
 				else da_append(&body->body.stmts, parse_var_mut(p, EXPR_PARSING_VAR));
 			} break;
 
-			case TOK_IF_SYM:    da_append(&body->body.stmts, parse_if_stmt(p, func)); break;
-			case TOK_WHILE_SYM: da_append(&body->body.stmts, parse_while_stmt(p, func)); break;
-			case TOK_FOR_SYM:   da_append(&body->body.stmts, parse_for_stmt(p, func));break;
-			case TOK_RET:       da_append(&body->body.stmts, parse_func_return(p, func)); break;
+			case TOK_BREAK:
+				da_append(&body->body.stmts, ast_new({
+					.kind = AST_LOOP_BREAK,
+					.loc = parser_next(p)->loc,
+				}));
+				expect_token(parser_peek(p), TOK_SEMI);
+				break;
+
+			case TOK_CONTINUE:
+				da_append(&body->body.stmts, ast_new({
+					.kind = AST_LOOP_CONTINUE,
+					.loc = parser_next(p)->loc,
+				}));
+				expect_token(parser_peek(p), TOK_SEMI);
+				break;
+
+			case TOK_IF_SYM:    da_append(&body->body.stmts, parse_if_stmt(p, func));             break;
+			case TOK_WHILE_SYM: da_append(&body->body.stmts, parse_while_stmt(p, func));          break;
+			case TOK_FOR_SYM:   da_append(&body->body.stmts, parse_for_stmt(p, func));            break;
+			case TOK_RET:       da_append(&body->body.stmts, parse_func_return(p, func));         break;
 			default:            da_append(&body->body.stmts, parse_var_mut(p, EXPR_PARSING_VAR)); break;
 		}
 

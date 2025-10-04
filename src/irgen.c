@@ -349,6 +349,10 @@ void ir_gen_func_call(Func *func, AST_Node *cn) {
 	da_append(&func->body,  func_call);
 }
 
+size_t lbl_st, lbl_ex;
+AST_Node *for_var_mut;
+bool loop_gen;
+
 void ir_gen_body(Func *func, AST_Node *fn) {
 	for (size_t i = 0; i < fn->body.stmts.count; i++) {
 		AST_Node *cn = da_get(&fn->body.stmts, i);
@@ -409,8 +413,32 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 				}));
 			} break;
 
+			case AST_LOOP_BREAK:
+				if (!loop_gen) lexer_error(cn->loc, "irgen error: break outside of a loop");
+				da_append(&func->body, ((Instruction){
+					.op = OP_JUMP,
+					.dst = (Operand) {
+						.type = OPR_LABEL,
+						.label_index = lbl_ex,
+					},
+				}));
+				break;
+
+			case AST_LOOP_CONTINUE:
+				if (!loop_gen) lexer_error(cn->loc, "irgen error: continue outside of a loop");
+				if (for_var_mut) ir_gen_var_mut(func, for_var_mut);
+				da_append(&func->body, ((Instruction){
+					.op = OP_JUMP,
+					.dst = (Operand) {
+						.type = OPR_LABEL,
+						.label_index = lbl_st,
+					},
+				}));
+				break;
+
 			case AST_WHILE_STMT: {
-				size_t lbl_st = label_index++;
+				loop_gen = true;
+				lbl_st = label_index++;
 
 				da_append(&func->body, ((Instruction){
 					.op = OP_LABEL,
@@ -421,7 +449,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 				}));
 
 				Operand res = ir_gen_expr(func, cn->stmt_while.exp);
-				size_t lbl_ex = label_index++;
+				lbl_ex = label_index++;
 
 				da_append(&func->body, ((Instruction){
 					.op = OP_JUMP_IF_NOT,
@@ -449,9 +477,11 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 						.label_index = lbl_ex,
 					},
 				}));
+				loop_gen = false;
 			} break;
 
 			case AST_FOR_STMT: {
+				loop_gen = true;
 				switch (cn->stmt_for.var->kind) {
 					case AST_VAR_MUT: ir_gen_var_mut(func, cn->stmt_for.var); break;
 					case AST_VAR_DEF: ir_gen_var_def(func, cn->stmt_for.var); break;
@@ -480,6 +510,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 					},
 				}));
 
+				for_var_mut = cn->stmt_for.mut;
 				ir_gen_body(func, cn->stmt_for.body);
 				ir_gen_var_mut(func, cn->stmt_for.mut);
 
@@ -498,6 +529,8 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 						.label_index = lbl_ex,
 					},
 				}));
+				loop_gen = false;
+				for_var_mut = NULL;
 			} break;
 
 			default: unreachable;
