@@ -3,52 +3,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+#define HASHMAP_IMPLEMENTATION
 #include "../include/parser.h"
+#include "../src/parser_expr.c"
 
-// This function gets left and right brackets. size_t *l should point to TOK_LBRA
-void parse_get_brackets(Parser *parser, size_t ptr, size_t *l, size_t *r) {
-	bool is_first = true;
-	int cnt = 0;
-
-	for (size_t i = ptr; i < parser->tokens_num; i++) {
-		if (parser->tokens[i].type == TOK_LBRA) {
-			cnt++;
-			if (is_first) {
-				is_first = false;
-				*l = i;
-			}	
-		} else if (parser->tokens[i].type == TOK_RBRA) {
-			cnt--;
-			*r = i;
-		}
-
-		if (cnt == 0) {
-			return;
-		}
-	}
+Symbol st_get(SymbolTable st, char *id) {
+	return *((Symbol*) hm_get(st.hm, hm_strhash(id)));
 }
 
-// This function gets left and right braces. size_t *l should point to TOK_LBRC
-void parse_get_braces(Parser *parser, size_t ptr, size_t *l, size_t *r) {
-	bool is_first = true;
-	int cnt = 0;
-
-	for (size_t i = ptr; i < parser->tokens_num; i++) {
-		if (parser->tokens[i].type == TOK_LBRC) {
-			cnt++;
-			if (is_first) {
-				is_first = false;
-				*l = i;
-			}
-		} else if (parser->tokens[i].type == TOK_RBRC) {
-			cnt--;
-			*r = i;
-		}
-
-		if (cnt == 0) {
-			return;
-		}
-	}
+void st_add(SymbolTable st, char *id, Symbol s) {
+	hm_put(st.hm, hm_strhash(id), hm_struct_dup(&s, sizeof s));
 }
 
 AST_Node *ast_alloc(AST_Node node) {
@@ -57,76 +22,104 @@ AST_Node *ast_alloc(AST_Node node) {
 	return new;
 }
 
-void ast_block_add_node(AST_Node *parent, AST_Node node) {
-	parent->payload.block.stmts[parent->payload.block.count++] = ast_alloc(node);
+void ast_block_add_node(AST_Node *block, AST_Node node) {
+	if (block->payload.block.tail != NULL)
+		block->payload.block.tail->next = ast_alloc(node);
+	else {
+		block->payload.block.head = ast_alloc(node);
+		block->payload.block.tail = block->payload.block.head;
+	}
 }
 
-int64_t parse_int(char *data) {
-	return atoi(data);
+void expect_token(Token *token, TokenType type) {
+	if (token->type == type) return;
+
+	size_t lines_num = token->location.line_num + 1;
+	const char *tok_str = tok_to_str(type);
+
+	printf("%zu parser error: %s token expected\n", lines_num, tok_str);
+	exit(1);
 }
 
-// 10 * 7 * 5 
+void parse_block(Parser *parser, AST_Node *parent) {
+	int br_cnt;
 
-AST_Node *parse_expression(Parser *parser, size_t ptr) {
-	AST_Node *stack[256];
-	size_t stack_ptr = 0;
+	while (true) {
+		switch (parser->cur_token->type) {
+			case TOK_LBRC:
+				br_cnt++;
+				break;
 
-	while (parser->tokens[ptr].type != TOK_SEMI) {
-		switch (parser->tokens[ptr].type) {
-			case TOK_INT:
-				stack[stack_ptr++] = ast_alloc((AST_Node){
-					.type = AST_INT,
-					.payload.int_num.val = parse_int(parser->tokens[ptr].data),
-				});
+			case TOK_RBRC:
+				br_cnt--;
+				if (br_cnt == 0)
+					return;
+
+			case TOK_TYPE:
+				expect_token(parser->cur_token-1, TOK_ID);
+				expect_token(parser->cur_token+1, TOK_EQ);
+
+				parser->cur_token++;
+
+				ast_block_add_node(parent, (AST_Node){
+						.type = AST_VARIABLE,
+						.payload.variable.name = (parser->cur_token-1)->data,
+						.payload.variable.type = parser->cur_token->data, 
+						.payload.variable.exp = parse_expression(parser, EXPR_PARSING_VAR),
+						});
+
+				break;
+
+			case TOK_IF_SYM:
+				expect_token(parser->cur_token+1, TOK_LBRA);
+
 				break;
 
 			default:
-				printf("expression parsing error wrong token");
 				break;
 		}
 	}
-
-	return NULL;
 }
 
-void parse_block(Parser *parser, AST_Node *parent, size_t prev_ptr) {
-	size_t ptr, to;
-	parse_get_braces(parser, prev_ptr, &ptr, &to);
+void parse_function(Parser *parser) {
+	expect_token(++parser->cur_token, TOK_ID);
+	expect_token(parser->cur_token+1, TOK_LBRA);
+	int br_cnt = 0;
 
-	while (ptr < to) {
-		switch (parser->tokens[ptr].type) {
-			case TOK_TYPE:
-				if (parser->tokens[ptr-1].type == TOK_ID &&
-					parser->tokens[ptr+1].type == TOK_EQ) {
-					ast_block_add_node(parent, (AST_Node){
-						.type = AST_VARIABLE,
-						.payload.variable.name = ast_alloc((AST_Node){
-							.type = AST_ID,
-							.payload.identifier.id = parser->tokens[ptr-1].data,
-						}),
-						.payload.variable.type = ast_alloc((AST_Node){
-							.type = AST_ID,
-							.payload.identifier.id = parser->tokens[ptr].data,
-						}),
-						.payload.variable.exp = parse_expression(parser, ptr),
-					});
-				}
+	while (true) {
+		switch (parser->cur_token->type) {
+			case TOK_LBRA:
+				br_cnt++;
 				break;
+
+			case TOK_RBRA:
+				br_cnt--;
+				if (br_cnt == 0)
+					return;
+				break;
+
+			case TOK_ID:
+				// func main(x: i32, y: i32)
+				expect_token(parser->cur_token+1, TOK_TYPE);
+				break;
+
+
 			default:
+				// TODO: error handling
 				break;
 		}
-		ptr++;
 	}
 }
 
 void parser_parse(Parser *parser) {
-	size_t ptr = 0;
 	while (true) {
-		switch (parser->tokens[ptr++].type) {
+		switch (parser->cur_token->type) {
 			case TOK_FUNC:
-
+				parse_function(parser);
 				break;
+
 			default:
+				// TODO: error handling
 				break;
 		}
 	}

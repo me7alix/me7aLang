@@ -1,8 +1,4 @@
-TILE: i32 = 10
-
 func main() {
-	ch: char = 'a'
-	if (TILE == 10) {
-		printf("wow\n")
-	}
+	num: i32 = 32 - 5 * 2
+	printf("%i\n", num)
 }

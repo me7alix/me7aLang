@@ -1,0 +1,119 @@
+typedef struct ExprNode {
+	AST_Node *node;
+	struct ExprNode *next, *prev;
+} ExprNode;
+
+void expr_node_add(ExprNode **en, AST_Node *n) {
+    if ((*en)->node == NULL) {  // Check if current node is empty, not prev
+        (*en)->node = n;
+        return;
+    }
+    (*en)->next = malloc(sizeof(ExprNode));
+    (*en)->next->node = n;      // Don't forget to set the node!
+    (*en)->next->next = NULL;
+    (*en)->next->prev = (*en);
+    (*en) = (*en)->next;
+}
+
+
+void expr_node_free(ExprNode *en) {
+	free(en);
+}
+
+bool is_expr_node_var(ExprNode *en) {
+	return en->node->type == AST_FLOAT ||
+	en->node->type == AST_INT ||
+	(en->node->type == AST_BIN_EXP &&
+	en->node->payload.exp_binary.l != NULL &&
+	en->node->payload.exp_binary.r != NULL);
+}
+
+AST_Node *parse_expression_r(ExprNode **head) {
+	if ((*head)->next == NULL)
+		return (*head)->node;
+
+	ExprNode *cur_node = (*head);
+
+	bool br_fl = false;
+	int br_cnt = 0;
+
+	while (cur_node != NULL) {
+		if (is_expr_node_var(cur_node)) {
+			float l_cost = 0, r_cost = 0;
+
+			if (cur_node->prev != NULL)
+				l_cost = op_cost(cur_node->prev->node->payload.exp_binary.op, false);
+
+			if (cur_node->next != NULL)
+				r_cost = op_cost(cur_node->next->node->payload.exp_binary.op, true);
+
+			if (l_cost > r_cost) {
+				cur_node->prev->node->payload.exp_binary.r = cur_node->node;
+			} else {
+				cur_node->next->node->payload.exp_binary.l = cur_node->node;
+			}
+
+			if (cur_node->prev != NULL) cur_node->prev->next = cur_node->next;
+			if (cur_node->next != NULL) cur_node->next->prev = cur_node->prev;
+
+			ExprNode *next = cur_node->next;
+
+			if (cur_node != (*head)) {
+				expr_node_free(cur_node);
+				cur_node = next;
+			} else {
+				expr_node_free(cur_node);
+				cur_node = next;
+				(*head) = next;
+			}
+		} else {
+			cur_node = cur_node->next;
+		}
+	}
+
+	return parse_expression_r(head);
+}
+
+AST_Node *parse_expression(Parser *parser) {
+	ExprNode *cur_node = malloc(sizeof(ExprNode));
+	cur_node->node = NULL;
+	cur_node->next = NULL;
+	cur_node->prev = NULL;
+	ExprNode *head = cur_node;
+
+	while (parser->cur_token->type != TOK_SEMI) {
+		switch (parser->cur_token->type) {
+			case TOK_INT:
+				expr_node_add(&cur_node, ast_alloc((AST_Node){
+					.type = AST_INT,
+					.payload.num_int = parse_int(parser->cur_token->data),
+				}));
+				break;
+
+			case TOK_FLOAT:
+				expr_node_add(&cur_node, ast_alloc((AST_Node){
+					.type = AST_FLOAT,
+					.payload.num_float = parse_float(parser->cur_token->data),
+				}));
+				break;
+
+			case TOK_PLUS: case TOK_MINUS: case TOK_STAR: case TOK_SLASH:
+				expr_node_add(&cur_node, ast_alloc((AST_Node){
+					.type = AST_BIN_EXP,
+					.payload.exp_binary.op = parser->cur_token->data[0],
+					.payload.exp_binary.l = NULL,
+					.payload.exp_binary.r = NULL,
+				}));
+				break;
+
+			default:
+				printf("expression parsing error wrong token");
+				break;
+		}
+
+		parser->cur_token++;
+	}
+
+	parser->cur_token++;
+	return parse_expression_r(&head);
+}

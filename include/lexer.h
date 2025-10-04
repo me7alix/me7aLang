@@ -1,5 +1,5 @@
-#ifndef _LEXER_H_
-#define _LEXER_H_
+#ifndef LEXER_H
+#define LEXER_H
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -11,7 +11,7 @@ typedef enum {
 	TOK_RPAR, TOK_PLUS, TOK_MINUS,TOK_FOR_SYM, TOK_RET,
 	TOK_IF_SYM, TOK_WHILE_SYM, TOK_STAR, TOK_AMP, TOK_COM,
 	TOK_SLASH, TOK_INT, TOK_FLOAT, TOK_LBRC, TOK_COL,
-	TOK_RBRC, TOK_DOT,
+	TOK_RBRC, TOK_DOT, TOK_EOF,
 } TokenType;
 
 typedef struct {
