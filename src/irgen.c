@@ -46,10 +46,11 @@ void vt_set(char *name, size_t index) {
 
 Type ir_get_opr_type(Operand op) {
 	switch (op.type) {
-		case OPR_VAR:      return op.var.type;      break;
-		case OPR_LITERAL:  return op.literal.type;  break;
-		case OPR_FUNC_INP: return op.func_inp.type; break;
-		case OPR_FUNC_RET: return op.func_ret.type; break;
+		case OPR_VAR:      return op.var.type;               break;
+		case OPR_LITERAL:  return op.literal.type;           break;
+		case OPR_FUNC_INP: return op.func_inp.type;          break;
+		case OPR_FUNC_RET: return op.func_ret.type;          break;
+		case OPR_SIZEOF:   return (Type) {.kind = TYPE_INT}; break;
 		default: unreachable; return (Type){0};
 	}
 }
@@ -58,6 +59,11 @@ void ir_gen_func_call(Func *func, AST_Node *cn);
 
 int64_t last_var;
 Operand ir_gen_expr(Func *func, AST_Node *en) {
+	if (!en) {
+		last_var = -1;
+		return (Operand) {.type = OPR_NULL};
+	}
+
 	switch (en->kind) {
 		case AST_LITERAL: {
 			last_var = -1;
@@ -139,13 +145,13 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 				Type lt = ir_get_opr_type(l);
 				Type rt = ir_get_opr_type(r);
 
-				if (lt.kind == TYPE_POINTER || rt.kind == TYPE_POINTER) {
+				if (is_pointer(lt) || is_pointer(rt)) {
 					Type ptr_base;
 					Operand tm;
-					if (lt.kind == TYPE_POINTER) {
+					if (is_pointer(lt)) {
 						ptr_base = *lt.pointer.base;
 						tm = r;
-					} else if (rt.kind == TYPE_POINTER) {
+					} else if (is_pointer(rt)) {
 						ptr_base = *rt.pointer.base;
 						tm = l;
 					}
@@ -160,19 +166,16 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 						.op = OP_MUL,
 						.arg1 = tm,
 						.arg2 = (Operand) {
-							.type = OPR_LITERAL,
-							.literal = (Literal){
-								.kind = LIT_INT,
-								.type = (Type) {.kind = TYPE_I64, .size = 8},
-								.lint = ptr_base.size,
-							},
+							.type = OPR_SIZEOF,
+							.size_of.type = (Type) {.kind = TYPE_IPTR},
+							.size_of.v_type = ptr_base,
 						},
 						.dst = dst,
 					};
 
 					da_append(&func->body, mult);
-					if (lt.kind == TYPE_POINTER) inst.arg2 = dst;
-					if (rt.kind == TYPE_POINTER) inst.arg1 = dst;
+					if (is_pointer(lt)) inst.arg2 = dst;
+					if (is_pointer(rt)) inst.arg1 = dst;
 				}
 			}
 
@@ -182,7 +185,15 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 		} break;
 
 		case AST_UN_EXP: {
-			if (en->exp_unary.op == AST_OP_DEREF) {
+			if (en->exp_unary.op == AST_OP_SIZEOF) {
+				Operand arg1 = ir_gen_expr(func, en->exp_unary.v);
+				last_var = -1;
+				return (Operand) {
+					.type = OPR_SIZEOF,
+					.size_of.type = en->exp_unary.type,
+					.size_of.v_type = ir_get_opr_type(arg1),
+				};
+			} else if (en->exp_unary.op == AST_OP_DEREF) {
 				Operand arg1 = ir_gen_expr(func, en->exp_unary.v);
 				last_var = -1;
 				return (Operand) {
@@ -389,7 +400,6 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 				}));
 
 				Operand res = ir_gen_expr(func, cn->stmt_while.exp);
-
 				size_t lbl_ex = label_index++;
 
 				da_append(&func->body, ((Instruction){
@@ -438,7 +448,6 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 				}));
 
 				Operand res = ir_gen_expr(func, cn->stmt_for.exp);
-
 				size_t lbl_ex = label_index++;
 
 				da_append(&func->body, ((Instruction){
@@ -505,12 +514,12 @@ void ir_gen_func(Program *prog, AST_Node *fn) {
 	da_append(&prog->funcs, func);
 }
 
-Program ir_gen_prog(Parser *parser) {
+Program ir_gen_prog(Parser *p) {
 	Program prog = {0};
 	label_index = 0;
 
-	for (size_t i = 0; i < parser->st.count; i++) {
-		Symbol cs = da_get(&parser->st, i);
+	for (size_t i = 0; i < p->st.count; i++) {
+		Symbol cs = da_get(&p->st, i);
 		if (cs.type == SBL_FUNC_EXTERN) {
 			da_append(&prog.externs, ((Extern){
 				.name = cs.func_extern.extern_smb,
@@ -519,7 +528,7 @@ Program ir_gen_prog(Parser *parser) {
 		}
 	}
 
-	AST_Node *pn = parser->program;
+	AST_Node *pn = p->program;
 	for (size_t i = 0; i < pn->program.stmts.count; i++) {
 		AST_Node *cn = da_get(&pn->program.stmts, i);
 		switch (cn->kind) {

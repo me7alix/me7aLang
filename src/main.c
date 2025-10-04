@@ -2,7 +2,6 @@
 #include <string.h>
 #include <time.h>
 
-#define DA_DEBUG
 #include "../include/lexer.h"
 #include "../include/parser.h"
 #include "../include/ir.h"

@@ -36,12 +36,36 @@ size_t iot_get(size_t index) {
 	return da_get(&iot, index).stack_off;
 }
 
+size_t get_type_size(Type type) {
+	switch (type.kind) {
+		case TYPE_POINTER:
+		case TYPE_IPTR:
+		case TYPE_I64:
+			return 8;
+
+		case TYPE_INT:
+		case TYPE_I32:
+			return 4;
+
+		case TYPE_BOOL:
+		case TYPE_I8:
+			return 1;
+
+		case TYPE_ARRAY:
+			return get_type_size(*type.array.elem) * type.array.length;
+
+		default: unreachable;
+	}
+}
+
 StringBuilder body = {0};
 size_t total_offset = 0;
 
 void type_to_stack(Type type, char *buf) {
 	switch (type.kind) {
+		case TYPE_ARRAY:
 		case TYPE_POINTER:
+		case TYPE_IPTR:
 		case TYPE_I64: sprintf(buf, "qword"); break;
 		case TYPE_INT:
 		case TYPE_I32: sprintf(buf, "dword"); break;
@@ -55,6 +79,10 @@ void type_to_stack(Type type, char *buf) {
 char opr_to_nasm_buf[64];
 char *opr_to_nasm(Operand opr) {
 	switch (opr.type) {
+		case OPR_SIZEOF: {
+			sprintf(opr_to_nasm_buf, "%zu", get_type_size(opr.size_of.v_type));
+		} break;
+
 		case OPR_LABEL: {
 			sprintf(opr_to_nasm_buf, ".L%zu", opr.label_index);
 		} break;
@@ -76,10 +104,11 @@ char *opr_to_nasm(Operand opr) {
 		case OPR_LITERAL: {
 			switch (opr.literal.type.kind) {
 				case TYPE_INT:   sprintf(opr_to_nasm_buf, "%d", (int32_t) opr.literal.lint); break;
-				case TYPE_FLOAT: sprintf(opr_to_nasm_buf, "%f", (float) opr.literal.lfloat); break;
 				case TYPE_BOOL:
 				case TYPE_I8:    sprintf(opr_to_nasm_buf, "%d", (int8_t) opr.literal.lint); break;
+				case TYPE_ARRAY:
 				case TYPE_POINTER:
+				case TYPE_IPTR:
 				case TYPE_I64:   sprintf(opr_to_nasm_buf, "%li", opr.literal.lint); break;
 				default: unreachable;
 			}
@@ -88,10 +117,11 @@ char *opr_to_nasm(Operand opr) {
 		case OPR_FUNC_RET: {
 			switch (opr.func_ret.type.kind) {
 				case TYPE_INT:   sprintf(opr_to_nasm_buf, "eax"); break;
-				case TYPE_FLOAT: unreachable;
 				case TYPE_BOOL:
 				case TYPE_I8:    sprintf(opr_to_nasm_buf, "al"); break;
+				case TYPE_ARRAY:
 				case TYPE_POINTER:
+				case TYPE_IPTR:
 				case TYPE_I64:   sprintf(opr_to_nasm_buf, "rax"); break;
 				default: unreachable;
 			}
@@ -100,10 +130,11 @@ char *opr_to_nasm(Operand opr) {
 		case OPR_FUNC_INP: {
 			switch (opr.func_inp.type.kind) {
 				case TYPE_INT:   sprintf(opr_to_nasm_buf, "%s", argreg32[opr.func_inp.arg_ind]); break;
-				case TYPE_FLOAT: unreachable;
 				case TYPE_BOOL:
 				case TYPE_I8:    sprintf(opr_to_nasm_buf, "%s", argreg8[opr.func_inp.arg_ind]); break;
+				case TYPE_ARRAY:
 				case TYPE_POINTER:
+				case TYPE_IPTR:
 				case TYPE_I64:   sprintf(opr_to_nasm_buf, "%s", argreg64[opr.func_inp.arg_ind]); break;
 				default: unreachable;
 			}
@@ -117,12 +148,16 @@ char *opr_to_nasm(Operand opr) {
 
 void type_to_reg(Type type, char *arg1, char *arg2) {
 	switch (type.kind) {
-		case TYPE_I8: case TYPE_BOOL:
+		case TYPE_I8:
+		case TYPE_BOOL:
 			sprintf(arg1, "al");
 			sprintf(arg2, "bl");
 			break;
 
-		case TYPE_I64: case TYPE_POINTER:
+		case TYPE_ARRAY:
+		case TYPE_POINTER:
+		case TYPE_IPTR:
+		case TYPE_I64:
 			sprintf(arg1, "rax");
 			sprintf(arg2, "rcx");
 			break;
@@ -181,7 +216,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			case OP_GREAT: case OP_LESS:
 			case OP_GREAT_EQ: case OP_LESS_EQ: {
 				char ts[32]; type_to_stack(ci.dst.var.type, ts);
-				total_offset += ci.dst.var.type.size;
+				total_offset += get_type_size(ci.dst.var.type);
 				iot_add(ci.dst.var.index, total_offset);
 				sprintf(dst, "%s [rbp - %zu]", ts, total_offset);
 				reg_alloc(ci, arg1, arg2);
@@ -234,7 +269,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 
 			case OP_NOT: case OP_NEG: {
 				char ts[32]; type_to_stack(ci.dst.var.type, ts);
-				total_offset += ci.dst.var.type.size;
+				total_offset += get_type_size(ci.dst.var.type);
 				iot_add(ci.dst.var.index, total_offset);
 				sprintf(dst, "%s [rbp - %zu]", ts, total_offset);
 				reg_alloc(ci, arg1, arg2);
@@ -258,11 +293,12 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 				switch (ci.arg1.type) {
 					case OPR_LITERAL: arg1_type = ci.arg1.literal.type; break;
 					case OPR_VAR:     arg1_type = ci.arg1.var.type;     break;
+					case OPR_SIZEOF:  arg1_type = ci.arg1.size_of.type; break;
 					default: unreachable;
 				}
 
 				char ts[32]; type_to_stack(ci.dst.var.type, ts);
-				total_offset += ci.dst.var.type.size;
+				total_offset += get_type_size(ci.dst.var.type);
 				iot_add(ci.dst.var.index, total_offset);
 				sprintf(dst, "%s [rbp - %zu]", ts, total_offset);
 				reg_alloc(ci, arg1, arg2);
@@ -276,22 +312,16 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 				} else if (dst_type.kind == TYPE_INT && arg1_type.kind == TYPE_I8) {
 					sb_append_strf(&body, TAB"movsx eax, %s\n", opr_to_nasm(ci.arg1));
 					sb_append_strf(&body, TAB"mov %s, eax\n", opr_to_nasm(ci.dst));
-				} else if (dst_type.kind == TYPE_I64 && arg1_type.kind == TYPE_INT) {
+				} else if ((dst_type.kind == TYPE_POINTER || dst_type.kind == TYPE_I64 || dst_type.kind == TYPE_IPTR) && arg1_type.kind == TYPE_INT) {
 					sb_append_strf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
 					sb_append_strf(&body, TAB"movsxd rax, eax\n");
 					sb_append_strf(&body, TAB"mov %s, rax\n", opr_to_nasm(ci.dst));
-				} else if (dst_type.kind == TYPE_POINTER && arg1_type.kind == TYPE_INT) {
-					sb_append_strf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
-					sb_append_strf(&body, TAB"movsxd rax, eax\n", opr_to_nasm(ci.dst));
-					sb_append_strf(&body, TAB"mov %s, rax\n", opr_to_nasm(ci.dst));
-				} else if (dst_type.kind == TYPE_INT && arg1_type.kind == TYPE_I64) {
+				} else if (dst_type.kind == TYPE_INT && (dst_type.kind == TYPE_POINTER || arg1_type.kind == TYPE_I64 || arg1_type.kind == TYPE_IPTR)) {
 					sb_append_strf(&body, TAB"mov rax, %s\n", opr_to_nasm(ci.arg1));
 					sb_append_strf(&body, TAB"mov eax, eax\n");
 					sb_append_strf(&body, TAB"movsx rax, eax\n");
 					sb_append_strf(&body, TAB"mov %s, eax\n", opr_to_nasm(ci.dst));
-				} else {
-					assert(!"unreachable");
-				}
+				} else unreachable;
 			} break;
 
 			case OP_ASSIGN: {
@@ -304,7 +334,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 					size_t off = iot_get(ci.dst.var.index);
 
 					if (off == 0) {
-						total_offset += ci.dst.var.type.size;
+						total_offset += get_type_size(ci.dst.var.type);
 						off = total_offset;
 						iot_add(ci.dst.var.index, off);
 					}
@@ -313,8 +343,10 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 					reg_alloc(ci, arg1, arg2);
 				}
 
-				sb_append_strf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
-				sb_append_strf(&body, TAB"mov %s, %s\n", dst, arg1);
+				if (ci.arg1.type != OPR_NULL) {
+					sb_append_strf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
+					sb_append_strf(&body, TAB"mov %s, %s\n", dst, arg1);
+				}
 			} break;
 
 			case OP_JUMP_IF_NOT: {
@@ -353,6 +385,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 				for (size_t i = 0; ci.args[i].type != OPR_NULL; i++) {
 					switch (ir_get_opr_type(ci.args[i]).kind) {
 						case TYPE_POINTER:
+						case TYPE_IPTR:
 						case TYPE_I64:
 							sb_append_strf(&body, TAB"mov %s, %s\n", argreg64[i], opr_to_nasm(ci.args[i]));
 							break;

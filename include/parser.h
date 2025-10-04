@@ -12,13 +12,13 @@
 
 typedef enum {
 	TYPE_NULL,
-	TYPE_INT, TYPE_UINT,
-	TYPE_I8,  TYPE_U8,
-	TYPE_I16, TYPE_U16,
-	TYPE_I32, TYPE_U32,
-	TYPE_I64, TYPE_U64,
+	TYPE_INT,  TYPE_UINT,
+	TYPE_I8,   TYPE_U8,
+	TYPE_I16,  TYPE_U16,
+	TYPE_I32,  TYPE_U32,
+	TYPE_I64,  TYPE_U64,
+	TYPE_IPTR, TYPE_UPTR,
 
-	TYPE_FLOAT,
 	TYPE_F16,
 	TYPE_F32,
 	TYPE_F64,
@@ -38,11 +38,9 @@ struct Type {
 	union {
 		struct { Type *base; } pointer;
 		struct { Type *elem; size_t length; } array;
-		struct { Type **params; size_t param_count; struct Type* ret; } function;
+		struct { Type **params; size_t param_count; Type* ret; } function;
 		struct { char *name; } user;
 	};
-
-	size_t size;
 };
 
 typedef enum {
@@ -88,6 +86,7 @@ typedef enum {
 	AST_OP_NOT,
 
 	// other
+	AST_OP_SIZEOF,
 	AST_OP_CAST,
 	AST_OP_REF,
 	AST_OP_DEREF,
@@ -217,10 +216,13 @@ Type parse_type(Parser *parser);
 void parser_st_add(Parser *parser, Symbol smbl);
 Symbol *parser_st_get(Parser *parser, const char *id, Location loc);
 
+Token *parser_peek(Parser *p);
+Token *parser_looknext(Parser *p);
+Token *parser_next(Parser *p);
+
+int64_t parse_int(char *data);
 Symbol *st_get(SymbolTable *st, const char *id);
 void expect_token(Token *token, TokenType type);
-void unexpect_token(Token *token, TokenType type);
-void parser_alloc();
 Parser parser_parse(Token *tokens);
 void parser_free(Parser parser);
 void expect_token(Token *token, TokenType type);
@@ -228,6 +230,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart);
 AST_Node *parse_func_call(Parser *parser);
 AST_Node *ast_alloc(AST_Node node);
 
+#define is_pointer(t) ((t).kind == TYPE_ARRAY || (t).kind == TYPE_POINTER)
 #define unreachable assert(!"unreachable")
 #define ast_new(...) \
 	ast_alloc((AST_Node) __VA_ARGS__ )

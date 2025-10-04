@@ -31,6 +31,7 @@ typedef enum {
 	OPR_LABEL,
 	OPR_NAME,
 	OPR_VAR,
+	OPR_SIZEOF,
 } OperandType;
 
 typedef struct {
@@ -40,6 +41,10 @@ typedef struct {
 		Literal literal;
 		size_t label_index;
 		char *name;
+		struct {
+			Type type;
+			Type v_type;
+		} size_of;
 		struct {
 			Type type;
 		} func_ret;

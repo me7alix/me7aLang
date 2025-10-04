@@ -89,8 +89,8 @@ Lexer lexer_lex(char *code) {
 			case ';': add_token(&lexer, TOK_SEMI,  ";"); break;
 			case '.': add_token(&lexer, TOK_DOT,   "."); break;
 			case ',': add_token(&lexer, TOK_COM,   ","); break;
-			//case '[': add_token(&lexer, TOK_OT,   ","); break;
-			//case ']': add_token(&lexer, TOK_OT,   ","); break;
+			case '[': add_token(&lexer, TOK_OSQBRA,"["); break;
+			case ']': add_token(&lexer, TOK_CSQBRA,"]"); break;
 
 			case '!': {
 				if (lexer.cur_char[1] == '=') {
@@ -238,6 +238,7 @@ Lexer lexer_lex(char *code) {
 				} else if (is_tok(&lexer, "true",   TOK_TRUE, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "false",  TOK_FALSE, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "null",   TOK_NULL, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "sizeof", TOK_SIZEOF, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "return", TOK_RET, lexer.cur_char)) {}
 
 				else if (isalpha(*lexer.cur_char)) {

@@ -5,7 +5,8 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 	if (l.type == OPR_LITERAL && r.type == OPR_LITERAL && en->kind == AST_BIN_EXP) {
 		if (l.literal.type.kind == r.literal.type.kind) {
 			switch (l.literal.type.kind) {
-				case TYPE_INT: {
+				case TYPE_INT:
+				case TYPE_I32: {
 					int32_t lv = (int32_t) l.literal.lint;
 					int32_t rv = (int32_t) r.literal.lint;
 					int32_t res;
@@ -22,10 +23,7 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 						.type = OPR_LITERAL,
 						.literal.kind = LIT_INT,
 						.literal.lint = res,
-						.literal.type = (Type) {
-							.kind = TYPE_INT,
-							.size = 4,
-						},
+						.literal.type = (Type) {.kind = TYPE_I32},
 					};
 				} break;
 
@@ -46,10 +44,7 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 						.type = OPR_LITERAL,
 						.literal.kind = LIT_INT,
 						.literal.lint = res,
-						.literal.type = (Type) {
-							.kind = TYPE_I64,
-							.size = 8,
-						},
+						.literal.type = (Type) {.kind = TYPE_I64},
 					};
 				} break;
 
@@ -70,10 +65,7 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 						.type = OPR_LITERAL,
 						.literal.kind = LIT_INT,
 						.literal.lint = res,
-						.literal.type = (Type) {
-							.kind = TYPE_I8,
-							.size = 1,
-						},
+						.literal.type = (Type) {.kind = TYPE_I8},
 					};
 				} break;
 

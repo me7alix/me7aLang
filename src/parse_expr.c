@@ -34,9 +34,7 @@ float op_cost(AST_ExprOp op, bool is_left) {
 			if (is_left) return 0.0;
 			else         return 3.0;
 		case AST_OP_NOT:
-			if (is_left) return 3.0;
-			else         return 0.0;
-		case AST_OP_NEG:
+		case AST_OP_NEG: case AST_OP_SIZEOF:
 		case AST_OP_REF: case AST_OP_DEREF:
 			if (is_left) return 3.0;
 			else         return 0.0;
@@ -49,14 +47,14 @@ float op_cost(AST_ExprOp op, bool is_left) {
 	return 0.0;
 }
 
-AST_Node *parse_func_call(Parser *parser) {
+AST_Node *parse_func_call(Parser *p) {
 	AST_Node *fcn = ast_new({ .kind = AST_FUNC_CALL });
-	fcn->loc = parser->cur_token->loc;
-	fcn->func_call.id = parser->cur_token->data;
-	expect_token(++parser->cur_token, TOK_OPAR);
-	parser->cur_token++;
+	fcn->loc = parser_peek(p)->loc;
+	fcn->func_call.id = parser_next(p)->data;
+	expect_token(parser_peek(p), TOK_OPAR);
+	parser_next(p);
 
-	Symbol *fc = parser_st_get(parser, fcn->func_call.id, fcn->loc);
+	Symbol *fc = parser_st_get(p, fcn->func_call.id, fcn->loc);
 	AST_Nodes fargs;
 
 	switch (fc->type) {
@@ -75,10 +73,10 @@ AST_Node *parse_func_call(Parser *parser) {
 	}
 
 	size_t arg_cnt = 0;
-	while (parser->cur_token->type != TOK_CPAR) {
-		AST_Node *expr = parse_expr(parser, EXPR_PARSING_FUNC_CALL, NULL);
+	while (parser_peek(p)->type != TOK_CPAR) {
 		if (arg_cnt + 1 > fargs.count) lexer_error(fcn->loc, "parser error: wrong amount of arguments");
 		Type farg_type = fargs.items[arg_cnt++]->func_def_arg.type;
+		AST_Node *expr = parse_expr(p, EXPR_PARSING_FUNC_CALL, &farg_type);
 		Type expr_type;
 
 		switch (expr->kind) {
@@ -86,14 +84,14 @@ AST_Node *parse_func_call(Parser *parser) {
 			case AST_UN_EXP:  expr_type = expr->exp_unary.type;  break;
 			case AST_LITERAL: expr_type = expr->literal.type;    break;
 			case AST_VAR: {
-				Symbol *var_smbl = parser_st_get(parser, expr->var_id, expr->loc);
+				Symbol *var_smbl = parser_st_get(p, expr->var_id, expr->loc);
 				expr_type = var_smbl->variable.type;
 			} break;
 			default: unreachable;
 		}
 
 		if (expr_type.kind != farg_type.kind) lexer_error(expr->loc, "parser error: wrong type");
-		if (expr_type.kind == TYPE_POINTER && farg_type.kind == TYPE_POINTER) {
+		if (is_pointer(expr_type) && is_pointer(farg_type)) {
 			if (expr_type.pointer.base->kind != farg_type.pointer.base->kind &&
 				!(expr_type.pointer.base->kind == TYPE_NULL || farg_type.pointer.base->kind == TYPE_NULL)) {
 				lexer_error(expr->loc, "parser error: wrong type");
@@ -101,11 +99,11 @@ AST_Node *parse_func_call(Parser *parser) {
 		}
 
 		da_append(&fcn->func_call.args, expr);
-		parser->cur_token++;
+		parser_next(p);
 	}
 
 	if (arg_cnt < fargs.count) lexer_error(fcn->loc, "parser error: wrong amount of arguments");
-	parser->cur_token++;
+	parser_next(p);
 	return fcn;
 }
 
@@ -176,11 +174,11 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 				switch (expr->literal.kind) {
 					case LIT_INT:
 						if(expr->literal.type.kind == TYPE_NULL)
-							expr->literal.type = (Type) {.kind = TYPE_INT,   .size = 4};
+							expr->literal.type = (Type) {.kind = TYPE_INT};
 						break;
-					case LIT_CHAR:  expr->literal.type = (Type) {.kind = TYPE_I8,    .size = 1}; break;
-					case LIT_FLOAT: expr->literal.type = (Type) {.kind = TYPE_FLOAT, .size = 4}; break;
-					case LIT_BOOL:  expr->literal.type = (Type) {.kind = TYPE_BOOL,  .size = 1}; break;
+					case LIT_CHAR:  expr->literal.type = (Type) {.kind = TYPE_I8}; break;
+					case LIT_FLOAT: expr->literal.type = (Type) {.kind = TYPE_F32}; break;
+					case LIT_BOOL:  expr->literal.type = (Type) {.kind = TYPE_BOOL}; break;
 				}
 			}
 
@@ -190,24 +188,24 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 		case AST_BIN_EXP: {
 			Type lt = expr_calc_types(parser, expr->exp_binary.l, vart);
 			if (expr->exp_binary.op == AST_OP_VAR_EQ) vart = &lt;
-			else if (lt.kind == TYPE_POINTER) {
-				Type i64 = (Type) {.kind = TYPE_I64, .size = 8};
-				vart = &i64;
+			else if (is_pointer(lt)) {
+				Type iptr = (Type) {.kind = TYPE_IPTR};
+				vart = &iptr;
 			}
 
 			Type rt = expr_calc_types(parser, expr->exp_binary.r, vart);
 			expr->exp_binary.type = lt;
 
-			if ((lt.kind == TYPE_I64 && rt.kind == TYPE_POINTER) ||
-				(lt.kind == TYPE_POINTER && rt.kind == TYPE_I64)) {
-				Type rest = lt.kind == TYPE_POINTER ? lt : rt;
+			if ((lt.kind == TYPE_IPTR && is_pointer(rt)) ||
+				(is_pointer(lt) && rt.kind == TYPE_IPTR)) {
+				Type rest = is_pointer(lt) ? lt : rt;
 				expr->exp_binary.type = rest;
 				assert(rest.pointer.base);
 			} else if (lt.kind != rt.kind) {
 				lexer_error(expr->loc, "parser error: operation on different types");
 			}
 
-			if (lt.kind == TYPE_POINTER && rt.kind == TYPE_POINTER) {
+			if (is_pointer(lt) && is_pointer(rt)) { // here could be a problem
 				if (lt.pointer.base->kind != rt.pointer.base->kind &&
 					!(lt.pointer.base->kind == TYPE_NULL || rt.pointer.base->kind == TYPE_NULL)) {
 					lexer_error(expr->loc, "parser error: operation on different types");
@@ -219,7 +217,6 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 				case AST_OP_LESS_EQ: case AST_OP_GREAT_EQ:
 				case AST_OP_GREAT: case AST_OP_LESS:
 					expr->exp_binary.type.kind = TYPE_BOOL;
-					expr->exp_binary.type.size = 1;
 				default:;
 			}
 
@@ -228,6 +225,8 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 
 		case AST_UN_EXP: {
 			switch (expr->exp_unary.op) {
+				case AST_OP_SIZEOF: break;
+
 				case AST_OP_CAST: {
 					expr_calc_types(parser, expr->exp_unary.v, &expr->exp_unary.type);
 				} break;
@@ -236,14 +235,13 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 					Type vt = expr_calc_types(parser, expr->exp_unary.v, vart);
 					expr->exp_unary.type = vt;
 					Type *base = malloc(sizeof(Type)); *base = vt;
-					expr->exp_unary.type = (Type) {.kind = TYPE_POINTER, .pointer.base = base, .size = 8 };
+					expr->exp_unary.type = (Type) {.kind = TYPE_POINTER, .pointer.base = base};
 				} break;
 
 				case AST_OP_DEREF: {
 					Type vt = expr_calc_types(parser, expr->exp_unary.v, vart);
 					expr->exp_unary.type = vt;
-					if (vt.kind != TYPE_POINTER)
-						lexer_error(expr->exp_unary.v->loc, "parser error: pointer expected");
+					if (!is_pointer(vt)) lexer_error(expr->exp_unary.v->loc, "parser error: pointer expected");
 					expr->exp_unary.type = *vt.pointer.base;
 				} break;
 
@@ -279,6 +277,7 @@ AST_ExprOp tok_to_binary_expr_op(TokenType tok) {
 
 AST_ExprOp tok_to_unary_expr_op(Token *tok) {
 	switch (tok->type) {
+		case TOK_SIZEOF:    return AST_OP_SIZEOF;
 		case TOK_COL:       return AST_OP_CAST;
 		case TOK_STAR:      return AST_OP_DEREF;
 		case TOK_AMP:       return AST_OP_REF;
@@ -290,48 +289,48 @@ AST_ExprOp tok_to_unary_expr_op(Token *tok) {
 	};
 }
 
-AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
+AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 	AST_Nodes nodes = {0};
 
 	while (true) {
-		if (parser->cur_token->type == TOK_OPAR) {
-			parser->cur_token++;
-			da_append(&nodes, parse_expr(parser, EXPR_PARSING_PAR, vart));
+		if (parser_peek(p)->type == TOK_OPAR) {
+			parser_next(p);
+			da_append(&nodes, parse_expr(p, EXPR_PARSING_PAR, vart));
 		}
 
 		if (type == EXPR_PARSING_FUNC_CALL) {
-			if (parser->cur_token->type == TOK_COM) break;
-			else if (parser->cur_token->type == TOK_CPAR) {
-				parser->cur_token--;
+			if (parser_peek(p)->type == TOK_COM) break;
+			else if (parser_peek(p)->type == TOK_CPAR) {
+				p->cur_token--;
 				break;
 			}
 		} else if (type == EXPR_PARSING_VAR) {
-			if (parser->cur_token->type == TOK_SEMI) {
+			if (parser_peek(p)->type == TOK_SEMI) {
 				break;
 			}
 		} else if (type == EXPR_PARSING_PAR) {
-			if (parser->cur_token->type == TOK_CPAR) {
-				parser->cur_token++;
+			if (parser_peek(p)->type == TOK_CPAR) {
+				parser_next(p);
 				break;
 			}
 		} else if (type == EXPR_PARSING_STMT) {
-			if (parser->cur_token->type == TOK_OBRA) {
-				parser->cur_token--;
+			if (parser_peek(p)->type == TOK_OBRA) {
+				p->cur_token--;
 				break;
 			}
 		}
 
-		switch (parser->cur_token->type) {
+		switch (parser_peek(p)->type) {
 			case TOK_ID:
-				if ((parser->cur_token+1)->type != TOK_OPAR) {
+				if ((parser_peek(p)+1)->type != TOK_OPAR) {
 					da_append(&nodes, ast_new({
 						.kind = AST_VAR,
-						.loc = parser->cur_token->loc,
-						.var_id = parser->cur_token->data
+						.loc = parser_peek(p)->loc,
+						.var_id = parser_peek(p)->data
 					}));
 				} else {
-					da_append(&nodes, parse_func_call(parser));
-					parser->cur_token--;
+					da_append(&nodes, parse_func_call(p));
+					p->cur_token--;
 				}
 				break;
 
@@ -339,15 +338,15 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 				da_append(&nodes, ast_new({
 					.kind = AST_LITERAL,
 					.literal.kind = LIT_INT,
-					.loc = parser->cur_token->loc,
-					.literal.lint = parse_int(parser->cur_token->data),
+					.loc = parser_peek(p)->loc,
+					.literal.lint = parse_int(parser_peek(p)->data),
 				}));
 				break;
 
 			case TOK_TRUE:
 				da_append(&nodes, ast_new({
 					.kind = AST_LITERAL,
-					.loc = parser->cur_token->loc,
+					.loc = parser_peek(p)->loc,
 					.literal.kind = LIT_BOOL,
 					.literal.lint = 1,
 				}));
@@ -363,7 +362,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 
 			case TOK_NULL: {
 				Type *u0 = malloc(sizeof(Type));
-				*u0 = (Type) {.kind = TYPE_NULL, .size = 0};
+				*u0 = (Type) {.kind = TYPE_NULL};
 				da_append(&nodes, ast_new({
 					.kind = AST_LITERAL,
 					.literal.type = (Type) { .kind = TYPE_POINTER, .pointer.base = u0},
@@ -375,9 +374,9 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 			case TOK_CHAR:
 				da_append(&nodes, ast_new({
 					.kind = AST_LITERAL,
-					.loc = parser->cur_token->loc,
+					.loc = parser_peek(p)->loc,
 					.literal.kind = LIT_CHAR,
-					.literal.lint = parser->cur_token->data[0],
+					.literal.lint = parser_peek(p)->data[0],
 				}));
 				break;
 
@@ -385,26 +384,49 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 				da_append(&nodes, ast_new({
 					.kind = AST_LITERAL,
 					.literal.kind = LIT_FLOAT,
-					.literal.lfloat = parse_float(parser->cur_token->data),
+					.literal.lfloat = parse_float(parser_peek(p)->data),
 				}));
 				break;
 
 			case TOK_COL: {
-				Type t = parse_type(parser);
+				Type t = parse_type(p);
 				da_append(&nodes, ast_new({
 					.kind = AST_UN_EXP,
-					.loc = parser->cur_token->loc,
+					.loc = parser_peek(p)->loc,
 					.exp_unary.type = t,
 					.exp_unary.op = AST_OP_CAST,
 					.exp_unary.v = NULL,
 				}));
 			} break;
 
+			case TOK_SIZEOF:
+				if (parser_looknext(p)->type == TOK_COL) {
+					da_append(&nodes, ast_new({
+						.kind = AST_UN_EXP,
+						.loc = parser_peek(p)->loc,
+						.exp_unary.op = tok_to_unary_expr_op(parser_next(p)),
+						.exp_unary.type = (Type) {.kind = TYPE_IPTR},
+						.exp_unary.v = ast_new({
+							.kind = AST_LITERAL,
+							.literal.type = parse_type(p),
+						}),
+					}));
+				} else {
+					da_append(&nodes, ast_new({
+						.kind = AST_UN_EXP,
+						.loc = parser_peek(p)->loc,
+						.exp_unary.op = tok_to_unary_expr_op(parser_peek(p)),
+						.exp_unary.type = (Type) {.kind = TYPE_IPTR},
+						.exp_unary.v = NULL,
+					}));
+				}
+				break;
+
 			case TOK_EXC: case TOK_AMP:
 				da_append(&nodes, ast_new({
 					.kind = AST_UN_EXP,
-					.loc = parser->cur_token->loc,
-					.exp_unary.op = tok_to_unary_expr_op(parser->cur_token),
+					.loc = parser_peek(p)->loc,
+					.exp_unary.op = tok_to_unary_expr_op(parser_peek(p)),
 					.exp_unary.v = NULL,
 				}));
 				break;
@@ -417,8 +439,8 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 			case TOK_EQ: {
 				da_append(&nodes, ast_new({
 					.kind = AST_BIN_EXP,
-					.loc = parser->cur_token->loc,
-					.exp_binary.op = tok_to_binary_expr_op(parser->cur_token->type),
+					.loc = parser_peek(p)->loc,
+					.exp_binary.op = tok_to_binary_expr_op(parser_peek(p)->type),
 					.exp_binary.l = NULL,
 					.exp_binary.r = NULL
 				}));
@@ -439,29 +461,29 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 				if (!is_unary_op) {
 					da_append(&nodes, ast_new({
 						.kind = AST_BIN_EXP,
-						.loc = parser->cur_token->loc,
-						.exp_binary.op = tok_to_binary_expr_op(parser->cur_token->type),
+						.loc = parser_peek(p)->loc,
+						.exp_binary.op = tok_to_binary_expr_op(parser_peek(p)->type),
 						.exp_binary.l = NULL,
 						.exp_binary.r = NULL
 					}));
 				} else {
 					da_append(&nodes, ast_new({
 						.kind = AST_UN_EXP,
-						.loc = parser->cur_token->loc,
-						.exp_unary.op = tok_to_unary_expr_op(parser->cur_token),
+						.loc = parser_peek(p)->loc,
+						.exp_unary.op = tok_to_unary_expr_op(parser_peek(p)),
 						.exp_unary.v = NULL,
 					}));
 				}
 			} break;
 
-			default: lexer_error(parser->cur_token->loc, "parser error: unexpected token");
+			default: lexer_error(parser_peek(p)->loc, "parser error: unexpected token");
 		}
 
-		parser->cur_token++;
+		parser_next(p);
 	}
 
 	AST_Node *expr = expr_expand(&nodes);
-	expr_calc_types(parser, expr, vart);
+	expr_calc_types(p, expr, vart);
 	da_free(&nodes);
 	return expr;
 }
