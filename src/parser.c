@@ -43,6 +43,7 @@ Symbol *parser_st_get(Parser *parser, const char *id, Location loc) {
 
 Type parse_type(Parser *parser) {
 	expect_token(parser->cur_token, TOK_COL);
+	Location loc = parser->cur_token->loc;
 	Type type = {0};
 	parser->cur_token++;
 
@@ -68,7 +69,7 @@ Type parse_type(Parser *parser) {
 	} else if (strcmp(type_name, "i64") == 0) {
 		type.kind = TYPE_I64;
 		type.size = 8;
-	}
+	} else lexer_error(loc, "parser error: no such type");
 
 	if (is_pointer) {
 		Type *base = malloc(sizeof(Type)); *base = type;
@@ -286,19 +287,7 @@ ex:
 	return body;
 }
 
-AST_Node *parse_function(Parser *parser) {
-	parser->cur_token++;
-
-	expect_token(parser->cur_token, TOK_ID);
-	AST_Node *fdn = ast_new({
-		.kind = AST_FUNC_DEF,
-		.loc = parser->cur_token->loc,
-		.func_def.id = parser->cur_token->data
-	});
-
-	parser->cur_token++;
-	expect_token(parser->cur_token++, TOK_OPAR);
-
+void parse_func_args(Parser *parser, AST_Nodes *fargs) {
 	while (parser->cur_token->type != TOK_CPAR) {
 		switch (parser->cur_token->type) {
 			case TOK_COM: break;
@@ -311,7 +300,7 @@ AST_Node *parse_function(Parser *parser) {
 
 				parser->cur_token++;
 				arg->func_def_arg.type = parse_type(parser);
-				da_append(&fdn->func_def.args, arg);
+				da_append(fargs, arg);
 
 				parser_st_add(parser, (Symbol) {
 					.id = arg->func_def_arg.id,
@@ -330,6 +319,22 @@ AST_Node *parse_function(Parser *parser) {
 	}
 
 	parser->cur_token++;
+}
+
+AST_Node *parse_function(Parser *parser) {
+	parser->cur_token++;
+
+	expect_token(parser->cur_token, TOK_ID);
+	AST_Node *fdn = ast_new({
+		.kind = AST_FUNC_DEF,
+		.loc = parser->cur_token->loc,
+		.func_def.id = parser->cur_token->data
+	});
+
+	parser->cur_token++;
+	expect_token(parser->cur_token++, TOK_OPAR);
+
+	parse_func_args(parser, &fdn->func_def.args);
 
 	if (parser->cur_token->type == TOK_COL) {
 		fdn->func_def.type = parse_type(parser);
@@ -337,7 +342,6 @@ AST_Node *parse_function(Parser *parser) {
 	} else {
 		fdn->func_def.type = (Type) {.kind = TYPE_NULL};
 	}
-
 
 	Symbol fds = {
 		.type = SBL_FUNC_DEF,
@@ -357,43 +361,24 @@ void parse_extern(Parser *parser) {
 	parser->cur_token++;
 
 	expect_token(parser->cur_token, TOK_ID);
+	char *extern_smb = parser->cur_token->data;
+
+	if (parser->cur_token[1].type == TOK_ID) {
+		parser->cur_token++;
+	}
+
+	expect_token(parser->cur_token, TOK_ID);
 
 	Symbol fes = {
 		.type = SBL_FUNC_EXTERN,
 		.id = parser->cur_token->data,
+		.func_extern.extern_smb = extern_smb,
 	};
 
 	parser->cur_token++;
 	expect_token(parser->cur_token++, TOK_OPAR);
 
-	while (parser->cur_token->type != TOK_CPAR) {
-		switch (parser->cur_token->type) {
-			case TOK_COM:
-				unexpect_token(parser->cur_token+1, TOK_COM);
-				break;
-
-			case TOK_ID:
-				expect_token(parser->cur_token+1, TOK_COL);
-				AST_Node *farg = ast_new({
-					.kind = AST_FUNC_DEF_ARG,
-					.func_def_arg.id = parser->cur_token->data
-				});
-
-				parser->cur_token++;
-				farg->func_def_arg.type = parse_type(parser);
-				da_append(&fes.func_extern.args, farg);
-				parser->cur_token++;
-				break;
-
-			default:
-				unexpect_token(parser->cur_token, parser->cur_token->type);
-				break;
-		}
-
-		parser->cur_token++;
-	}
-
-	parser->cur_token++;
+	parse_func_args(parser, &fes.func_extern.args);
 
 	if (parser->cur_token->type == TOK_COL) {
 		fes.func_extern.type = parse_type(parser);

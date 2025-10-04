@@ -196,6 +196,7 @@ typedef struct {
 		struct {
 			AST_Nodes args;
 			Type type;
+			char *extern_smb;
 		} func_extern;
 		struct {
 			Type type;

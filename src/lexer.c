@@ -73,6 +73,7 @@ void lexer_error(Location loc, char *error) {
 Lexer lexer_lex(char *code) {
 	Lexer lexer = {0};
 	lexer.cur_char = code;
+	lexer.cur_loc.line_start = code;
 
 	while (*lexer.cur_char != '\0') {
 		lexer.cur_loc.line_char = lexer.cur_char;
@@ -213,7 +214,8 @@ Lexer lexer_lex(char *code) {
 					lexer.cur_char++;
 					if (*lexer.cur_char == '\\') {
 						lexer.cur_char++;
-						if (*lexer.cur_char == 'n') add_token(&lexer, TOK_CHAR, "\n");
+						if      (*lexer.cur_char == 'n') add_token(&lexer, TOK_CHAR, "\n");
+						else if (*lexer.cur_char == '0') add_token(&lexer, TOK_CHAR, "\0");
 						else lexer_error(lexer.cur_loc, "lexer error: wrong character");
 						lexer.cur_char++;
 					} else {
@@ -226,14 +228,14 @@ Lexer lexer_lex(char *code) {
 					}
 				}
 
-				else if (is_tok(&lexer, "for", TOK_FOR_SYM, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "while", TOK_WHILE_SYM, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "if", TOK_IF_SYM, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "func", TOK_FUNC, lexer.cur_char)) {
+				else if   (is_tok(&lexer, "for",    TOK_FOR_SYM, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "while",  TOK_WHILE_SYM, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "if",     TOK_IF_SYM, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "func",   TOK_FUNC, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "struct", TOK_STRUCT, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "extern", TOK_EXTERN, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "true", TOK_TRUE, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "false", TOK_FALSE, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "true",   TOK_TRUE, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "false",  TOK_FALSE, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "return", TOK_RET, lexer.cur_char)) {}
 
 				else if (isalpha(*lexer.cur_char)) {

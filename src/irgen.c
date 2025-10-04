@@ -507,7 +507,7 @@ Program ir_gen_prog(Parser *parser) {
 		Symbol cs = da_get(&parser->st, i);
 		if (cs.type == SBL_FUNC_EXTERN) {
 			da_append(&prog.externs, ((Extern){
-				.name = cs.id,
+				.name = cs.func_extern.extern_smb,
 				.ret_type = cs.func_extern.type,
 			}));
 		}

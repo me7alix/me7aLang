@@ -47,23 +47,55 @@ float op_cost(AST_ExprOp op, bool is_left) {
 
 AST_Node *parse_func_call(Parser *parser) {
 	AST_Node *fcn = ast_new({ .kind = AST_FUNC_CALL });
+	fcn->loc = parser->cur_token->loc;
 	fcn->func_call.id = parser->cur_token->data;
 	expect_token(++parser->cur_token, TOK_OPAR);
 	parser->cur_token++;
 
-	while (parser->cur_token->type != TOK_CPAR) {
-		da_append(&fcn->func_call.args, parse_expr(parser, EXPR_PARSING_FUNC_CALL, NULL));
-		parser->cur_token++;
-	}
-
-	parser->cur_token++;
 	Symbol *fc = parser_st_get(parser, fcn->func_call.id, fcn->loc);
+	AST_Nodes fargs;
+
 	switch (fc->type) {
-		case SBL_FUNC_DEF:    fcn->func_call.type = fc->func_def.type;    break;
-		case SBL_FUNC_EXTERN: fcn->func_call.type = fc->func_extern.type; break;
+		case SBL_FUNC_DEF:
+			fcn->func_call.type = fc->func_def.type;
+			fargs = fc->func_def.args;
+			break;
+
+		case SBL_FUNC_EXTERN:
+			fcn->func_call.type = fc->func_extern.type;
+			fcn->func_call.id = fc->func_extern.extern_smb;
+			fargs = fc->func_extern.args;
+			break;
+
 		default: unreachable;
 	}
 
+	size_t arg_cnt = 0;
+	while (parser->cur_token->type != TOK_CPAR) {
+		AST_Node *expr = parse_expr(parser, EXPR_PARSING_FUNC_CALL, NULL);
+		if (arg_cnt + 1 > fargs.count) lexer_error(fcn->loc, "parser error: wrong amount of arguments");
+		Type farg_type = fargs.items[arg_cnt++]->func_def_arg.type;
+		bool err = false;
+
+		switch (expr->kind) {
+			case AST_BIN_EXP: if (expr->exp_binary.type.kind != farg_type.kind) err = true; break;
+			case AST_UN_EXP:  if (expr->exp_unary.type.kind != farg_type.kind)  err = true; break;
+			case AST_LITERAL: if (expr->literal.type.kind != farg_type.kind)    err = true; break;
+			case AST_VAR: {
+				Symbol *var_smbl = parser_st_get(parser, expr->var_id, expr->loc);
+				if (var_smbl->variable.type.kind != farg_type.kind) err = true;
+			} break;
+			default: unreachable;
+		}
+
+		if (err) lexer_error(expr->loc, "parser error: wrong type");
+
+		da_append(&fcn->func_call.args, expr);
+		parser->cur_token++;
+	}
+
+	if (arg_cnt < fargs.count) lexer_error(fcn->loc, "parser error: wrong amount of arguments");
+	parser->cur_token++;
 	return fcn;
 }
 
