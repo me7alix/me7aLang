@@ -2,7 +2,6 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <errno.h>
 #include <ctype.h>
 #include "../include/lexer.h"
 
@@ -22,28 +21,6 @@ char *get_word(Lexer *lexer) {
 	memcpy(word, start, l);
 	word[l] = '\0';
 	return word;
-}
-
-char *str_slice(char *str, size_t start, size_t len) {
-	if (!str) return NULL;
-
-	size_t str_len = strlen(str);
-	if (start >= str_len) {
-		char *empty = malloc(1);
-		if (!empty) { errno = ENOMEM; return NULL; }
-		empty[0] = '\0';
-		return empty;
-	}
-
-	size_t max_avail = str_len - start;
-	size_t slice_len = len < max_avail ? len : max_avail;
-
-	char *slice = malloc(slice_len + 1);
-	if (!slice) { errno = ENOMEM; return NULL; }
-
-	memcpy(slice, str + start, slice_len);
-	slice[slice_len] = '\0';
-	return slice;
 }
 
 void add_token(Lexer *lexer, TokenType type, char *data) {
@@ -114,10 +91,24 @@ void lexer_error(Lexer *lexer, char *error) {
 void lexer_lex(Lexer *lexer) {
 	while (*lexer->cur_char != '\0') {
 		switch (*lexer->cur_char) {
-			case ' ':
-				break;
-			case '\t':
-				break;
+			case ' ': case '\t': break;
+			case '{': add_token(lexer, TOK_OBRA, "{"); break;
+			case '}': add_token(lexer, TOK_CBRA, "}"); break;
+			case '(': add_token(lexer, TOK_OPAR, "("); break;
+			case ')': add_token(lexer, TOK_CPAR, ")"); break;
+			case '+': add_token(lexer, TOK_PLUS, "+"); break;
+			case '-': add_token(lexer, TOK_MINUS, "-"); break;
+			case '*': add_token(lexer, TOK_STAR, "*"); break;
+			case '=': add_token(lexer, TOK_EQ, "="); break;
+			case '>': add_token(lexer, TOK_GREAT, ">"); break;
+			case '<': add_token(lexer, TOK_LESS, "<"); break;
+			case ';': add_token(lexer, TOK_SEMI, ";"); break;
+			case '.': add_token(lexer, TOK_DOT, "."); break;
+			case '&': add_token(lexer, TOK_AMP, "&"); break;
+			case '!': add_token(lexer, TOK_EXC, "!"); break;
+			case ',': add_token(lexer, TOK_COM, ","); break;
+			case '|': add_token(lexer, TOK_PIPE, "|"); break;
+
 			case '\n':
 				if (lexer->tokens[lexer->tokens_num-1].type != TOK_SEMI &&
 					lexer->tokens[lexer->tokens_num-1].type != TOK_CBRA &&
@@ -127,68 +118,23 @@ void lexer_lex(Lexer *lexer) {
 				lexer->cur_loc.line_num++;
 				lexer->cur_loc.line_start = lexer->cur_char + 1;
 				break;
-			case '{':
-				add_token(lexer, TOK_OBRA, "{");
-				break;
-			case '}':
-				add_token(lexer, TOK_CBRA, "}");
-				break;
-			case '(':
-				add_token(lexer, TOK_OPAR, "(");
-				break;
-			case ')':
-				add_token(lexer, TOK_CPAR, ")");
-				break;
-			case '+':
-				add_token(lexer, TOK_PLUS, "+");
-				break;
-			case '-':
-				add_token(lexer, TOK_MINUS, "-");
-				break;
-			case '*':
-				add_token(lexer, TOK_STAR, "*");
-				break;
-			case '=':
-				add_token(lexer, TOK_EQ, "=");
-				break;
-			case '>':
-				add_token(lexer, TOK_GREAT, ">");
-				break;
-			case '<':
-				add_token(lexer, TOK_LESS, "<");
-				break;
-			case ';':
-				add_token(lexer, TOK_SEMI, ";");
-				break;
-			case '.':
-				add_token(lexer, TOK_DOT, ".");
-				break;
-			case '&':
-				add_token(lexer, TOK_AMP, "&");
-				break;
-			case '!':
-				add_token(lexer, TOK_EXC, "!");
-				break;
-			case ',':
-				add_token(lexer, TOK_COM, ",");
-				break;
-			case '|':
-				add_token(lexer, TOK_PIPE, "|");
-				break;
-			case ':':
+
+			case ':': {
 				lexer->cur_char++;
 				char *type = get_word(lexer);
 				add_token(lexer, TOK_TYPE, type);
-				break;
-			case '/':
+			} break;
+
+			case '/': {
 				if (*(lexer->cur_char + 1) == '/') {
 					while (*(lexer->cur_char) != '\n')
 						lexer->cur_char += 1;
 					break;
 				}
 				add_token(lexer, TOK_SLASH, "/");
-				break;
-			default:
+			} break;
+
+			default: {
 				if (isdigit(*lexer->cur_char)) {
 					char *start = lexer->cur_char;
 					bool isFloat = 0;
@@ -199,9 +145,15 @@ void lexer_lex(Lexer *lexer) {
 							break;
 						lexer->cur_char++;
 					}
-					if (isFloat) add_token(lexer, TOK_FLOAT, str_slice(start, 0, lexer->cur_char - start + 1));
-					else add_token(lexer, TOK_INT, str_slice(start, 0, lexer->cur_char - start + 1));
-				} else if (*(lexer->cur_char) == '"') {
+
+					size_t l = lexer->cur_char - start + 1;
+					char *num = malloc(sizeof(char) * (l+1));
+					memcpy(num, start, l); num[l] = '\0';
+					if (isFloat) add_token(lexer, TOK_FLOAT, num);
+					else add_token(lexer, TOK_INT, num);
+				}
+
+				else if (*(lexer->cur_char) == '"') {
 					char *lmark = lexer->cur_char++;
 					char *start = lexer->cur_char;
 					while (!(*(lexer->cur_char+1) == '\"' && *(lexer->cur_char) != '\\')) {
@@ -210,9 +162,15 @@ void lexer_lex(Lexer *lexer) {
 							lexer_error(lexer, "unclosed string");
 						}
 					}
-					add_token(lexer, TOK_STRING, str_slice(start, 0, lexer->cur_char - start + 1));
+
+					size_t l = lexer->cur_char - start + 1;
+					char *str = malloc(sizeof(char) * (l+1));
+					memcpy(str, start, l); str[l] = '\0';
+					add_token(lexer, TOK_STRING, str);
 					lexer->cur_char++;
-				} else if (*(lexer->cur_char) == '\'') {
+				}
+
+				else if (*(lexer->cur_char) == '\'') {
 					lexer->cur_char++;
 					if ((*(lexer->cur_char + 1) != '\'')) {
 						lexer->cur_char++;
@@ -221,21 +179,24 @@ void lexer_lex(Lexer *lexer) {
 
 					add_token(lexer, TOK_CHAR, lexer->cur_char);
 					lexer->cur_char++;
-				} else if (is_tok(lexer, "for", TOK_FOR_SYM, lexer->cur_char)) {
+				}
+
+				else if (is_tok(lexer, "for", TOK_FOR_SYM, lexer->cur_char)) {
 				} else if (is_tok(lexer, "while", TOK_WHILE_SYM, lexer->cur_char)) {
 				} else if (is_tok(lexer, "if", TOK_IF_SYM, lexer->cur_char)) {
 				} else if (is_tok(lexer, "func", TOK_FUNC, lexer->cur_char)) {
 				} else if (is_tok(lexer, "struct", TOK_STRUCT, lexer->cur_char)) {
-				} else if (is_tok(lexer, "return", TOK_RET, lexer->cur_char)) {
-				} else if (isalpha(*lexer->cur_char)) {
+				} else if (is_tok(lexer, "return", TOK_RET, lexer->cur_char)) {}
+
+				else if (isalpha(*lexer->cur_char)) {
 					char *id = get_word(lexer);
 					add_token(lexer, TOK_ID, id);
-				} else {
-					lexer_error(lexer, "unknown token");
 				}
 
-				break;
+				else lexer_error(lexer, "unknown token");
+			} break;
 		}
+
 		lexer->cur_char++;
 	}
 
@@ -284,4 +245,3 @@ const char *tok_to_str(TokenType tok_type) {
 		default:            return "UNKNOWN_TOKEN";
 	}
 }
-
