@@ -76,7 +76,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 				switch (da_get(nodes, i-1)->type) {
 					case AST_BIN_EXP: l_cost = op_cost(da_get(nodes, i-1)->exp_binary.op, true); break;
 					case AST_UN_EXP:  l_cost = op_cost(da_get(nodes, i-1)->exp_unary.op, true);  break;
-						default: unreachable;
+					default: unreachable;
 				}
 			}
 
@@ -84,7 +84,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 				switch (da_get(nodes, i+1)->type) {
 					case AST_BIN_EXP: r_cost = op_cost(da_get(nodes, i+1)->exp_binary.op, false); break;
 					case AST_UN_EXP:  r_cost = op_cost(da_get(nodes, i+1)->exp_unary.op, false);  break;
-						default: unreachable;
+					default: unreachable;
 				}
 			}
 
@@ -95,13 +95,13 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 				switch (da_get(nodes, i-1)->type) {
 					case AST_BIN_EXP: da_get(nodes, i-1)->exp_binary.r = node; break;
 					case AST_UN_EXP:  da_get(nodes, i-1)->exp_unary.v = node;  break;
-						default: unreachable;
+					default: unreachable;
 				}
 			} else {
 				switch (da_get(nodes, i+1)->type) {
 					case AST_BIN_EXP: da_get(nodes, i+1)->exp_binary.l = node; break;
 					case AST_UN_EXP:  da_get(nodes, i+1)->exp_unary.v = node;  break;
-						default: unreachable;
+					default: unreachable;
 				}
 			}
 
@@ -142,14 +142,13 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 
 			expr->exp_binary.type = rt;
 
-			if (expr->exp_binary.op == TOK_EQ_EQ ||
-				expr->exp_binary.op == TOK_NOT_EQ ||
-				expr->exp_binary.op == TOK_GREAT_EQ ||
-				expr->exp_binary.op == TOK_LESS_EQ ||
-				expr->exp_binary.op == TOK_GREAT ||
-				expr->exp_binary.op == TOK_LESS) {
-				expr->exp_binary.type.kind = TYPE_BOOL;
-				expr->exp_binary.type.size = 1;
+			switch (expr->exp_binary.op) {
+				case TOK_EQ_EQ: case TOK_NOT_EQ:
+				case TOK_LESS_EQ: case TOK_GREAT_EQ:
+				case TOK_GREAT: case TOK_LESS:
+					expr->exp_binary.type.kind = TYPE_BOOL;
+					expr->exp_binary.type.size = 1;
+				default:;
 			}
 
 			return expr->exp_binary.type;
