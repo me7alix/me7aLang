@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <threads.h>
+
 #define SB_IMPLEMENTATION
 #include "../thirdparty/sb.h"
 #include "../include/parser.h"
@@ -161,17 +162,17 @@ void nasm_codegen_expr_bool(NASM_Codegen *cg, AST_Node *p, Type *type, AST_Node 
 			if (p->type == AST_IF_STMT) {
 				if (isLv && isRv) {
 					nasm_codegen_expr_get_val(cg, src_buf, exp->exp_binary.l);
-					cg_add(TAB"mov r9d, %s\n", src_buf);
+					cg_add(TAB"mov eax, %s\n", src_buf);
 					nasm_codegen_expr_get_val(cg, src_buf, exp->exp_binary.r);
-					cg_add(TAB"cmp r9d, %s\n", src_buf);
+					cg_add(TAB"cmp eax, %s\n", src_buf);
 				} else if (isLv && !isRv) {
-					cg_add(TAB"mov r9d, %s\n", address);
+					cg_add(TAB"mov eax, %s\n", address);
 					nasm_codegen_expr_get_val(cg, src_buf, exp->exp_binary.l);
-					cg_add(TAB"cmp r9d, %s\n", src_buf);
+					cg_add(TAB"cmp eac, %s\n", src_buf);
 				} else if (!isLv && isRv) {
-					cg_add(TAB"mov r9d, %s\n", address);
+					cg_add(TAB"mov eax, %s\n", address);
 					nasm_codegen_expr_get_val(cg, src_buf, exp->exp_binary.r);
-					cg_add(TAB"cmp r9d, %s\n", src_buf);
+					cg_add(TAB"cmp eax, %s\n", src_buf);
 				}
 
 				cg_add(TAB"jne .L%zu\n", id);

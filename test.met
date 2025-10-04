@@ -1,9 +1,18 @@
 func main(): int {
-	c: int = 5
+	fib: int = 5
 
-	if 5 == 5 {
-		return c
+	a: int = 1
+	b: int = 2
+	l: int = 0
+
+	i: int = 0
+	while i != fib {
+		l = b
+		b = b + a
+		a = l
+
+		i = i + 1
 	}
 
-	return 2
+	return b
 }

@@ -89,8 +89,16 @@ void lexer_lex(Lexer *lexer, char *code) {
 			case '*': add_token(lexer, TOK_STAR, "*"); break;
 			case ';': add_token(lexer, TOK_SEMI, ";"); break;
 			case '.': add_token(lexer, TOK_DOT, "."); break;
-			case '!': add_token(lexer, TOK_EXC, "!"); break;
 			case ',': add_token(lexer, TOK_COM, ","); break;
+
+			case '!': {
+				if (lexer->cur_char[1] == '=') {
+					add_token(lexer, TOK_NOT_EQ, "!=");
+					lexer->cur_char++;
+				} else {
+					add_token(lexer, TOK_EXC, "!"); 
+				}
+			} break;
 
 			case '&': {
 				if (lexer->cur_char[1] == '&') {

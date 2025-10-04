@@ -92,14 +92,14 @@
 		_da_capacity_grow(da); \
 		memcpy((da)->items+(index)+1, (da)->items+(index), sizeof(*(da)->items)*((da)->count-index)); \
 		da_get(da, (index)) = item; \
-	} while(0)	
+	} while(0)
 
 #define da_get(da, index) \
 	(*({ \
 	   _da_error_if(index >= (da)->count || (index) < 0, "index %" PRId64 " is out of the range 0..%zu\n", \
 			   ((int64_t)(index)), (da)->count); \
 		(da)->items + index; \
-	}))
+	})) \
 
 #define da_last(da) \
 	({ \

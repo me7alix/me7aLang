@@ -1,8 +1,14 @@
 #include <stdio.h>
+
+#define DA_DEBUG
 #include "../include/lexer.h"
 #include "../include/parser.h"
+#include "../include/ir.h"
+#include "../thirdparty/sb.h"
 
-#include "codegen.c"
+#define SB_IMPLEMENTATION
+#include "nasmgen.c"
+//#include "codegen.c"
 
 char *read_file(const char *filename) {
 	FILE* file = fopen(filename, "rb");
@@ -113,14 +119,19 @@ int main(int argc, char **argv) {
 	Parser parser = {0};
 	parser_parse(&parser, lexer.tokens.items);
 
-	NASM_Codegen cg = {0};
-	nasm_codegen(&cg, &parser);
+	//NASM_Codegen cg = {0};
+	//nasm_codegen(&cg, &parser);
+
 
 	char buf[512];
 	char output_file[256];
 
+	Program *prog = ir_gen_prog(parser.program);
+
+	StringBuilder cg = nasm_gen_prog(prog);
+
 	sprintf(output_file, "%s.asm", output_bin);
-	write_to_file(output_file, sb_to_str(cg.code));
+	write_to_file(output_file, sb_to_str(cg));
 
 	sprintf(buf, "nasm -f elf64 %s", output_file); system(buf);
 	sprintf(buf, "gcc -no-pie %s.o -o %s", output_bin, output_bin); system(buf);

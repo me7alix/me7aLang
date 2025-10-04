@@ -18,7 +18,7 @@ float op_cost(TokenType op, bool is_left) {
 			else         return 2.0;
 		case TOK_EQ_EQ: case TOK_LESS:
 		case TOK_LESS_EQ: case TOK_GREAT:
-		case TOK_GREAT_EQ:
+		case TOK_GREAT_EQ: case TOK_NOT_EQ:
 			if (is_left) return 0.9;
 			else         return 0.8;
 		case TOK_AND: case TOK_OR:
@@ -92,6 +92,7 @@ Type *expr_calc_types(Parser *parser, AST_Node *expr) {
 			.kind = TYPE_INT,
 			.size = 4,
 		};
+		printf("int: %d\n", t->kind);
 		return t;
 	}
 
@@ -106,6 +107,7 @@ Type *expr_calc_types(Parser *parser, AST_Node *expr) {
 
 	if (expr->type == AST_VAR) {
 		Symbol *v = parser_st_get(parser, expr->var_id);
+		printf("var: %d\n", v->variable.type->kind);
 		return v->variable.type;
 	}
 
@@ -114,12 +116,14 @@ Type *expr_calc_types(Parser *parser, AST_Node *expr) {
 
 	if (lt->kind != rt->kind) {
 		fprintf(stderr, "wrong types in exression\n");
+		fprintf(stderr, "%d %d\n", lt->kind, rt->kind);
 		exit(1);
 	}
 
-	expr->exp_binary.type = lt;
+	expr->exp_binary.type = rt;
 
 	if (expr->exp_binary.op == TOK_EQ_EQ ||
+		expr->exp_binary.op == TOK_NOT_EQ ||
 		expr->exp_binary.op == TOK_GREAT_EQ ||
 		expr->exp_binary.op == TOK_LESS_EQ ||
 		expr->exp_binary.op == TOK_GREAT ||
@@ -191,6 +195,7 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type) {
 				}));
 				break;
 
+			case TOK_NOT_EQ:
 			case TOK_LESS: case TOK_GREAT:
 			case TOK_LESS_EQ: case TOK_GREAT_EQ:
 			case TOK_EQ_EQ: case TOK_AND: case TOK_OR:

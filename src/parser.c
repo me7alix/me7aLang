@@ -128,6 +128,7 @@ AST_Node *parse_var_mut(Parser *parser) {
 		.type = AST_VAR_MUT,
 		.var_mut.type = s->variable.type,
 		.var_mut.offset = s->variable.offset,
+		.var_mut.id = id,
 		.var_mut.exp = parse_expr(parser, EXPR_PARSING_VAR),
 	});
 
@@ -152,6 +153,18 @@ AST_Node *parse_if_stmt(Parser *parser, AST_Node *func) {
 
 	r->stmt_if.exp = parse_expr(parser, EXPR_PARSING_STMT);
 	r->stmt_if.body = parse_body(parser, func);
+
+	return r;
+}
+
+AST_Node *parse_while_stmt(Parser *parser, AST_Node *func) {
+	parser->cur_token++;
+
+	AST_Node *r = ast_alloc((AST_Node){
+		.type = AST_WHILE_STMT });
+
+	r->stmt_while.exp = parse_expr(parser, EXPR_PARSING_STMT);
+	r->stmt_while.body = parse_body(parser, func);
 
 	return r;
 }
@@ -181,6 +194,10 @@ AST_Node *parse_body(Parser *parser, AST_Node *func) {
 
 			case TOK_IF_SYM:
 				da_append(&body->body.stmts, parse_if_stmt(parser, func));
+				break;
+
+			case TOK_WHILE_SYM:
+				da_append(&body->body.stmts, parse_while_stmt(parser, func));
 				break;
 
 			case TOK_RET:

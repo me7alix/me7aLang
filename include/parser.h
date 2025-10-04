@@ -28,18 +28,20 @@ typedef enum {
 	TYPE_STRUCT,
 } TypeKind;
 
-typedef struct {
+typedef struct Type Type;
+
+struct Type {
 	TypeKind kind;
 
 	union {
-		struct { struct Type* base; } pointer;
-		struct { struct Type* elem; size_t length; } array;
-		struct { struct Type** params; size_t param_count; struct Type* ret; } function;
-		struct { char* name; } user;
+		struct { Type *base; } pointer;
+		struct { Type *elem; size_t length; } array;
+		struct { Type **params; size_t param_count; struct Type* ret; } function;
+		struct { char *name; } user;
 	};
 
 	size_t size;
-} Type;
+};
 
 typedef enum {
 	EXPR_PARSING_VAR, EXPR_PARSING_FUNC_CALL,
@@ -47,6 +49,7 @@ typedef enum {
 } ExprParsingType;
 
 typedef enum {
+	AST_WHILE_STMT,
 	AST_IF_STMT, AST_BIN_EXP, AST_UN_EXP,
 	AST_VAR_DEF, AST_VAR, AST_INT, AST_FLOAT,
 	AST_FUNC_CALL_ARG,AST_FUNC_CALL, AST_BODY,
@@ -87,6 +90,7 @@ struct AST_Node {
 			AST_Node *exp;
 		} var_def;
 		struct {
+			char *id;
 			Type *type;
 			size_t offset;
 			AST_Node *exp;
