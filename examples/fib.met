@@ -1,24 +1,24 @@
 func print_frame() {
-	print_int(1010101)
+	for i := 0; i != 7; i=i+1; {
+		print_char(65 + i)
+	}
+
+	print_char('\n')
 }
 
-
 func main(): int {
-	fibs_cnt := 10
-
-	a: int = 1
-	b: int = 2
-	
 	print_frame()
 
-	i := 0; while i != fibs_cnt {
+	fibs_cnt := 10
+	a: int = 1
+	b: int = 2
+
+	for i := 0; i != fibs_cnt; i=i+1; {
 		print_int(a)
 
 		l := b
 		b = b + a
 		a = l
-
-		i = i + 1
 	}
 
 	print_frame()
