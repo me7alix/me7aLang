@@ -10,6 +10,8 @@ extern EndDrawing()
 extern CloseWindow()
 
 func main(): int {
+	NULL := 0:i64
+
 	WHITE := 4126537215
 	RED := 4278190335
 
@@ -21,7 +23,7 @@ func main(): int {
 	pos_x := 0
 	pos_y := 0
 
-	InitWindow(800, 600, 0:i64)
+	InitWindow(800, 600, NULL)
 	SetTargetFPS(60)
 
 	while WindowShouldClose() == 0:i8 {

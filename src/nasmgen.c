@@ -300,7 +300,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 						}
 
 						sprintf(arg1, "rax");
-						sprintf(dst, "word [rbp - %zu]", off);
+						sprintf(dst, "qword [rbp - %zu]", off);
 						sb_append_strf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
 					} break;
 
