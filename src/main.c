@@ -57,18 +57,21 @@ int write_to_file(const char *filename, const char *text) {
 	return 0;
 }
 
+void print_usage() {
+	printf(
+		"Usage: [options] file...\n"
+		"Options:\n"
+		"  -o   Output file path\n"
+		"  -asm Returns asm output\n");
+}
 
 int main(int argc, char **argv) {
 	char *input_file = NULL;
-	char *output_bin = NULL;
+	char *output_bin = "a.out";
 	bool save_asm_output = false;
 
 	if (argc == 1) {
-		printf(
-			"Usage: options file...\n"
-			"Options:\n"
-			"  -o   Output file path\n"
-			"  -asm Returns asm output");
+		print_usage();
 		return 0;
 	}
 
@@ -83,6 +86,11 @@ int main(int argc, char **argv) {
 			i++;
 		} else if (strcmp(argv[i], "-asm") == 0) {
 			save_asm_output = true;
+		} else if (
+			strcmp(argv[i], "-h") == 0 ||
+			strcmp(argv[i], "--help") == 0) {
+			print_usage();
+			return 0;
 		} else {
 			if (argv[i][0] == '-') {
 				fprintf(stderr, "invalid option\n");

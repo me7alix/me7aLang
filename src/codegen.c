@@ -1,3 +1,5 @@
+#include <assert.h>
+#include <threads.h>
 #define SB_IMPLEMENTATION
 #include "../thirdparty/sb.h"
 #include "../include/parser.h"
@@ -6,6 +8,8 @@
 
 #define cg_add(...) \
 sb_append_strf(&cg->code, __VA_ARGS__)
+
+size_t id = 0;
 
 typedef struct {
 	StringBuilder code;
@@ -34,14 +38,15 @@ void nasm_codegen_expr_get_val(NASM_Codegen *cg, char *buf, AST_Node *exp) {
 	}
 }
 
-void nasm_codegen_expr_int(NASM_Codegen *cg, Type *type, AST_Node *exp, char *address) {
+void nasm_codegen_expr_int(NASM_Codegen *cg, AST_Node *p, Type *type, AST_Node *exp, char *address) {
 	char src_buf[256];
 
 	bool isLv = exp->exp_binary.l->type != AST_BIN_EXP;
 	bool isRv = exp->exp_binary.r->type != AST_BIN_EXP;
 
-	switch (*exp->exp_binary.op) {
-		case '+': {
+	printf("%s\n", tok_to_str(exp->exp_binary.op));
+	switch (exp->exp_binary.op) {
+		case TOK_PLUS: {
 			if (isLv && isRv) {
 				nasm_codegen_expr_get_val(cg, src_buf, exp->exp_binary.l);
 				cg_add(TAB"mov %s, %s\n", address, src_buf);
@@ -56,7 +61,7 @@ void nasm_codegen_expr_int(NASM_Codegen *cg, Type *type, AST_Node *exp, char *ad
 			}
 		} break;
 
-		case '*': {
+		case TOK_STAR: {
 			char *reg = NULL;
 
 			if (type->kind == TYPE_INT || type->kind == TYPE_I32) reg = "r9d";
@@ -81,7 +86,7 @@ void nasm_codegen_expr_int(NASM_Codegen *cg, Type *type, AST_Node *exp, char *ad
 			}
 		} break;
 
-		case '-': {
+		case TOK_MINUS: {
 			if (isLv && isRv) {
 				nasm_codegen_expr_get_val(cg, src_buf, exp->exp_binary.l);
 				cg_add(TAB"mov %s, %s\n", address, src_buf);
@@ -96,7 +101,7 @@ void nasm_codegen_expr_int(NASM_Codegen *cg, Type *type, AST_Node *exp, char *ad
 			}
 		} break;
 
-		case '/': {
+		case TOK_SLASH: {
 			char *dividend_help_reg = NULL;
 			char *dividend_reg = NULL;
 			char *divisor_reg = NULL;
@@ -141,8 +146,42 @@ void nasm_codegen_expr_int(NASM_Codegen *cg, Type *type, AST_Node *exp, char *ad
 
 			if (fl) cg_add(TAB"mov %s, r9d\n", address);
 		} break;
+
+		default: break;
 	}
 }
+
+void nasm_codegen_expr_bool(NASM_Codegen *cg, AST_Node *p, Type *type, AST_Node *exp, char *address) {
+	char src_buf[256];
+
+	bool isLv = exp->exp_binary.l->type != AST_BIN_EXP;
+	bool isRv = exp->exp_binary.r->type != AST_BIN_EXP;
+	switch (exp->exp_binary.op) {
+		case TOK_EQ_EQ: {
+			if (p->type == AST_IF_STMT) {
+				if (isLv && isRv) {
+					nasm_codegen_expr_get_val(cg, src_buf, exp->exp_binary.l);
+					cg_add(TAB"mov r9d, %s\n", src_buf);
+					nasm_codegen_expr_get_val(cg, src_buf, exp->exp_binary.r);
+					cg_add(TAB"cmp r9d, %s\n", src_buf);
+				} else if (isLv && !isRv) {
+					cg_add(TAB"mov r9d, %s\n", address);
+					nasm_codegen_expr_get_val(cg, src_buf, exp->exp_binary.l);
+					cg_add(TAB"cmp r9d, %s\n", src_buf);
+				} else if (!isLv && isRv) {
+					cg_add(TAB"mov r9d, %s\n", address);
+					nasm_codegen_expr_get_val(cg, src_buf, exp->exp_binary.r);
+					cg_add(TAB"cmp r9d, %s\n", src_buf);
+				}
+
+				cg_add(TAB"jne .L%zu\n", id);
+			}
+		} break;
+
+		default: break;
+	}
+}
+
 
 void nasm_codegen_expr(NASM_Codegen *cg, AST_Node *p, AST_Node *exp) {
 	char address[256];
@@ -184,6 +223,17 @@ void nasm_codegen_expr(NASM_Codegen *cg, AST_Node *p, AST_Node *exp) {
 
 		if (p->var_mut.type->kind == TYPE_INT)
 			sprintf(address, "dword [rbp - %zu]", p->var_mut.offset);
+	} else if (p->type == AST_IF_STMT){
+		if (p->stmt_if.exp->type == AST_INT) {
+			cg_add(TAB"mov eax, %zu\n", exp->num_int);
+			return;
+		} else if (p->stmt_if.exp->type == AST_VAR) {
+			nasm_codegen_expr_get_val(cg, buf, exp);
+			cg_add(TAB"mov eax, %s\n", buf);
+			return;
+		}
+
+		sprintf(address, "eax");
 	}
 
 	switch (exp->type) {
@@ -192,13 +242,22 @@ void nasm_codegen_expr(NASM_Codegen *cg, AST_Node *p, AST_Node *exp) {
 			nasm_codegen_expr(cg, p, exp->exp_binary.r);
 
 			if (exp->exp_binary.type->kind == TYPE_INT) {
-				nasm_codegen_expr_int(cg, exp->exp_binary.type, exp, address);
+				nasm_codegen_expr_int(cg, p, exp->exp_binary.type, exp, address);
+			} else if (exp->exp_binary.type->kind == TYPE_BOOL) {
+				nasm_codegen_expr_bool(cg, p, exp->exp_binary.type, exp, address);
 			}
 		} break;
 
-		default:
-			break;
+		default: break;
 	}
+}
+
+void nasm_codegen_body(NASM_Codegen *cg, AST_Node *p);
+
+void nasm_codegen_if_stmt(NASM_Codegen *cg, AST_Node *p) {
+	nasm_codegen_expr(cg, p, p->stmt_if.exp);
+	nasm_codegen_body(cg, p->stmt_if.body);
+	cg_add(".L%zu:\n", id++);
 }
 
 void nasm_codegen_body(NASM_Codegen *cg, AST_Node *p) {
@@ -217,12 +276,20 @@ void nasm_codegen_body(NASM_Codegen *cg, AST_Node *p) {
 
 			case AST_FUNC_RET:
 				nasm_codegen_expr(cg, cur_node, cur_node->func_ret.exp);
+				cg_add(TAB"mov rsp, rbp\n");
+				cg_add(TAB"pop rbp\n");
+				cg_add(TAB"ret\n");
 				break;
 
-			default:
+			case AST_IF_STMT:
+				nasm_codegen_if_stmt(cg, cur_node);
 				break;
+
+			default: break;
 		}
 	}
+
+	cg_add(TAB"add rsp, %zu\n", p->body.total_off+8);
 }
 
 void nasm_codegen_func_def(NASM_Codegen *cg, AST_Node *p) {
@@ -231,7 +298,7 @@ void nasm_codegen_func_def(NASM_Codegen *cg, AST_Node *p) {
 	cg_add(TAB"push rbp\n");
 	cg_add(TAB"mov rbp, rsp\n");
 
-	nasm_codegen_body(cg, p->func_def.block);
+	nasm_codegen_body(cg, p->func_def.body);
 
 	cg_add(TAB"mov rsp, rbp\n");
 	cg_add(TAB"pop rbp\n");

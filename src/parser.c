@@ -142,6 +142,20 @@ AST_Node *parse_func_return(Parser *parser, AST_Node *func) {
 	return ret;
 }
 
+AST_Node *parse_body(Parser *parser, AST_Node *func);
+
+AST_Node *parse_if_stmt(Parser *parser, AST_Node *func) {
+	parser->cur_token++;
+
+	AST_Node *r = ast_alloc((AST_Node){
+		.type = AST_IF_STMT });
+
+	r->stmt_if.exp = parse_expr(parser, EXPR_PARSING_STMT);
+	r->stmt_if.body = parse_body(parser, func);
+
+	return r;
+}
+
 AST_Node *parse_body(Parser *parser, AST_Node *func) {
 	AST_Node *body = ast_alloc((AST_Node){.type = AST_BODY});
 	int br_cnt = 0;
@@ -166,7 +180,7 @@ AST_Node *parse_body(Parser *parser, AST_Node *func) {
 				break;
 
 			case TOK_IF_SYM:
-				expect_token(parser->cur_token+1, TOK_OPAR);
+				da_append(&body->body.stmts, parse_if_stmt(parser, func));
 				break;
 
 			case TOK_RET:
@@ -240,7 +254,7 @@ AST_Node *parse_function(Parser *parser) {
 		da_append(&fds.func_def.args, da_get(&fdn->func_def.args, i));
 
 	parser_st_add(parser, fds);
-	fdn->func_def.block = parse_body(parser, fdn);
+	fdn->func_def.body = parse_body(parser, fdn);
 	return fdn;
 }
 

@@ -16,15 +16,16 @@ double calculate_expr(AST_Node *exp) {
 	double a = calculate_expr(exp->exp_binary.l);
 	double b = calculate_expr(exp->exp_binary.r);
 
-	switch (*exp->exp_binary.op) {
-		case '+':
+	switch (exp->exp_binary.op) {
+		case TOK_PLUS:
 			return a + b;
-		case '*':
+		case TOK_STAR:
 			return a * b;
-		case '-':
+		case TOK_MINUS:
 			return a - b;
-		case '/':
+		case TOK_SLASH:
 			return a / b;
+		default: break;
 	}
 
 	return 0;

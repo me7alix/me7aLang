@@ -1,8 +1,9 @@
 func main(): int {
-	c: int
-	a: int = 5
-	b: int = 20
-	c = 20 / 5
+	c: int = 5
 
-	return c * 2
+	if 5 == 5 {
+		return c
+	}
+
+	return 2
 }

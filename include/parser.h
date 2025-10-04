@@ -43,7 +43,7 @@ typedef struct {
 
 typedef enum {
 	EXPR_PARSING_VAR, EXPR_PARSING_FUNC_CALL,
-	EXPR_PARSING_BRA,
+	EXPR_PARSING_BRA, EXPR_PARSING_STMT,
 } ExprParsingType;
 
 typedef enum {
@@ -67,7 +67,7 @@ struct AST_Node {
 			char *id;
 			AST_Nodes args;
 			Type *type;
-			AST_Node *block;
+			AST_Node *body;
 		} func_def;
 		struct {
 			AST_Nodes stmts;
@@ -100,11 +100,11 @@ struct AST_Node {
 			AST_Node *body;
 		} stmt_while;
 		struct {
-			char op;
+			TokenType op;
 			AST_Node *v;
 		} exp_unary;
 		struct {
-			char *op;
+			TokenType op;
 			Type *type;
 			AST_Node *l, *r;
 		} exp_binary;

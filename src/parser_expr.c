@@ -8,31 +8,26 @@
 int64_t parse_int(char *data) { return atol(data); }
 double parse_float(char *data) { return atof(data); }
 
-float op_cost(char *op, bool is_left) {
-	switch (*op) {
-		case '+': case '-':
+float op_cost(TokenType op, bool is_left) {
+	switch (op) {
+		case TOK_PLUS: case TOK_MINUS:
 			if (is_left) return 1.1;
 			else         return 1.0;
-		case '*': case '/':
+		case TOK_STAR: case TOK_SLASH:
 			if (is_left) return 2.1;
 			else         return 2.0;
-	}
-
-	if (strcmp(op, "==") == 0) {
-		if (is_left) return 0.9;
-		else         return 0.9;
-	} else if (strcmp(op, ">=") == 0) {
-		if (is_left) return 0.9;
-		else         return 0.9;
-	} else if (strcmp(op, "<=") == 0) {
-		if (is_left) return 0.9;
-		else         return 0.9;
-	} else if (strcmp(op, "&&") == 0) {
-		if (is_left) return 0.9;
-		else         return 0.9;
-	} else if (strcmp(op, "||") == 0) {
-		if (is_left) return 0.9;
-		else         return 0.9;
+		case TOK_EQ_EQ: case TOK_LESS:
+		case TOK_LESS_EQ: case TOK_GREAT:
+		case TOK_GREAT_EQ:
+			if (is_left) return 0.9;
+			else         return 0.8;
+		case TOK_AND: case TOK_OR:
+			if (is_left) return 0.6;
+			else         return 0.5;
+		case TOK_TYPE:
+			if (is_left) return 3.0;
+			else         return 0.0;
+		default:         break;
 	}
 
 	return 0.0;
@@ -66,7 +61,9 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 	for (size_t i = 0; i < nodes->count; i++) {
 		if (nodes->count == 1) break;
 		AST_Node *node = da_get(nodes, i);
-		if (!(node->type == AST_BIN_EXP && !(node->exp_binary.l && node->exp_binary.r))) {
+		bool is_bin_op = node->type == AST_BIN_EXP && !(node->exp_binary.l && node->exp_binary.r);
+		bool is_un_op = node->type == AST_UN_EXP && node->exp_unary.v;
+		if (!is_bin_op && !is_un_op) {
 			bool is_lelf = false;
 			float l_cost = 0, r_cost = 0;
 
@@ -121,6 +118,15 @@ Type *expr_calc_types(Parser *parser, AST_Node *expr) {
 	}
 
 	expr->exp_binary.type = lt;
+
+	if (expr->exp_binary.op == TOK_EQ_EQ ||
+		expr->exp_binary.op == TOK_GREAT_EQ ||
+		expr->exp_binary.op == TOK_LESS_EQ ||
+		expr->exp_binary.op == TOK_GREAT ||
+		expr->exp_binary.op == TOK_LESS) {
+		expr->exp_binary.type->kind = TYPE_BOOL;
+	}
+
 	return lt;
 }
 
@@ -147,15 +153,17 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type) {
 				parser->cur_token++;
 				break;
 			}
+		} else if (type == EXPR_PARSING_STMT) {
+			if (parser->cur_token->type == TOK_OBRA) break;
 		}
 
 		switch (parser->cur_token->type) {
 			case TOK_ID:
-				if ((parser->cur_token + 1)->type != TOK_OPAR) {
+				if ((parser->cur_token+1)->type != TOK_OPAR) {
 					da_append(&nodes, ast_alloc((AST_Node){
-								.type = AST_VAR,
-								.var_id = parser->cur_token->data
-								}));
+						.type = AST_VAR,
+						.var_id = parser->cur_token->data
+					}));
 				} else {
 					da_append(&nodes, parse_func_call(parser));
 				}
@@ -163,26 +171,37 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type) {
 
 			case TOK_INT:
 				da_append(&nodes, ast_alloc((AST_Node){
-							.type = AST_INT,
-							.num_int = parse_int(parser->cur_token->data)
-							}));
+					.type = AST_INT,
+					.num_int = parse_int(parser->cur_token->data)
+				}));
 				break;
 
 			case TOK_FLOAT:
 				da_append(&nodes, ast_alloc((AST_Node){
-							.type = AST_FLOAT,
-							.num_float = parse_float(parser->cur_token->data)
-							}));
+					.type = AST_FLOAT,
+					.num_float = parse_float(parser->cur_token->data)
+				}));
 				break;
 
+			case TOK_TYPE:
+				da_append(&nodes, ast_alloc((AST_Node){
+					.type = AST_UN_EXP,
+					.exp_unary.op = parser->cur_token->type,
+					.exp_unary.v = NULL,
+				}));
+				break;
+
+			case TOK_LESS: case TOK_GREAT:
+			case TOK_LESS_EQ: case TOK_GREAT_EQ:
+			case TOK_EQ_EQ: case TOK_AND: case TOK_OR:
 			case TOK_PLUS: case TOK_MINUS:
 			case TOK_STAR: case TOK_SLASH:
 				da_append(&nodes, ast_alloc((AST_Node){
-							.type = AST_BIN_EXP,
-							.exp_binary.op = parser->cur_token->data,
-							.exp_binary.l = NULL,
-							.exp_binary.r = NULL
-							}));
+					.type = AST_BIN_EXP,
+					.exp_binary.op = parser->cur_token->type,
+					.exp_binary.l = NULL,
+					.exp_binary.r = NULL
+				}));
 				break;
 
 			default:
