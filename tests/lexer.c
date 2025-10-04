@@ -26,7 +26,7 @@ bool tok_compare(Token a, Token b) {
 bool test_lexer(char *code, Token *tokens, size_t tokens_num) {
 	Lexer lexer = lexer_lex(code);
 
-	if (tokens_num != lexer.tokens.count) 
+	if (tokens_num != lexer.tokens.count)
 		return false;
 
 	for (size_t i = 0; i < lexer.tokens.count; i++) {

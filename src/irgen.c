@@ -210,6 +210,12 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 				default: unreachable;
 			}
 
+			if (inst.op == OP_CAST) {
+				if (ir_get_opr_type(inst.arg1).kind == ir_get_opr_type(inst.dst).kind) {
+					inst.op = OP_ASSIGN;
+				}
+			}
+
 			last_var = inst.dst.var.index;
 			da_append(&func->body, inst);
 			return inst.dst;

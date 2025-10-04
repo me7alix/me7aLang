@@ -1,9 +1,9 @@
-extern malloc malloc_int(cnt: i64): *int
-extern free   free_int(ptr: *int)
-extern        print_int(val: int)
+extern malloc(cnt: i64): *u0
+extern free(ptr: *u0)
+extern print_int(val: int)
 
 func main(): int {
-	nums := malloc_int(40:i64)
+	nums := malloc(40:i64):*int
 
 	for i: i64 = 0; i < 10; i=i+1 {
 		*(nums + i) = (i * i):int
@@ -13,6 +13,6 @@ func main(): int {
 		print_int(*(nums + i))
 	}
 	
-	free_int(nums)
+	free(nums)
 	return 0
 }

@@ -69,6 +69,9 @@ Type parse_type(Parser *parser) {
 	} else if (strcmp(type_name, "i64") == 0) {
 		type.kind = TYPE_I64;
 		type.size = 8;
+	} else if (strcmp(type_name, "u0") == 0) {
+		type.kind = TYPE_NULL;
+		type.size = 0;
 	} else lexer_error(loc, "parser error: no such type");
 
 	if (is_pointer) {

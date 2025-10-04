@@ -4,11 +4,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <threads.h>
+#include <string.h>
 
 #include "../include/parser.h"
 
-int64_t parse_int(char *data) { return atol(data); }
 double parse_float(char *data) { return atof(data); }
+int64_t parse_int(char *data) {
+	char *end;
+	return strtol(data, &end, 0);
+}
 
 float op_cost(AST_ExprOp op, bool is_left) {
 	switch (op) {
@@ -75,20 +79,26 @@ AST_Node *parse_func_call(Parser *parser) {
 		AST_Node *expr = parse_expr(parser, EXPR_PARSING_FUNC_CALL, NULL);
 		if (arg_cnt + 1 > fargs.count) lexer_error(fcn->loc, "parser error: wrong amount of arguments");
 		Type farg_type = fargs.items[arg_cnt++]->func_def_arg.type;
-		bool err = false;
+		Type expr_type;
 
 		switch (expr->kind) {
-			case AST_BIN_EXP: if (expr->exp_binary.type.kind != farg_type.kind) err = true; break;
-			case AST_UN_EXP:  if (expr->exp_unary.type.kind != farg_type.kind)  err = true; break;
-			case AST_LITERAL: if (expr->literal.type.kind != farg_type.kind)    err = true; break;
+			case AST_BIN_EXP: expr_type = expr->exp_binary.type; break;
+			case AST_UN_EXP:  expr_type = expr->exp_unary.type;  break;
+			case AST_LITERAL: expr_type = expr->literal.type;    break;
 			case AST_VAR: {
 				Symbol *var_smbl = parser_st_get(parser, expr->var_id, expr->loc);
-				if (var_smbl->variable.type.kind != farg_type.kind) err = true;
+				expr_type = var_smbl->variable.type;
 			} break;
 			default: unreachable;
 		}
 
-		if (err) lexer_error(expr->loc, "parser error: wrong type");
+		if (expr_type.kind != farg_type.kind) lexer_error(expr->loc, "parser error: wrong type");
+		if (expr_type.kind == TYPE_POINTER && farg_type.kind == TYPE_POINTER) {
+			if (expr_type.pointer.base->kind != farg_type.pointer.base->kind &&
+				!(expr_type.pointer.base->kind == TYPE_NULL || farg_type.pointer.base->kind == TYPE_NULL)) {
+				lexer_error(expr->loc, "parser error: wrong type");
+			}
+		}
 
 		da_append(&fcn->func_call.args, expr);
 		parser->cur_token++;
@@ -125,7 +135,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 				switch (da_get(nodes, i+1)->kind) {
 					case AST_BIN_EXP: r_cost = op_cost(da_get(nodes, i+1)->exp_binary.op, false); break;
 					case AST_UN_EXP:  r_cost = op_cost(da_get(nodes, i+1)->exp_unary.op, false);  break;
-					default: lexer_error(da_get(nodes, i+1)->loc, "wrong"); unreachable;
+					default: unreachable;
 				}
 			}
 
@@ -164,7 +174,10 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 				expr->literal.type = *vart;
 			} else {
 				switch (expr->literal.kind) {
-					case LIT_INT:   expr->literal.type = (Type) {.kind = TYPE_INT,   .size = 4}; break;
+					case LIT_INT:
+						if(expr->literal.type.kind == TYPE_NULL)
+							expr->literal.type = (Type) {.kind = TYPE_INT,   .size = 4};
+						break;
 					case LIT_CHAR:  expr->literal.type = (Type) {.kind = TYPE_I8,    .size = 1}; break;
 					case LIT_FLOAT: expr->literal.type = (Type) {.kind = TYPE_FLOAT, .size = 4}; break;
 					case LIT_BOOL:  expr->literal.type = (Type) {.kind = TYPE_BOOL,  .size = 1}; break;
@@ -177,6 +190,11 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 		case AST_BIN_EXP: {
 			Type lt = expr_calc_types(parser, expr->exp_binary.l, vart);
 			if (expr->exp_binary.op == AST_OP_VAR_EQ) vart = &lt;
+			else if (lt.kind == TYPE_POINTER) {
+				Type i64 = (Type) {.kind = TYPE_I64, .size = 8};
+				vart = &i64;
+			}
+
 			Type rt = expr_calc_types(parser, expr->exp_binary.r, vart);
 			expr->exp_binary.type = lt;
 
@@ -187,6 +205,13 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 				assert(rest.pointer.base);
 			} else if (lt.kind != rt.kind) {
 				lexer_error(expr->loc, "parser error: operation on different types");
+			}
+
+			if (lt.kind == TYPE_POINTER && rt.kind == TYPE_POINTER) {
+				if (lt.pointer.base->kind != rt.pointer.base->kind &&
+					!(lt.pointer.base->kind == TYPE_NULL || rt.pointer.base->kind == TYPE_NULL)) {
+					lexer_error(expr->loc, "parser error: operation on different types");
+				}
 			}
 
 			switch (expr->exp_binary.op) {
@@ -335,6 +360,17 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart) {
 					.literal.lint = 0,
 				}));
 				break;
+
+			case TOK_NULL: {
+				Type *u0 = malloc(sizeof(Type));
+				*u0 = (Type) {.kind = TYPE_NULL, .size = 0};
+				da_append(&nodes, ast_new({
+					.kind = AST_LITERAL,
+					.literal.type = (Type) { .kind = TYPE_POINTER, .pointer.base = u0},
+					.literal.kind = LIT_INT,
+					.literal.lint = 0,
+				}));
+			} break;
 
 			case TOK_CHAR:
 				da_append(&nodes, ast_new({

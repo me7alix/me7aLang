@@ -267,9 +267,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 				sprintf(dst, "%s [rbp - %zu]", ts, total_offset);
 				reg_alloc(ci, arg1, arg2);
 
-				if (dst_type.kind == arg1_type.kind) {
-					reg_alloc(ci, arg1, arg2);
-					sb_append_strf(&body, TAB"mov %s, %s\n", dst, opr_to_nasm(ci.arg1));
+				if (dst_type.kind == arg1_type.kind) { unreachable;
 				} else if (dst_type.kind == TYPE_I8 && arg1_type.kind == TYPE_INT) {
 					sb_append_strf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
 					sb_append_strf(&body, TAB"mov al, al\n");

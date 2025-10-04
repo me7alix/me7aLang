@@ -181,8 +181,9 @@ Lexer lexer_lex(char *code) {
 					while (true) {
 						if (*lexer.cur_char == '.')
 							isFloat = 1;
-						if (!(isdigit(lexer.cur_char[1]) || lexer.cur_char[1] == '.'))
-							break;
+						if (!(isdigit(lexer.cur_char[1]) ||
+							isalpha(lexer.cur_char[1]) ||
+							lexer.cur_char[1] == '.')) break;
 						lexer.cur_char++;
 					}
 
@@ -236,6 +237,7 @@ Lexer lexer_lex(char *code) {
 				} else if (is_tok(&lexer, "extern", TOK_EXTERN, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "true",   TOK_TRUE, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "false",  TOK_FALSE, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "null",   TOK_NULL, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "return", TOK_RET, lexer.cur_char)) {}
 
 				else if (isalpha(*lexer.cur_char)) {
