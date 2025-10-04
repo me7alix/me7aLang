@@ -6,34 +6,68 @@
 #include <threads.h>
 #include <stdbool.h>
 
-#define DA_DEBUG
 #include "../thirdparty/da.h"
 #include "../include/lexer.h"
 
 typedef enum {
+	TYPE_INT, TYPE_UINT,
+	TYPE_I8, TYPE_U8,
+	TYPE_I16, TYPE_U16,
+	TYPE_I32, TYPE_U32,
+	TYPE_I64, TYPE_U64,
+
+	TYPE_FLOAT,
+	TYPE_F16,
+	TYPE_F32,
+	TYPE_F64,
+
+	TYPE_BOOL,
+	TYPE_POINTER,
+	TYPE_ARRAY,
+	TYPE_FUNCTION,
+	TYPE_STRUCT,
+} TypeKind;
+
+typedef struct {
+	TypeKind kind;
+
+	union {
+		struct { struct Type* base; } pointer;
+		struct { struct Type* elem; size_t length; } array;
+		struct { struct Type** params; size_t param_count; struct Type* ret; } function;
+		struct { char* name; } user;
+	};
+
+	size_t size;
+} Type;
+
+typedef enum {
 	EXPR_PARSING_VAR, EXPR_PARSING_FUNC_CALL,
-	EXPR_PARSING_VAR_BRA,
+	EXPR_PARSING_BRA,
 } ExprParsingType;
 
 typedef enum {
 	AST_IF_STMT, AST_BIN_EXP, AST_UN_EXP,
 	AST_VAR_DEF, AST_VAR, AST_INT, AST_FLOAT,
-	AST_FUNC_CALL_ARG,AST_FUNC_CALL,
-	AST_STRING, AST_TYPE, AST_OP_PLUS,
-	AST_FUNC_DEF, AST_FUNC_DEF_ARG,
+	AST_FUNC_CALL_ARG,AST_FUNC_CALL, AST_BODY,
+	AST_FUNC_DEF, AST_FUNC_DEF_ARG, AST_FUNC_RET,
+	AST_STRING, AST_TYPE, AST_OP_PLUS, AST_VAR_MUT,
 	AST_FUNC_RET_TYPE, AST_FOR_STMT,
 	AST_UN_OP, AST_BIN_OP, AST_PROG,
 } AST_NodeType;
 
-typedef da(struct AST_Node*) AST_Nodes;
+typedef struct AST_Node AST_Node;
+typedef da(AST_Node*) AST_Nodes;
 
-typedef struct AST_Node {
+struct AST_Node {
 	AST_NodeType type;
+
 	union {
 		struct {
 			char *id;
 			AST_Nodes args;
-			struct AST_Node *block;
+			Type *type;
+			AST_Node *block;
 		} func_def;
 		struct {
 			AST_Nodes stmts;
@@ -44,36 +78,51 @@ typedef struct AST_Node {
 		} func_call;
 		struct {
 			AST_Nodes stmts;
-		} block;
+			size_t total_off;
+		} body;
 		struct {
-			char *id, *type;
-			struct AST_Node *exp;
-		} variable;
+			char *id;
+			Type *type;
+			size_t offset;
+			AST_Node *exp;
+		} var_def;
 		struct {
-			struct AST_Node *exp;
-			struct AST_Node *block;
+			Type *type;
+			size_t offset;
+			AST_Node *exp;
+		} var_mut;
+		struct {
+			AST_Node *exp;
+			AST_Node *body;
 		} stmt_if;
 		struct {
-			struct AST_Node *exp;
-			struct AST_Node *block;
+			AST_Node *exp;
+			AST_Node *body;
 		} stmt_while;
 		struct {
 			char op;
-			struct AST_Node *v;
+			AST_Node *v;
 		} exp_unary;
 		struct {
 			char op;
-			struct AST_Node *l, *r;
+			Type *type;
+			AST_Node *l, *r;
 		} exp_binary;
 		struct {
 			char *id;
-			char *type;
+			Type *type;
 		} func_def_arg;
+		struct {
+			AST_Node *exp;
+			Type *type;
+		} func_ret;
+
+		AST_Node *func_ret_exp;
 		char *var_id;
 		int64_t num_int;
 		double num_float;
-	} payload;
-} AST_Node;
+	};
+};
 
 typedef enum {
 	SBL_FUNC_DEF, SBL_VAR,
@@ -85,26 +134,29 @@ typedef struct {
 	int nested[16];
 	union {
 		struct {
-			da(AST_Node*) args;
+			AST_Nodes args;
+			AST_Node *type;
 		} func_def;
 		struct {
-			char *type;
+			Type *type;
+			size_t offset;
 		} variable;
-	} payload;
+	};
 } Symbol;
 
 typedef da(Symbol) SymbolTable;
 
-Symbol *st_get(SymbolTable *st, int nested[16], const char *id);
-
 typedef struct {
 	Token *cur_token;
 	SymbolTable st;
-	int nested[16];
-	size_t nested_ptr;
+	int nested[16], nptr;
 	AST_Node *program;
 } Parser;
 
+void parser_st_add(Parser *parser, Symbol smbl);
+Symbol *parser_st_get(Parser *parser, const char *id);
+
+Symbol *st_get(SymbolTable *st, const char *id);
 void parser_alloc();
 void parser_parse(Parser *parser);
 void parser_free(Parser parser);

@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include "../include/lexer.h"
+#include "../include/parser.h"
+
+#include "nasm_codegen.c"
 
 char *read_file(const char *filename) {
 	FILE* file = fopen(filename, "rb");
@@ -33,8 +36,30 @@ char *read_file(const char *filename) {
 	return buffer;
 }
 
+int write_to_file(const char *filename, const char *text) {
+	FILE *file = fopen(filename, "w");
+	if (file == NULL) {
+		perror("Error opening file");
+		return -1;
+	}
+
+	if (fputs(text, file) == EOF) {
+		perror("Error writing to file");
+		fclose(file);
+		return -1;
+	}
+
+	if (fclose(file) == EOF) {
+		perror("Error closing file");
+		return -1;
+	}
+
+	return 0;
+}
+
+
 int main(void) {
-	char *code = read_file("main.vec");
+	char *code = read_file("test.met");
 	if (code == NULL) {
 		perror("error while opening file\n");
 		return 0;
@@ -43,17 +68,28 @@ int main(void) {
 	Lexer lexer = lexer_alloc(code);
 	lexer_lex(&lexer);
 
-	for (int i = 0; i < lexer.tokens_num; i++) {
-		printf("%s", tok_to_str(lexer.tokens[i].type));
-		if (lexer.tokens[i].type == TOK_ID || lexer.tokens[i].type == TOK_INT || 
-			lexer.tokens[i].type == TOK_FLOAT || lexer.tokens[i].type == TOK_STRING)
-			printf("(%s)", lexer.tokens[i].data);
-		printf(" ");
-		if (lexer.tokens[i].type == TOK_LBRC ||
-			lexer.tokens[i].type == TOK_RBRC ||
-			lexer.tokens[i].type == TOK_SEMI)
-			printf("\n");
+	for (size_t i = 0; i < lexer.tokens_num; i++) {
+		printf("%s\n", tok_to_str(lexer.tokens[i].type));
 	}
+
+	Parser parser = {
+		.cur_token = lexer.tokens,
+	};
+
+	parser_parse(&parser);
+
+	NASM_Codegen cg = {0};
+	cg.st = parser.st;
+
+	printf("codegen get started\n");
+	nasm_codegen(&cg, parser.program);
+
+	printf("%s", sb_to_str(cg.code));
+	write_to_file("prog.asm", sb_to_str(cg.code));
+	system("nasm -f elf64 prog.asm");
+	system("gcc -no-pie prog.o -o prog");	
+	system("rm prog.asm");
+	system("rm prog.o");
 
 	lexer_free(&lexer);
 	return 0;

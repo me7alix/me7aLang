@@ -2,19 +2,21 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+
+#define DA_DEBUG
 #include "../include/lexer.h"
 #include "../include/parser.h"
 
 #define ARR_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
 
 double calculate_expr(AST_Node *exp) {
-	if (exp->type == AST_INT) return exp->payload.num_int;
-	if (exp->type == AST_FLOAT) return exp->payload.num_float;
+	if (exp->type == AST_INT) return exp->num_int;
+	if (exp->type == AST_FLOAT) return exp->num_float;
 
-	double a = calculate_expr(exp->payload.exp_binary.l);
-	double b = calculate_expr(exp->payload.exp_binary.r);
+	double a = calculate_expr(exp->exp_binary.l);
+	double b = calculate_expr(exp->exp_binary.r);
 
-	switch (exp->payload.exp_binary.op) {
+	switch (exp->exp_binary.op) {
 		case '+':
 			return a + b;
 		case '*':
@@ -45,6 +47,7 @@ int main(void) {
 
 	test_expression(1, "10 - (10 + 2) * 4 - 3;", -41);
 	test_expression(2, "223 - 89 + (78 - (1 * 3));", 209);
+	test_expression(3, "5;", 5);
 
 	return 0;
 }

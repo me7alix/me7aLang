@@ -1,5 +1,10 @@
-main(): void {
-	a: i32 = 8
-	b: i32 = 7 + 9
-	exit(a + b)
+func main(): int {
+	a: int
+
+	b: int = 12 - 3
+	c: int = 7
+
+	a = c + b
+
+	return c * (a + b)
 }

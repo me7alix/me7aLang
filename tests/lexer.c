@@ -53,9 +53,9 @@ int main() {
 	Token test_tokens_1[] = {
 		{ .type = TOK_FUNC },
 		{ .type = TOK_ID, .data = "main" },
-		{ .type = TOK_LBRA },
-		{ .type = TOK_RBRA },
-		{ .type = TOK_LBRC },
+		{ .type = TOK_OPAR },
+		{ .type = TOK_CPAR },
+		{ .type = TOK_OBRA },
 		{ .type = TOK_ID, .data = "a" },
 		{ .type = TOK_TYPE, .data = "i32" },
 		{ .type = TOK_EQ },
@@ -63,24 +63,26 @@ int main() {
 		{ .type = TOK_PLUS },
 		{ .type = TOK_INT, .data = "2" },
 		{ .type = TOK_SEMI },
-		{ .type = TOK_RBRC },
+		{ .type = TOK_CBRA },
+		{ .type = TOK_EOF },
 	};
 
 	run_test(test_code_1, test_tokens_1, ARR_LEN(test_tokens_1), 1);	
 
-	char *test_code_2 = "func main() {\n println(\"hi\")\n}";
+	char *test_code_2 = "func print_hi() {\n println(\"hi\")\n}";
 	Token test_tokens_2[] = {
 		{ .type = TOK_FUNC },
-		{ .type = TOK_ID, .data = "main" },
-		{ .type = TOK_LBRA },
-		{ .type = TOK_RBRA },
-		{ .type = TOK_LBRC },
+		{ .type = TOK_ID, .data = "print_hi" },
+		{ .type = TOK_OPAR },
+		{ .type = TOK_CPAR },
+		{ .type = TOK_OBRA },
 		{ .type = TOK_ID, .data = "println" },
-		{ .type = TOK_LBRA },
+		{ .type = TOK_OPAR },
 		{ .type = TOK_STRING, .data = "hi" },
-		{ .type = TOK_RBRA },
+		{ .type = TOK_CPAR },
 		{ .type = TOK_SEMI },
-		{ .type = TOK_RBRC },
+		{ .type = TOK_CBRA },
+		{ .type = TOK_EOF },
 	};
 
 	run_test(test_code_2, test_tokens_2, ARR_LEN(test_tokens_2), 2);	
@@ -88,10 +90,10 @@ int main() {
 	char *test_code_3 = "if (a == b && c != true || 10 == 10)";
 	Token test_tokens_3[] = {
 		{ .type = TOK_IF_SYM },
-		{ .type = TOK_LBRA },
+		{ .type = TOK_OPAR },
 		{ .type = TOK_ID, .data = "a" },
 		{ .type = TOK_EQ },
-		{ .type = TOK_EQ },	
+		{ .type = TOK_EQ },
 		{ .type = TOK_ID, .data = "b" },
 		{ .type = TOK_AMP },
 		{ .type = TOK_AMP },
@@ -105,7 +107,8 @@ int main() {
 		{ .type = TOK_EQ },
 		{ .type = TOK_EQ },
 		{ .type = TOK_INT, .data = "10" },
-		{ .type = TOK_RBRA },
+		{ .type = TOK_CPAR },
+		{ .type = TOK_EOF },
 	};
 
 	run_test(test_code_3, test_tokens_3, ARR_LEN(test_tokens_3), 3);	

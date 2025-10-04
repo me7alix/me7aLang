@@ -6,15 +6,22 @@
 #include <ctype.h>
 #include "../include/lexer.h"
 
-void get_word(Lexer *lexer, char **start, char **end) {
+char *get_word(Lexer *lexer) {
 	while (*lexer->cur_char == ' ')
 		lexer->cur_char++;
-	*start = lexer->cur_char;
+
+	char *start = lexer->cur_char;
 	while (isalpha(*lexer->cur_char) ||
 		isdigit(*lexer->cur_char) ||
 		*lexer->cur_char == '_')
 		lexer->cur_char++;
-	*end = lexer->cur_char;
+	lexer->cur_char--;
+
+	size_t l = lexer->cur_char - start + 1;
+	char *word = malloc(sizeof(char) * (l+1));
+	memcpy(word, start, l);
+	word[l] = '\0';
+	return word;
 }
 
 char *str_slice(char *str, size_t start, size_t len) {
@@ -59,7 +66,7 @@ bool is_tok(Lexer *lexer, char *tok, TokenType type, char *str) {
 
 	add_token(lexer, type, tok);
 
-	for (size_t i = 0; i < strlen(tok) - 1; i++) 
+	for (size_t i = 0; i < strlen(tok) - 1; i++)
 		lexer->cur_char++;
 
 	return true;
@@ -113,24 +120,24 @@ void lexer_lex(Lexer *lexer) {
 				break;
 			case '\n':
 				if (lexer->tokens[lexer->tokens_num-1].type != TOK_SEMI &&
-					lexer->tokens[lexer->tokens_num-1].type != TOK_RBRC &&
-					lexer->tokens[lexer->tokens_num-1].type != TOK_LBRC &&
+					lexer->tokens[lexer->tokens_num-1].type != TOK_CBRA &&
+					lexer->tokens[lexer->tokens_num-1].type != TOK_OBRA &&
 					lexer->tokens[lexer->tokens_num-1].type != TOK_COM)
 					add_token(lexer, TOK_SEMI, ";");
 				lexer->cur_loc.line_num++;
 				lexer->cur_loc.line_start = lexer->cur_char + 1;
 				break;
 			case '{':
-				add_token(lexer, TOK_LBRC, "{");
+				add_token(lexer, TOK_OBRA, "{");
 				break;
 			case '}':
-				add_token(lexer, TOK_RBRC, "}");
+				add_token(lexer, TOK_CBRA, "}");
 				break;
 			case '(':
-				add_token(lexer, TOK_LBRA, "(");
+				add_token(lexer, TOK_OPAR, "(");
 				break;
 			case ')':
-				add_token(lexer, TOK_RBRA, ")");
+				add_token(lexer, TOK_CPAR, ")");
 				break;
 			case '+':
 				add_token(lexer, TOK_PLUS, "+");
@@ -169,13 +176,9 @@ void lexer_lex(Lexer *lexer) {
 				add_token(lexer, TOK_PIPE, "|");
 				break;
 			case ':':
-				char *semi = lexer->cur_char;
 				lexer->cur_char++;
-				char *start, *end;
-				get_word(lexer, &start, &end);
-				add_token(lexer, TOK_TYPE, str_slice(start, 0, end - start));
-				lexer->cur_char = end - 1;
-				//add_token(lexer, TOK_COL, ":");
+				char *type = get_word(lexer);
+				add_token(lexer, TOK_TYPE, type);
 				break;
 			case '/':
 				if (*(lexer->cur_char + 1) == '/') {
@@ -189,7 +192,7 @@ void lexer_lex(Lexer *lexer) {
 				if (isdigit(*lexer->cur_char)) {
 					char *start = lexer->cur_char;
 					bool isFloat = 0;
-					while (true) {	
+					while (true) {
 						if (*(lexer->cur_char) == '.')
 							isFloat = 1;
 						if (!(isdigit(*(lexer->cur_char+1)) || *(lexer->cur_char+1) == '.'))
@@ -225,10 +228,8 @@ void lexer_lex(Lexer *lexer) {
 				} else if (is_tok(lexer, "struct", TOK_STRUCT, lexer->cur_char)) {
 				} else if (is_tok(lexer, "return", TOK_RET, lexer->cur_char)) {
 				} else if (isalpha(*lexer->cur_char)) {
-					char *start, *end;
-					get_word(lexer, &start, &end);
-					add_token(lexer, TOK_ID, str_slice(start, 0, end - start));
-					lexer->cur_char = end - 1;
+					char *id = get_word(lexer);
+					add_token(lexer, TOK_ID, id);
 				} else {
 					lexer_error(lexer, "unknown token");
 				}
@@ -247,39 +248,40 @@ void lexer_free(Lexer *lexer) {
 
 const char *tok_to_str(TokenType tok_type) {
 	switch (tok_type) {
-		case TOK_FUNC:		return "TOK_FUNC";
-		case TOK_RBRA:		return "TOK_RBRA";
-		case TOK_LBRA:		return "TOK_LBRA";
-		case TOK_ID:		return "TOK_ID";
-		case TOK_SEMI:		return "TOK_SEMI";
-		case TOK_EQ:		return "TOK_EQ";
-		case TOK_LESS:		return "TOK_LESS";
-		case TOK_GREAT:		return "TOK_GREAT";
-		case TOK_TYPE:		return "TOK_TYPE";
-		case TOK_STRUCT:	return "TOK_STRUCT";
-		case TOK_STRING:	return "TOK_STRING";
-		case TOK_LPAR:		return "TOK_LPAR";
-		case TOK_RPAR:		return "TOK_RPAR";
-		case TOK_PLUS:		return "TOK_PLUS";
-		case TOK_MINUS:		return "TOK_MINUS";
-		case TOK_FOR_SYM:	return "TOK_FOR_SYM";
-		case TOK_IF_SYM:	return "TOK_IF_SYM";
+		case TOK_FUNC:      return "TOK_FUNC";
+		case TOK_CPAR:      return "TOK_CPAR";
+		case TOK_OPAR:      return "TOK_OPAR";
+		case TOK_ID:        return "TOK_ID";
+		case TOK_SEMI:      return "TOK_SEMI";
+		case TOK_EQ:        return "TOK_EQ";
+		case TOK_LESS:      return "TOK_LESS";
+		case TOK_GREAT:     return "TOK_GREAT";
+		case TOK_TYPE:      return "TOK_TYPE";
+		case TOK_STRUCT:    return "TOK_STRUCT";
+		case TOK_STRING:    return "TOK_STRING";
+		case TOK_LPAR:      return "TOK_LPAR";
+		case TOK_RPAR:      return "TOK_RPAR";
+		case TOK_PLUS:      return "TOK_PLUS";
+		case TOK_MINUS:     return "TOK_MINUS";
+		case TOK_FOR_SYM:   return "TOK_FOR_SYM";
+		case TOK_IF_SYM:    return "TOK_IF_SYM";
 		case TOK_WHILE_SYM: return "TOK_WHILE_SYM";
-		case TOK_STAR:		return "TOK_STAR";
-		case TOK_SLASH:		return "TOK_SLASH";
-		case TOK_INT:		return "TOK_INT";
-		case TOK_FLOAT:		return "TOK_FLOAT";
-		case TOK_LBRC:		return "TOK_LBRC";
-		case TOK_RBRC:		return "TOK_RBRC";
-		case TOK_COL:		return "TOK_COL";
-		case TOK_DOT:		return "TOK_DOT";
-		case TOK_COM:		return "TOK_COM";
-		case TOK_RET:		return "TOK_RET";
-		case TOK_AMP:		return "TOK_AMP";
-		case TOK_PIPE:		return "TOK_PIPE";
-		case TOK_EXC:		return "TOK_EXC";
-		case TOK_CHAR:		return "TOK_CHAR";
-		default:			return "UNKNOWN_TOKEN";
+		case TOK_STAR:      return "TOK_STAR";
+		case TOK_SLASH:     return "TOK_SLASH";
+		case TOK_INT:       return "TOK_INT";
+		case TOK_FLOAT:     return "TOK_FLOAT";
+		case TOK_OBRA:      return "TOK_OBRA";
+		case TOK_CBRA:      return "TOK_CBRA";
+		case TOK_COL:       return "TOK_COL";
+		case TOK_DOT:       return "TOK_DOT";
+		case TOK_COM:       return "TOK_COM";
+		case TOK_RET:       return "TOK_RET";
+		case TOK_AMP:       return "TOK_AMP";
+		case TOK_PIPE:      return "TOK_PIPE";
+		case TOK_EXC:       return "TOK_EXC";
+		case TOK_CHAR:      return "TOK_CHAR";
+		case TOK_EOF:       return "TOK_EOF";
+		default:            return "UNKNOWN_TOKEN";
 	}
 }
 
