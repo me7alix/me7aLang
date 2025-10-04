@@ -4,9 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define HASHMAP_IMPLEMENTATION
 #include "../include/parser.h"
-#include "../src/parser_expr.c"
 
 bool check_nested(int pn[16], int n[16]) {
 	for (size_t i = 0; n[i] != 0; i++) {
@@ -30,15 +28,6 @@ AST_Node *ast_alloc(AST_Node node) {
 	AST_Node *new = malloc(sizeof(AST_Node)); 
 	memcpy(new, &node, sizeof(node));
 	return new;
-}
-
-void ast_block_add_node(AST_Node *block, AST_Node node) {
-	if (block->payload.block.tail != NULL)
-		block->payload.block.tail->next = ast_alloc(node);
-	else {
-		block->payload.block.head = ast_alloc(node);
-		block->payload.block.tail = block->payload.block.head;
-	}
 }
 
 void expect_token(Token *token, TokenType type) {
@@ -71,12 +60,12 @@ void parse_block(Parser *parser, AST_Node *parent) {
 
 				parser->cur_token++;
 
-				ast_block_add_node(parent, (AST_Node){
-						.type = AST_VARIABLE,
-						.payload.variable.name = (parser->cur_token-1)->data,
-						.payload.variable.type = parser->cur_token->data, 
-						.payload.variable.exp = parse_expression(parser, EXPR_PARSING_VAR),
-						});
+				da_append(&parent->payload.block.stmts, ast_alloc((AST_Node){
+							.type = AST_VAR_DEF,
+							.payload.variable.id = (parser->cur_token-1)->data,
+							.payload.variable.type = parser->cur_token->data, 
+							.payload.variable.exp = parse_expr(parser, EXPR_PARSING_VAR),
+							}));
 
 				break;
 
@@ -91,15 +80,16 @@ void parse_block(Parser *parser, AST_Node *parent) {
 	}
 }
 
-void parse_function(Parser *parser) {
+AST_Node *parse_function(Parser *parser) {
 	expect_token(++parser->cur_token, TOK_ID);
 	expect_token(parser->cur_token+1, TOK_LBRA);
 	int br_cnt = 0;
+	bool fl = true;
 
-	AST_Node *func_def = ast_alloc((AST_Node){0});
-	func_def->type = AST_FUNC_DEF;
+	AST_Node *fdn = ast_alloc((AST_Node){0});
+	fdn->type = AST_FUNC_DEF;
 
-	while (true) {
+	while (fl) {
 		switch (parser->cur_token->type++) {
 			case TOK_LBRA:
 				br_cnt++;
@@ -108,16 +98,16 @@ void parse_function(Parser *parser) {
 			case TOK_RBRA:
 				br_cnt--;
 				if (br_cnt == 0)
-					return;
+					fl = false;
 				break;
 
 			case TOK_ID:
 				expect_token(parser->cur_token+1, TOK_TYPE);
-				func_def->payload.func_def.args = ast_alloc((AST_Node){
-						.type = AST_FUNC_DEF_ARG,
-						.payload.func_def_arg.name = parser->cur_token->data,
-						.payload.func_def_arg.type = (parser->cur_token+1)->data,
-						});
+				da_append(&fdn->payload.func_def.args, ast_alloc((AST_Node){
+							.type = AST_FUNC_DEF_ARG,
+							.payload.func_def_arg.id = parser->cur_token->data,
+							.payload.func_def_arg.type = (parser->cur_token+1)->data
+							}));
 				break;
 
 			default:
@@ -126,11 +116,17 @@ void parse_function(Parser *parser) {
 		}
 	}
 
-	da_append(&parser->st, ((Symbol){
-			.type = SBL_FUNC_DEF,
-			.id = func_def->payload.func_def.name,
-			.payload.func_def.args = func_def->payload.func_def.args,
-			}));
+	Symbol fds = {
+		.type = SBL_FUNC_DEF,
+		.id = fdn->payload.func_def.id,
+	};
+
+	for (size_t i = 0; i < fdn->payload.func_def.args.count; i++) {
+		da_append(&fds.payload.func_def.args, da_get(&fdn->payload.func_def.args, i));
+	}
+
+	da_append(&parser->st, fds);
+	return fdn;
 }
 
 void parser_parse(Parser *parser) {

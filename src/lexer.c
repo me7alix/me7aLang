@@ -237,6 +237,8 @@ void lexer_lex(Lexer *lexer) {
 		}
 		lexer->cur_char++;
 	}
+
+	add_token(lexer, TOK_EOF, "EOF");
 }
 
 void lexer_free(Lexer *lexer) {

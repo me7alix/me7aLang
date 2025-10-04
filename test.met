@@ -1,0 +1,5 @@
+main(): void {
+	a: i32 = 8
+	b: i32 = 7 + 9
+	exit(a + b)
+}

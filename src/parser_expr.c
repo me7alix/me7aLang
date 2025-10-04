@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <threads.h>
 
 #include "../include/parser.h"
 
@@ -30,197 +31,117 @@ float op_cost(char op, bool is_left) {
 	return 0.0;
 }
 
-// TODO: add func call and variables supporting
-typedef struct ExprNode {
-	Token *tok;
-	struct ExprNode *l, *r;
-	struct ExprNode *next, *prev;
-} ExprNode;
+void parse_func_call(Parser *parser, char **name, AST_Nodes *args) {
+	*name = parser->cur_token->data;
 
-void expr_node_add(ExprNode **en, Token *n) {
-	if ((*en)->tok == NULL) {
-		(*en)->tok = n;
-		return;
-	}
-
-	(*en)->next = malloc(sizeof(ExprNode));
-	(*en)->next->tok = n;
-	(*en)->next->l = NULL;
-	(*en)->next->r = NULL;
-	(*en)->next->next = NULL;
-	(*en)->next->prev = (*en);
-	(*en) = (*en)->next;
-}
-
-
-void expr_node_free(ExprNode *en) {
-	free(en);
-}
-
-void expr_nodes_free(ExprNode *head) {
-	if (head->next != NULL) expr_nodes_free(head->next);
-	expr_node_free(head);
-}
-
-bool is_tok_op(TokenType type) {
-	switch (type) {
-		case TOK_PLUS: case TOK_MINUS:
-		case TOK_STAR: case TOK_SLASH:
-			return true;
-		default:
-			return false;
-	}
-}
-
-bool is_expr_node_var(ExprNode *en) {
-	return
-		en->tok->type == TOK_FLOAT ||
-		en->tok->type == TOK_INT ||
-		en->tok->type == TOK_ID ||
-		(is_tok_op(en->tok->type) &&
-		 en->l != NULL && en->r != NULL);
-}
-
-AST_Node *expr_tree_to_ast(ExprNode *expr) {
-	switch (expr->tok->type) {
-		case TOK_PLUS: case TOK_MINUS: case TOK_STAR: case TOK_SLASH:
-			return ast_alloc((AST_Node){
-					.type = AST_BIN_EXP,
-					.payload.exp_binary.op = expr->tok->data[0],
-					.payload.exp_binary.l = expr_tree_to_ast(expr->l),
-					.payload.exp_binary.r = expr_tree_to_ast(expr->r),
-					});
-
-		case TOK_FLOAT:
-			return ast_alloc((AST_Node){
-					.type = AST_FLOAT,
-					.payload.num_float = parse_float(expr->tok->data),
-					});
-
-		case TOK_INT:
-			return ast_alloc((AST_Node){
-					.type = AST_INT,
-					.payload.num_int = parse_int(expr->tok->data),
-					});
-
-		default:
-			printf("parsing error: expr tree to ast parsing error\n");
-			return NULL;
-	}
-
-	return NULL;
-}
-
-ExprNode *parse_expression_r(ExprNode **head) {
-	if ((*head)->next == NULL)
-		return (*head);
-
-	ExprNode *cur_node = (*head);
-	ExprNode *br_prev = NULL;
-	ExprNode *br_expr = NULL;
-	ExprNode *br_expr_s = NULL;
-	bool br_fl = false;
 	int br_cnt = 0;
 
-	while (cur_node != NULL) {
-		if (cur_node->tok->type == TOK_RBRA) {
-			br_cnt--;
-
-			if (br_cnt == 0) {
-				br_fl = false;
-
-				ExprNode *expr = parse_expression_r(&br_expr_s);
-				if (br_prev != NULL) {
-					br_prev->next = expr;
-					expr->prev = br_prev;
-				} else {
-					*head = expr;
-					expr->prev = NULL;
-				}
-
-				expr->next = cur_node->next;
-				if (cur_node->next != NULL) {
-					cur_node->next->prev = expr;
-				}
-
-				cur_node = expr;
-				continue;
-			}
+	while (parser->cur_token->type != TOK_EOF) {
+		switch ((parser->cur_token++)->type) {
+			case TOK_RBRA: if (--br_cnt == 0) return;
+			case TOK_ID: case TOK_INT: case TOK_LBRA: case TOK_FLOAT:
+				if (parser->cur_token->type == TOK_LBRA) br_cnt++;
+				da_append(args, parse_expr(parser, EXPR_PARSING_FUNC_CALL));
+				break;
+			default: /* TODO: error handling */ break;
 		}
+	}
+}
 
-		if (br_fl) expr_node_add(&br_expr, cur_node->tok);	
+AST_Node *expr_expand(AST_Nodes *nodes) {
+	if (nodes->count == 1) {
+		return da_get(nodes, 0);
+	}
 
-		if (cur_node->tok->type == TOK_LBRA) {
-			if (br_cnt == 0) {
-				br_fl = true;
-				br_prev = cur_node->prev;
-
-				br_expr = malloc(sizeof(ExprNode));
-				*br_expr = (ExprNode){0};
-				br_expr_s = br_expr;
-			}
-
-			br_cnt++;
-		}
-
-		if (is_expr_node_var(cur_node) && !br_fl) {
-			if (cur_node->prev == NULL && cur_node->next == NULL) break;
+	for (size_t i = 0; i < nodes->count; i++) {
+		if (nodes->count == 1) break;
+		AST_Node *node = da_get(nodes, i);
+		if (node->type == AST_INT || node->type == AST_FLOAT ||
+		   (node->type == AST_BIN_EXP && node->payload.exp_binary.l && node->payload.exp_binary.r)) {
+			bool is_lelf = false;
 			float l_cost = 0, r_cost = 0;
 
-			if (cur_node->prev != NULL)
-				l_cost = op_cost(cur_node->prev->tok->data[0], false);
+			if (i != 0) l_cost = op_cost(da_get(nodes, i-1)->payload.exp_binary.op, true);
+			if (i != nodes->count-1) r_cost = op_cost(da_get(nodes, i+1)->payload.exp_binary.op, false);
 
-			if (cur_node->next != NULL)
-				r_cost = op_cost(cur_node->next->tok->data[0], true);
+			if (l_cost > r_cost) is_lelf = true;
 
-			if (l_cost > r_cost)
-				cur_node->prev->r = cur_node;
+			if (l_cost == 0 && r_cost == 0) /* TODO: error handling */;
+
+			if (is_lelf)
+				da_get(nodes, i-1)->payload.exp_binary.r = node;
 			else
-				cur_node->next->l = cur_node;
+				da_get(nodes, i+1)->payload.exp_binary.l = node;
 
-			if (cur_node->prev != NULL)
-				cur_node->prev->next = cur_node->next;
-
-			if (cur_node->next != NULL)
-				cur_node->next->prev = cur_node->prev;
-
-			if (cur_node == (*head))
-				(*head) = cur_node->next;
+			da_ordered_remove(nodes, i);
+			i--;
 		}
-
-		cur_node = cur_node->next;
 	}
 
-	return parse_expression_r(head);
+	return expr_expand(nodes);
 }
 
-AST_Node *parse_expression(Parser *parser, ExprParsingType type) {
-	ExprNode *cur_node = malloc(sizeof(ExprNode));
-	ExprNode *head = cur_node;
-	*cur_node = (ExprNode){0};
-	int br_cnt = 0;
+AST_Node *parse_expr(Parser *parser, ExprParsingType type) {
+	AST_Nodes nodes = {0};
 
 	while (true) {
-		if (parser->cur_token->type == TOK_LBRA) br_cnt++;
-		if (parser->cur_token->type == TOK_RBRA) br_cnt--;
+		if (parser->cur_token->type == TOK_LBRA) {
+			parser->cur_token++;
+			da_append(&nodes, parse_expr(parser, EXPR_PARSING_VAR_BRA));
+		}
 
 		if (type == EXPR_PARSING_FUNC_CALL) {
-			if (br_cnt == 0 && parser->cur_token->type == TOK_COM) break;
-			if (br_cnt == -1) break;
+			if (parser->cur_token->type == TOK_COM || parser->cur_token->type == TOK_RBRA) {
+				break;
+			}
 		} else if (type == EXPR_PARSING_VAR) {
-			if (parser->cur_token->type == TOK_SEMI) break;
+			if (parser->cur_token->type == TOK_SEMI) {
+				break;
+			}
+		} else if (type == EXPR_PARSING_VAR_BRA) {
+			if (parser->cur_token->type == TOK_RBRA) {
+				break;
+			}
 		}
 
 		switch (parser->cur_token->type) {
-			case TOK_RBRA: case TOK_LBRA:
-			case TOK_INT: case TOK_FLOAT:
+			case TOK_LBRA: case TOK_RBRA:
+				break;
+			case TOK_ID:
+				if ((parser->cur_token + 1)->type != TOK_LBRA) {
+					da_append(&nodes, ast_alloc((AST_Node){
+								.type = AST_VAR,
+								.payload.var_id = parser->cur_token->data}));
+				} else {
+					AST_Node *fcn = ast_alloc((AST_Node){.type = AST_FUNC_CALL});
+					parse_func_call(parser, &fcn->payload.func_call.id, &fcn->payload.func_call.args);
+					da_append(&nodes, fcn);
+				}
+				break;
+
+			case TOK_INT:
+				da_append(&nodes, ast_alloc((AST_Node){
+						.type = AST_INT,
+						.payload.num_int = parse_int(parser->cur_token->data)}));
+				break;
+
+			case TOK_FLOAT:
+				da_append(&nodes, ast_alloc((AST_Node){
+						.type = AST_FLOAT,
+						.payload.num_float = parse_float(parser->cur_token->data)}));
+				break;
+
 			case TOK_PLUS: case TOK_MINUS:
 			case TOK_STAR: case TOK_SLASH:
-				expr_node_add(&cur_node, parser->cur_token);
+				da_append(&nodes, ast_alloc((AST_Node){
+						.type = AST_BIN_EXP,
+						.payload.exp_binary.op = parser->cur_token->data[0],
+						.payload.exp_binary.l = NULL,
+						.payload.exp_binary.r = NULL}));
 				break;
 
 			default:
-				printf("expression parsing error: wrong token");
+				printf("expression parsing error: wrong token\n");
 				break;
 		}
 
@@ -228,6 +149,7 @@ AST_Node *parse_expression(Parser *parser, ExprParsingType type) {
 	}
 
 	parser->cur_token++;
-	ExprNode *expr_tree = parse_expression_r(&head);
-	return expr_tree_to_ast(expr_tree);
+	AST_Node *expr = expr_expand(&nodes);
+	da_free(&nodes);
+	return expr;
 }
