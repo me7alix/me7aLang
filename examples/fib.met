@@ -1,20 +1,15 @@
 extern print_int()
 extern print_char()
-
-func print_frame() {
-	for i := 0; i < 7; i=i+1 {
-		ch := (i + 65:int):i8
-		print_char(ch)
-		print_char(' ')
-	}
-
-	print_char('\n')
-}
+extern input_int(): int
 
 func main(): int {
-	print_frame()
+	print_char('c')
+	print_char('n')
+	print_char('t')
+	print_char(':')
+	print_char(' ')
 
-	cnt := 10
+	cnt := input_int()
 	a: int = 1
 	b: int = 2
 
@@ -26,6 +21,5 @@ func main(): int {
 		a = l
 	}
 
-	print_frame()
 	return 0
 }

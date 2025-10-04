@@ -65,7 +65,7 @@ func main(): int {
 		y_check := paddle_y + paddle_h > ball_y && paddle_y < ball_y + ball_r * 2
 		
 		if x_check && y_check {
-			ball_dir_y = 0 - ball_dir_y
+			ball_dir_y = -ball_dir_y
 		}
 
 		DrawRectangleLines(ball_x, ball_y, ball_r*2, ball_r*2, WHITE)
