@@ -127,6 +127,11 @@ int main(int argc, char **argv) {
 	char output_file[256];
 
 	Program prog = ir_gen_prog(parser.program);
+	if (save_ir_output) {
+		sprintf(buf, "%s.ir", output_bin);
+		ir_dump_prog(&prog, buf);
+	}
+
 	StringBuilder cg = nasm_gen_prog(&prog);
 
 	sprintf(output_file, "%s.asm", output_bin);
@@ -136,10 +141,6 @@ int main(int argc, char **argv) {
 	sprintf(buf, "gcc -no-pie ./examples/runtime.o %s.o -o %s", output_bin, output_bin); system(buf); printf("info: %s\n", buf);
 	sprintf(buf, "rm %s.o", output_bin); system(buf);  printf("info: %s\n", buf);
 	if (!save_asm_output) { sprintf(buf, "rm %s", output_file); system(buf); }
-	if (save_ir_output) {
-		sprintf(buf, "%s.ir", output_bin);
-		ir_dump_prog(&prog, buf);
-	}
 
 	lexer_free(&lexer);
 	da_free(&prog.funcs);

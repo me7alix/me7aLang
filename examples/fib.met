@@ -1,6 +1,8 @@
 func print_frame() {
 	for i := 0; i != 7; i=i+1; {
-		print_char(65 + i)
+		ch := (i + 65:int):i8
+		print_char(ch)
+		print_char(' ')
 	}
 
 	print_char('\n')
@@ -9,11 +11,11 @@ func print_frame() {
 func main(): int {
 	print_frame()
 
-	fibs_cnt := 10
+	cnt := 10
 	a: int = 1
 	b: int = 2
 
-	for i := 0; i != fibs_cnt; i=i+1; {
+	for i := 0; i != cnt; i=i+1; {
 		print_int(a)
 
 		l := b

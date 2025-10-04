@@ -5,13 +5,15 @@
 #include <stdint.h>
 #include <threads.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #include "../thirdparty/da.h"
 #include "../include/lexer.h"
 
 typedef enum {
+	TYPE_NULL,
 	TYPE_INT, TYPE_UINT,
-	TYPE_I8, TYPE_U8,
+	TYPE_I8,  TYPE_U8,
 	TYPE_I16, TYPE_U16,
 	TYPE_I32, TYPE_U32,
 	TYPE_I64, TYPE_U64,
@@ -69,10 +71,10 @@ typedef struct {
 typedef enum {
 	AST_WHILE_STMT,
 	AST_IF_STMT, AST_BIN_EXP, AST_UN_EXP,
-	AST_VAR_DEF, AST_VAR, AST_LITERAL, //AST_INT, AST_FLOAT,
+	AST_VAR_DEF, AST_VAR, AST_LITERAL, AST_TYPE,
 	AST_FUNC_CALL_ARG,AST_FUNC_CALL, AST_BODY,
 	AST_FUNC_DEF, AST_FUNC_DEF_ARG, AST_FUNC_RET,
-	AST_STRING, AST_TYPE, AST_OP_PLUS, AST_VAR_MUT,
+	AST_STRING, AST_OP_PLUS, AST_VAR_MUT,
 	AST_FUNC_RET_TYPE, AST_FOR_STMT,
 	AST_UN_OP, AST_BIN_OP, AST_PROG,
 } AST_NodeType;
@@ -143,6 +145,7 @@ struct AST_Node {
 			Type type;
 		} func_ret;
 		Literal literal;
+		Type vtype;
 		AST_Node *func_ret_exp;
 		char *var_id;
 	};
@@ -176,6 +179,7 @@ typedef struct {
 	AST_Node *program;
 } Parser;
 
+Type parse_type(Parser *parser);
 void parser_st_add(Parser *parser, Symbol smbl);
 Symbol *parser_st_get(Parser *parser, const char *id);
 
@@ -189,5 +193,9 @@ void expect_token(Token *token, TokenType type);
 AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart);
 AST_Node *parse_func_call(Parser *parser);
 AST_Node *ast_alloc(AST_Node node);
+
+#define unreachable assert(!"unreachable")
+#define ast_new(...) \
+	ast_alloc((AST_Node) { __VA_ARGS__ })
 
 #endif

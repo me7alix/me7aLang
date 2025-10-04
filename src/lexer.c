@@ -159,9 +159,7 @@ void lexer_lex(Lexer *lexer, char *code) {
 					add_token(lexer, TOK_ASSIGN, ":=");
 					lexer->cur_char++;
 				} else {
-					lexer->cur_char++;
-					char *type = get_word(lexer);
-					add_token(lexer, TOK_TYPE, type);
+					add_token(lexer, TOK_COL, ":");
 				}
 			} break;
 
@@ -263,7 +261,6 @@ const char *tok_to_str(TokenType tok_type) {
 		case TOK_EQ:        return "TOK_EQ";
 		case TOK_LESS:      return "TOK_LESS";
 		case TOK_GREAT:     return "TOK_GREAT";
-		case TOK_TYPE:      return "TOK_TYPE";
 		case TOK_STRUCT:    return "TOK_STRUCT";
 		case TOK_STRING:    return "TOK_STRING";
 		case TOK_LPAR:      return "TOK_LPAR";

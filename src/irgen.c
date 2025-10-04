@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 
 #include "../include/ir.h"
 #include "../include/parser.h"
@@ -96,7 +95,6 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 			Operand calc = ir_opr_calc(en, l, r, &ret);
 			if (ret) return calc;
 
-
 			Instruction inst = {
 				.arg1 = l,
 				.arg2 = r,
@@ -127,13 +125,32 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 			return inst.dst;
 		} break;
 
-		case AST_UN_EXP: break;
+		case AST_UN_EXP: {
+			Instruction inst = {
+				.arg1 = ir_gen_expr(func, en->exp_unary.v),
+				.dst = (Operand){
+					.type = OPR_VAR,
+					.var.type = en->exp_unary.type,
+					.var.index = var_index++,
+				},
+			};
 
-		default: assert(!"unreachable");
+			switch (en->exp_unary.op) {
+				case TOK_COL: inst.op = OP_CAST; break;
+				default: unreachable;
+			}
+
+			da_append(&func->body, inst);
+			return inst.dst;
+		} break;
+
+		default: unreachable;
 	}
 
 	return (Operand){0};
 }
+
+void ir_dump_opr(Operand opr, char *buf);
 
 void ir_gen_var_def(Func *func, AST_Node *cn) {
 	Operand res = ir_gen_expr(func, cn->var_def.exp);
@@ -156,7 +173,7 @@ void ir_gen_var_def(Func *func, AST_Node *cn) {
 			});
 		} break;
 
-		default: assert(!"unreachable");
+		default: unreachable;
 	}
 }
 
@@ -177,7 +194,7 @@ void ir_gen_var_mut(Func *func, AST_Node *cn) {
 			}));
 		} break;
 
-		default: assert(!"unreachable");
+		default: unreachable;
 	}
 }
 
@@ -198,7 +215,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 					},
 				};
 
-				assert(cn->func_call.args.count < 6);
+				assert(cn->func_call.args.count < 7);
 				for (size_t i = 0; i < cn->func_call.args.count; i++) {
 					AST_Node *arg = da_get(&cn->func_call.args, i);
 					func_call.args[i] = ir_gen_expr(func, arg);
@@ -230,7 +247,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 						}));
 					} break;
 
-					default: assert(!"unreachable");
+					default: unreachable;
 				}
 			} break;
 
@@ -291,7 +308,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 
 				da_append(&func->body, ((Instruction){
 					.op = OP_JUMP,
-					.arg1 = (Operand) {
+					.dst = (Operand) {
 						.type = OPR_LABEL,
 						.label_index = lbl_st,
 					},
@@ -310,7 +327,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 				switch (cn->stmt_for.var->type) {
 					case AST_VAR_MUT: ir_gen_var_mut(func, cn->stmt_for.var); break;
 					case AST_VAR_DEF: ir_gen_var_def(func, cn->stmt_for.var); break;
-					default: assert(!"unreachable");
+					default: unreachable;
 				}
 
 				size_t lbl_st = label_index++;
@@ -341,7 +358,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 
 				da_append(&func->body, ((Instruction){
 					.op = OP_JUMP,
-					.arg1 = (Operand) {
+					.dst = (Operand) {
 						.type = OPR_LABEL,
 						.label_index = lbl_st,
 					},
@@ -356,13 +373,12 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 				}));
 			} break;
 
-			default: assert(!"unreachable");
+			default: unreachable;
 		}
 	}
 }
 
 void ir_gen_func(Program *prog, AST_Node *fn) {
-	//var_index = 0;
 	da_resize(&vt, 0);
 	Func func = {.name = fn->func_def.id, .ret_type = fn->func_def.type};
 	ir_gen_body(&func, fn->func_def.body);
@@ -380,7 +396,7 @@ Program ir_gen_prog(AST_Node *pn) {
 				ir_gen_func(&prog, cn);
 				break;
 
-			default: assert(!"unreachable");
+			default: unreachable;
 		}
 	}
 
