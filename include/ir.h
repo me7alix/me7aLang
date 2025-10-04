@@ -96,7 +96,7 @@ typedef struct {
 	da(Func) funcs;
 } Program;
 
-Type ir_get_opr_type(Operand op);
+Type *ir_get_opr_type(Operand *op);
 Program ir_gen_prog(Parser *parser);
 
 #endif // IR_H

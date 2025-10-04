@@ -1,18 +1,40 @@
 extern malloc(cnt: iptr): *u0
 extern free(ptr: *u0)
 extern print_int(val: int)
+extern print_char(val: i8)
+
+func change_fifth(nums: [10]int) {
+	*(nums + 4) = 111
+}
 
 func main(): int {
-	nums := malloc(sizeof:int * 10):*int
+	nums: [10]int
 
 	for i: iptr = 0; i < 10; i=i+1 {
 		*(nums + i) = (i * i):int
 	}
 
+	change_fifth(nums)
 	for i: iptr = 0; i < 10; i=i+1 {
 		print_int(*(nums + i))
 	}
+
+	print_char('\n')
+	print_char('\n')
+
+	// here we allocate the second array and copy the values from the first
+
+	nums2: *int = malloc(sizeof:int * 10)
+
+	for i: iptr = 0; i < 10; i=i+1 {
+		*(nums2 + i) = *(nums + i)
+	}
+
+	for i: iptr = 0; i < 10; i=i+1 {
+		print_int(*(nums2 + i))
+	}
+
+	free(nums2)
 	
-	free(nums)
 	return 0
 }

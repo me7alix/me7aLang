@@ -205,7 +205,7 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 				lexer_error(expr->loc, "parser error: operation on different types");
 			}
 
-			if (is_pointer(lt) && is_pointer(rt)) { // here could be a problem
+			if (is_pointer(lt) && is_pointer(rt)) {
 				if (lt.pointer.base->kind != rt.pointer.base->kind &&
 					!(lt.pointer.base->kind == TYPE_NULL || rt.pointer.base->kind == TYPE_NULL)) {
 					lexer_error(expr->loc, "parser error: operation on different types");

@@ -60,25 +60,23 @@ void sb_append_str(StringBuilder *sb, const char *s) {
 
 void sb_append_strf(StringBuilder *sb, const char *fmt, ...) {
 	if (!sb || !fmt) return;
+
 	va_list args, args_copy;
 	va_start(args, fmt);
 
 	va_copy(args_copy, args);
 
-	int len = vsnprintf(NULL, 0, fmt, args);
+	int needed_chars = vsnprintf(NULL, 0, fmt, args);
 	va_end(args);
 
-	if (len < 0) {
-		va_end(args_copy);
-		return;
-	}
+	size_t needed_total = sb->cnt + (size_t)needed_chars + 1;
+	sb_capacity_grow(sb, needed_total);
 
-	sb_capacity_grow(sb, (size_t)len);
-
-	vsnprintf(sb->str + sb->cnt, sb->cap - sb->cnt, fmt, args_copy);
-	sb->cnt += (size_t)len;
-
+	int wrote = vsnprintf(sb->str + sb->cnt, sb->cap - sb->cnt, fmt, args_copy);
 	va_end(args_copy);
+
+	sb->cnt += (size_t)wrote;
+	if (sb->cnt < sb->cap) sb->str[sb->cnt] = '\0';
 }
 
 void sb_append_char(StringBuilder *sb, char ch) {

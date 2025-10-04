@@ -8,8 +8,8 @@
 #include "../thirdparty/sb.h"
 
 #define SB_IMPLEMENTATION
+#include "./codegen/amd64-nasm.c"
 #include "irdump.c"
-#include "nasmgen.c"
 
 char *read_file(const char *filename) {
 	FILE* file = fopen(filename, "rb");

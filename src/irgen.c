@@ -44,19 +44,21 @@ void vt_set(char *name, size_t index) {
 	}
 }
 
-Type ir_get_opr_type(Operand op) {
-	switch (op.type) {
-		case OPR_VAR:      return op.var.type;               break;
-		case OPR_LITERAL:  return op.literal.type;           break;
-		case OPR_FUNC_INP: return op.func_inp.type;          break;
-		case OPR_FUNC_RET: return op.func_ret.type;          break;
-		case OPR_SIZEOF:   return (Type) {.kind = TYPE_INT}; break;
-		default: unreachable; return (Type){0};
+Type iptr = {.kind = TYPE_IPTR};
+Type *ir_get_opr_type(Operand *op) {
+	switch (op->type) {
+		case OPR_VAR:      return &op->var.type;      break;
+		case OPR_LITERAL:  return &op->literal.type;  break;
+		case OPR_FUNC_INP: return &op->func_inp.type; break;
+		case OPR_FUNC_RET: return &op->func_ret.type; break;
+		case OPR_SIZEOF:   return &iptr; break;;
+		default: unreachable; return NULL;
 	}
 }
 
 void ir_gen_func_call(Func *func, AST_Node *cn);
 
+bool before_eq;
 int64_t last_var;
 Operand ir_gen_expr(Func *func, AST_Node *en) {
 	if (!en) {
@@ -142,8 +144,8 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 
 			// pointers arithmetic
 			if (inst.op == OP_ADD || inst.op == OP_SUB) {
-				Type lt = ir_get_opr_type(l);
-				Type rt = ir_get_opr_type(r);
+				Type lt = *ir_get_opr_type(&l);
+				Type rt = *ir_get_opr_type(&r);
 
 				if (is_pointer(lt) || is_pointer(rt)) {
 					Type ptr_base;
@@ -191,17 +193,32 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 				return (Operand) {
 					.type = OPR_SIZEOF,
 					.size_of.type = en->exp_unary.type,
-					.size_of.v_type = ir_get_opr_type(arg1),
+					.size_of.v_type = *ir_get_opr_type(&arg1),
 				};
 			} else if (en->exp_unary.op == AST_OP_DEREF) {
 				Operand arg1 = ir_gen_expr(func, en->exp_unary.v);
-				last_var = -1;
-				return (Operand) {
+				Operand ret = (Operand) {
 					.type = OPR_VAR,
 					.var.type = en->exp_unary.type,
 					.var.is_mem_addr = true,
 					.var.index = arg1.var.index,
 				};
+
+				if (!before_eq) {
+					last_var = -1;
+					return ret;
+				} else {
+					da_append(&func->body, ((Instruction){
+						.op = OP_ASSIGN,
+						.arg1 = ret,
+						.dst = (Operand) {
+							.type = OPR_VAR,
+							.var.type = en->exp_unary.type,
+							.var.index = var_index++,
+						}
+					}));
+					return da_last(&func->body).dst;
+				}
 			}
 
 			Instruction inst = {
@@ -222,7 +239,9 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 			}
 
 			if (inst.op == OP_CAST) {
-				if (ir_get_opr_type(inst.arg1).kind == ir_get_opr_type(inst.dst).kind) {
+				Type *lt = ir_get_opr_type(&inst.arg1);
+				Type *rt = ir_get_opr_type(&inst.dst);
+				if (lt->kind == rt->kind) {
 					inst.op = OP_ASSIGN;
 				}
 			}
@@ -267,20 +286,6 @@ void ir_gen_var_def(Func *func, AST_Node *cn) {
 	}
 }
 
-void ir_gen_var_mut_old(Func *func, AST_Node *cn) {
-	Variable v = vt_get(cn->var_mut.id);
-	Operand res = ir_gen_expr(func, cn->var_mut.exp);
-	da_append(&func->body, ((Instruction){
-		.op = OP_ASSIGN,
-		.arg1 = res,
-		.dst = (Operand) {
-			.type = OPR_VAR,
-			.var.type = cn->var_mut.type,
-			.var.index = v.index,
-		},
-	}));
-}
-
 void ir_gen_var_mut(Func *func, AST_Node *cn) {
 	bool is_ptr_assign = false;
 	if (cn->kind == AST_UN_EXP) is_ptr_assign = true;
@@ -299,8 +304,11 @@ void ir_gen_var_mut(Func *func, AST_Node *cn) {
 			},
 		}));
 	} else {
+		before_eq = false;
 		Operand dst = ir_gen_expr(func, cn->var_mut.exp->exp_binary.l);
+		before_eq = true;
 		Operand res = ir_gen_expr(func, cn->var_mut.exp->exp_binary.r);
+		before_eq = false;
 		da_append(&func->body, ((Instruction){
 			.op = OP_ASSIGN,
 			.arg1 = res,
