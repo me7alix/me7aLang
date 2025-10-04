@@ -24,7 +24,7 @@ func main(): int {
 
 	// here we allocate the second array and copy the values from the first
 
-	nums2: *int = malloc(sizeof:int * 10)
+	nums2: *int = malloc(sizeof nums)
 
 	for i: iptr = 0; i < 10; i+=1 {
 		*(nums2 + i) = *(nums + i)

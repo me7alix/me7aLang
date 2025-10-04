@@ -78,7 +78,10 @@ char opr_to_nasm_buf[64];
 char *opr_to_nasm(Operand opr) {
 	switch (opr.type) {
 		case OPR_SIZEOF: {
-			sprintf(opr_to_nasm_buf, "%zu", get_type_size(opr.size_of.v_type));
+			size_t size = get_type_size(opr.size_of.v_type);
+			if (opr.size_of.v_type.kind == TYPE_ARRAY)
+				size = get_type_size(*opr.size_of.v_type.array.elem) * opr.size_of.v_type.array.length;
+			sprintf(opr_to_nasm_buf, "%zu", size);
 		} break;
 
 		case OPR_LABEL: {

@@ -465,6 +465,11 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				if (nodes.count == 0) {
 					is_unary_op = true;
 				} else {
+					if (da_last(&nodes)->kind == AST_UN_EXP)
+						lexer_error(parser_peek(p)->loc,
+				  "parser error: invalid operator combination\n"
+				  "hint: try to use parenthesis");
+
 					bool is_bin_op = da_last(&nodes)->kind == AST_BIN_EXP;
 					if (is_bin_op && da_last(&nodes)->exp_binary.l && da_last(&nodes)->exp_binary.r) is_bin_op = false;
 					if (is_bin_op) {
