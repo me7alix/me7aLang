@@ -94,14 +94,12 @@ typedef enum {
 } AST_ExprOp;
 
 typedef enum {
-	AST_WHILE_STMT,
-	AST_IF_STMT, AST_BIN_EXP, AST_UN_EXP,
+	AST_WHILE_STMT, AST_IF_STMT, AST_BIN_EXP, AST_UN_EXP,
 	AST_VAR_DEF, AST_VAR, AST_LITERAL, AST_TYPE,
 	AST_FUNC_CALL_ARG,AST_FUNC_CALL, AST_BODY,
 	AST_FUNC_DEF, AST_FUNC_DEF_ARG, AST_FUNC_RET,
-	AST_STRING, AST_OP_PLUS, AST_VAR_MUT,
-	AST_FUNC_RET_TYPE, AST_FOR_STMT,
-	AST_UN_OP, AST_BIN_OP, AST_PROG,
+	AST_STRING, AST_VAR_MUT, AST_FUNC_RET_TYPE,
+	AST_FOR_STMT, AST_UN_OP, AST_BIN_OP, AST_PROG,
 } AST_NodeKind;
 
 typedef struct AST_Node AST_Node;
@@ -187,6 +185,7 @@ typedef struct {
 	SymbolType type;
 	char *id;
 	int nested[16];
+
 	union {
 		struct {
 			AST_Nodes args;

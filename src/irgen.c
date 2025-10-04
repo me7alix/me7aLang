@@ -241,7 +241,7 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 			if (inst.op == OP_CAST) {
 				Type *lt = ir_get_opr_type(&inst.arg1);
 				Type *rt = ir_get_opr_type(&inst.dst);
-				if (lt->kind == rt->kind) {
+				if (lt->kind == rt->kind || (is_pointer(*lt) && is_pointer(*rt))) {
 					inst.op = OP_ASSIGN;
 				}
 			}
