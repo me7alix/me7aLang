@@ -1,8 +1,19 @@
-func main(): int {
-	a := 1
-	b := 2
+func print_frame() {
+	print_int(1010101)
+}
 
-	i := 0; while i != 5 {
+
+func main(): int {
+	fibs_cnt := 10
+
+	a: int = 1
+	b: int = 2
+	
+	print_frame()
+
+	i := 0; while i != fibs_cnt {
+		print_int(a)
+
 		l := b
 		b = b + a
 		a = l
@@ -10,5 +21,6 @@ func main(): int {
 		i = i + 1
 	}
 
-	return b
+	print_frame()
+	return 0
 }
