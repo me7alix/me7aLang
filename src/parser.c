@@ -8,6 +8,11 @@
 
 #include "../include/parser.h"
 
+int nested_uniq = 1;
+#define nested_push_next(p) (p)->nested[(p)->nptr++] = nested_uniq
+#define nested_push(p) (p)->nested[(p)->nptr++] = nested_uniq++
+#define nested_pop(p) (p)->nested[--(p)->nptr] = 0
+
 bool check_nested(int pn[16], int n[16]) {
 	for (size_t i = 0; n[i] != 0; i++) {
 		if (pn[i] != n[i]) return false;
@@ -236,7 +241,6 @@ AST_Node *parse_while_stmt(Parser *p, AST_Node *func) {
 	return r;
 }
 
-int uniq = 1;
 AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 	parser_next(p);
 
@@ -245,7 +249,7 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 		.loc = (parser_peek(p)-1)->loc,
 	});
 
-	p->nested[p->nptr++] = uniq;
+	nested_push_next(p);
 
 	if ((parser_looknext(p))->type == TOK_COL)
 		r->stmt_for.var = parse_var_def(p);
@@ -260,14 +264,15 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 	r->stmt_for.mut = parse_var_mut(p, EXPR_PARSING_STMT);
 	parser_next(p);
 
-	p->nested[--p->nptr] = 0;
+	nested_pop(p);
 
 	r->stmt_for.body = parse_body(p, func);
 	return r;
 }
 
 AST_Node *parse_body(Parser *p, AST_Node *func) {
-	p->nested[p->nptr++] = uniq++;
+	nested_push(p);
+
 	AST_Node *body = ast_new({.kind = AST_BODY});
 	int br_cnt = 0;
 
@@ -320,7 +325,7 @@ AST_Node *parse_body(Parser *p, AST_Node *func) {
 	}
 
 ex:
-	p->nested[--p->nptr] = 0;
+	nested_pop(p);
 	return body;
 }
 
@@ -339,13 +344,13 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 				arg->func_def_arg.type = parse_type(p);
 				da_append(fargs, arg);
 
-				p->nested[p->nptr++] = uniq;
+				nested_push_next(p);
 				parser_symbols_add(p, (Symbol) {
 					.id = arg->func_def_arg.id,
 					.type = SBL_VAR,
 					.variable.type = arg->func_def_arg.type,
 				});
-				p->nested[--p->nptr] = 0;
+				nested_pop(p);
 
 				break;
 
@@ -393,7 +398,7 @@ AST_Node *parse_function(Parser *p) {
 
 	parser_symbols_add(p, fds);
 	fdn->func_def.body = parse_body(p, fdn);
-	uniq++;
+	nested_uniq++;
 	return fdn;
 }
 
@@ -429,7 +434,7 @@ void parse_extern(Parser *p) {
 
 	parser_symbols_add(p, fes);
 	expect_token(parser_peek(p), TOK_SEMI);
-	uniq++;
+	nested_uniq++;
 }
 
 Parser parser_parse(Token *tokens) {
