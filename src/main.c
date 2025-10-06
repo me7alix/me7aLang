@@ -2,6 +2,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "../include/preprocessor.h"
 #include "../include/lexer.h"
 #include "../include/parser.h"
 #include "../include/ir.h"
@@ -74,7 +75,7 @@ void print_usage() {
 }
 
 int main(int argc, char **argv) {
-	char *input_file = NULL;
+	da(char*) input_files = {0};
 	char *output_bin = "a.out";
 	char *clibs = "";
 	char *obj_files = "";
@@ -86,7 +87,7 @@ int main(int argc, char **argv) {
 		return 0;
 	}
 
-	for (size_t i = 0; i < argc; i++) {
+	for (size_t i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "-o") == 0) {
 			if (i >= argc) {
 				fprintf(stderr, "invalid -o argument\n");
@@ -123,19 +124,28 @@ int main(int argc, char **argv) {
 				return 1;
 			}
 
-			input_file = argv[i];
+			da_append(&input_files, argv[i]);
 		}
 	}
+
 	char buf[512];
 	char output_file[256];
-	char *code = read_file(input_file);
-	if (code == NULL) {
-		perror("error while opening file\n");
-		return 1;
+
+	Sources sources = {0};
+	da_foreach(char *, input_file, &input_files) {
+		char *code = read_file(*input_file);
+		if (code == NULL) {
+			perror("error while opening file\n");
+			return 1;
+		}
+
+		da_append(&sources, lexer_lex(*input_file, code));
 	}
 
-	Lexer lexer = lexer_lex(code);
-	Parser parser = parser_parse(lexer.tokens.items);
+	Lexer *entry = &da_get(&sources, 0);
+	preprocessor(&sources, entry);
+
+	Parser parser = parser_parse(entry->tokens.items);
 	Program prog = ir_gen_prog(&parser);
 	const char *cg = nasm_gen_prog(&prog);
 
@@ -154,8 +164,5 @@ int main(int argc, char **argv) {
 		ir_dump_prog(&prog, buf);
 	}
 
-	lexer_free(&lexer);
-	da_free(&prog.funcs);
-	da_free(&prog.externs);
 	return 0;
 }

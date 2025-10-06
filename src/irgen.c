@@ -572,8 +572,8 @@ Program ir_gen_prog(Parser *p) {
 	Program prog = {0};
 	label_index = 0;
 
-	for (size_t i = 0; i < p->st.count; i++) {
-		Symbol cs = da_get(&p->st, i);
+	for (size_t i = 0; i < p->symbols.count; i++) {
+		Symbol cs = da_get(&p->symbols, i);
 		if (cs.type == SBL_FUNC_EXTERN) {
 			da_append(&prog.externs, ((Extern){
 				.name = cs.func_extern.extern_smb,

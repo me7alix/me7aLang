@@ -20,20 +20,31 @@ void set_nested(int pn[16], int n[16]) {
 	memcpy(n, pn, 16 * sizeof(int));
 }
 
-void parser_st_add(Parser *p, Symbol smbl) {
-	set_nested(p->nested, smbl.nested);
-	da_append(&p->st, smbl);
-}
-
-Symbol *parser_st_get(Parser *p, const char *id) {
-	for (int i = p->st.count - 1; i >= 0; i--) {
-		if (strcmp(da_get(&p->st, i).id, id) == 0) {
-			bool nst = check_nested(p->nested, da_get(&p->st, i).nested);
-			if (da_get(&p->st, i).type == SBL_VAR && !nst) {
+void parser_symbols_add(Parser *p, Symbol smbl) {
+	for (int i = p->symbols.count - 1; i >= 0; i--) {
+		if (strcmp(da_get(&p->symbols, i).id, smbl.id) == 0) {
+			bool nst = check_nested(p->nested, da_get(&p->symbols, i).nested);
+			if (da_get(&p->symbols, i).type == SBL_VAR && !nst) {
 				break;
 			}
 
-			return &da_get(&p->st, i);
+			lexer_error(parser_peek(p)->loc, "parser error: redifinition of the symbol");
+		}
+	}
+
+	set_nested(p->nested, smbl.nested);
+	da_append(&p->symbols, smbl);
+}
+
+Symbol *parser_symbols_get(Parser *p, const char *id) {
+	for (int i = p->symbols.count - 1; i >= 0; i--) {
+		if (strcmp(da_get(&p->symbols, i).id, id) == 0) {
+			bool nst = check_nested(p->nested, da_get(&p->symbols, i).nested);
+			if (da_get(&p->symbols, i).type == SBL_VAR && !nst) {
+				break;
+			}
+
+			return &da_get(&p->symbols, i);
 		}
 	}
 
@@ -128,7 +139,7 @@ AST_Node *parse_var_def(Parser *p) {
 		vdn->var_def.exp = parse_expr(p, EXPR_PARSING_VAR, &type);
 	}
 
-	parser_st_add(p, (Symbol) {
+	parser_symbols_add(p, (Symbol) {
 		.type = SBL_VAR,
 		.id = vdn->var_def.id,
 		.variable.type = type,
@@ -158,14 +169,14 @@ AST_Node *parse_var_assign(Parser *p) {
 		case AST_LITERAL:   vdn->var_def.type = exp->literal.type;    break;
 		case AST_FUNC_CALL: vdn->var_def.type = exp->func_call.type;  break;
 		case AST_VAR: {
-			Symbol *s = parser_st_get(p, exp->var_id);
+			Symbol *s = parser_symbols_get(p, exp->var_id);
 			vdn->var_def.type = s->variable.type;
 		} break;
 		default: unreachable;
 	}
 
 	assert(vdn->var_def.type.kind);
-	parser_st_add(p, (Symbol) {
+	parser_symbols_add(p, (Symbol) {
 		.type = SBL_VAR,
 		.id = vdn->var_def.id,
 		.variable.type = vdn->var_def.type,
@@ -225,6 +236,7 @@ AST_Node *parse_while_stmt(Parser *p, AST_Node *func) {
 	return r;
 }
 
+int uniq = 1;
 AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 	parser_next(p);
 
@@ -232,6 +244,8 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 		.kind = AST_FOR_STMT,
 		.loc = (parser_peek(p)-1)->loc,
 	});
+
+	p->nested[p->nptr++] = uniq;
 
 	if ((parser_looknext(p))->type == TOK_COL)
 		r->stmt_for.var = parse_var_def(p);
@@ -245,11 +259,13 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 	parser_next(p);
 	r->stmt_for.mut = parse_var_mut(p, EXPR_PARSING_STMT);
 	parser_next(p);
+
+	p->nested[--p->nptr] = 0;
+
 	r->stmt_for.body = parse_body(p, func);
 	return r;
 }
 
-int uniq = 1;
 AST_Node *parse_body(Parser *p, AST_Node *func) {
 	p->nested[p->nptr++] = uniq++;
 	AST_Node *body = ast_new({.kind = AST_BODY});
@@ -324,7 +340,7 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 				da_append(fargs, arg);
 
 				p->nested[p->nptr++] = uniq;
-				parser_st_add(p, (Symbol) {
+				parser_symbols_add(p, (Symbol) {
 					.id = arg->func_def_arg.id,
 					.type = SBL_VAR,
 					.variable.type = arg->func_def_arg.type,
@@ -375,8 +391,9 @@ AST_Node *parse_function(Parser *p) {
 	for (size_t i = 0; i < fdn->func_def.args.count; i++)
 		da_append(&fds.func_def.args, da_get(&fdn->func_def.args, i));
 
-	parser_st_add(p, fds);
+	parser_symbols_add(p, fds);
 	fdn->func_def.body = parse_body(p, fdn);
+	uniq++;
 	return fdn;
 }
 
@@ -410,8 +427,9 @@ void parse_extern(Parser *p) {
 		fes.func_extern.type = (Type) {.kind = TYPE_NULL};
 	}
 
-	parser_st_add(p, fes);
+	parser_symbols_add(p, fes);
 	expect_token(parser_peek(p), TOK_SEMI);
+	uniq++;
 }
 
 Parser parser_parse(Token *tokens) {
@@ -430,7 +448,17 @@ Parser parser_parse(Token *tokens) {
 				parse_extern(&p);
 				break;
 
-			default: unreachable;
+			case TOK_IMPORT:
+				parser_next(&p);
+				parser_next(&p);
+				break;
+
+			case TOK_MACRO:
+				while (parser_peek(&p)->type != TOK_SEMI)
+					parser_next(&p);
+				break;
+
+			default: printf("%s\n", parser_peek(&p)->data); unreachable;
 		}
 
 		p.cur_token++;

@@ -48,7 +48,7 @@ bool is_tok(Lexer *lexer, char *tok, TokenType type, char *str) {
 void lexer_error(Location loc, char *error) {
 	size_t lines_num = loc.line_num + 1;
 	size_t chars_num = loc.line_char-loc.line_start + 1;
-	printf("%zu:%zu %s\n", lines_num, chars_num, error);
+	printf("%s:%zu:%zu %s\n", loc.file, lines_num, chars_num, error);
 
 	loc.line_char = loc.line_start;
 	char error_pointer[128];
@@ -70,8 +70,9 @@ void lexer_error(Location loc, char *error) {
 	exit(1);
 }
 
-Lexer lexer_lex(char *code) {
+Lexer lexer_lex(char *file, char *code) {
 	Lexer lexer = {0};
+	lexer.cur_loc.file = file;
 	lexer.cur_char = code;
 	lexer.cur_loc.line_start = code;
 
@@ -248,24 +249,22 @@ Lexer lexer_lex(char *code) {
 					}
 				}
 
-				else if   (is_tok(&lexer, "for",    TOK_FOR_SYM, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "while",  TOK_WHILE_SYM, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "if",     TOK_IF_SYM, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "func",   TOK_FUNC, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "struct", TOK_STRUCT, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "extern", TOK_EXTERN, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "true",   TOK_TRUE, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "false",  TOK_FALSE, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "break",  TOK_BREAK, lexer.cur_char)) {
+				else if   (is_tok(&lexer, "for",     TOK_FOR_SYM, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "while",   TOK_WHILE_SYM, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "if",      TOK_IF_SYM, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "func",    TOK_FUNC, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "struct",  TOK_STRUCT, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "extern",  TOK_EXTERN, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "true",    TOK_TRUE, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "false",   TOK_FALSE, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "break",   TOK_BREAK, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "continue",TOK_CONTINUE, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "null",   TOK_NULL, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "sizeof", TOK_SIZEOF, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "return", TOK_RET, lexer.cur_char)) {}
-
-				else if (isalpha(*lexer.cur_char)) {
-					char *id = get_word(&lexer);
-					add_token(&lexer, TOK_ID, id);
-				}
+				} else if (is_tok(&lexer, "null",    TOK_NULL, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "sizeof",  TOK_SIZEOF, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "return",  TOK_RET, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "import",  TOK_IMPORT, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "macro",   TOK_MACRO, lexer.cur_char)) {
+				} else if (isalpha(*lexer.cur_char)) add_token(&lexer, TOK_ID, get_word(&lexer));
 
 				else lexer_error(lexer.cur_loc, "lexer error: unknown token");
 			} break;

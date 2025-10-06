@@ -1,20 +1,9 @@
-extern InitWindow         rl_init_window(width: int, height: int, title: *i8)
-extern SetTargetFPS       rl_set_target_fps(fps: int)
-extern DrawRectangleLines rl_draw_rect_lines(x: int, y: int, w: int, h: int, clr: int)
-extern GetRandomValue     rl_get_rand_val(from: int, to: int): int
-extern IsKeyDown          rl_is_key_down(key: int): bool
-extern WindowShouldClose  rl_window_should_close(): bool
-extern ClearBackground    rl_clear_bg(clr: int)
-extern BeginDrawing       rl_begin_drawing()
-extern EndDrawing         rl_end_drawing()
-extern CloseWindow        rl_close_window()
+import "./examples/raylib.met"
+
+macro SCREEN_WIDTH  800
+macro SCREEN_HEIGHT 600
 
 func main(): int {
-	SCREEN_WIDTH  := 800
-	SCREEN_HEIGHT := 600
-
-	KEY_D := 68; KEY_A := 65
-
 	title: [4]i8
 	*(title + 0) = 'P'
 	*(title + 1) = 'O'
@@ -27,9 +16,9 @@ func main(): int {
 	// Ball
 	ball_speed   := 5
 	ball_r       := 15
-	ball_x       := rl_get_rand_val(100, SCREEN_WIDTH - 100)
-	ball_y       := rl_get_rand_val(100, SCREEN_HEIGHT/2)
-	ball_dir_x   := rl_get_rand_val(0, 1) * 2 - 1
+	ball_x       := rl_rand(100, SCREEN_WIDTH - 100)
+	ball_y       := rl_rand(100, SCREEN_HEIGHT/2)
+	ball_dir_x   := rl_rand(0, 1) * 2 - 1
 	ball_dir_y   := -1
 	
 	// Paddle
@@ -41,7 +30,7 @@ func main(): int {
 
 	while !rl_window_should_close() {
 		rl_begin_drawing()
-		rl_clear_bg(0xFF000000)
+		rl_clear_bg(rl_ColorBlack)
 
 		ball_x += ball_dir_x * ball_speed
 		ball_y += ball_dir_y * ball_speed
@@ -56,11 +45,11 @@ func main(): int {
 			ball_dir_y = -ball_dir_y
 		}
 
-		if rl_is_key_down(KEY_D) && paddle_x < SCREEN_WIDTH - paddle_w {
+		if rl_is_key_down(rl_KeyD) && paddle_x < SCREEN_WIDTH - paddle_w {
 			paddle_x += paddle_speed;
 		}
 
-		if rl_is_key_down(KEY_A) && paddle_x > 0 {
+		if rl_is_key_down(rl_KeyA) && paddle_x > 0 {
 			paddle_x -= paddle_speed
 		}
 		
@@ -71,8 +60,8 @@ func main(): int {
 			ball_dir_y = -ball_dir_y
 		}
 
-		rl_draw_rect_lines(ball_x, ball_y, ball_r*2, ball_r*2, 0xFFFF0000)
-		rl_draw_rect_lines(paddle_x, paddle_y, paddle_w, paddle_h, 0xFF0000FF)
+		rl_draw_rect_lines(ball_x, ball_y, ball_r*2, ball_r*2, rl_ColorRed)
+		rl_draw_rect_lines(paddle_x, paddle_y, paddle_w, paddle_h, rl_ColorBlue)
 		rl_end_drawing()
 	}
 

@@ -14,10 +14,11 @@ typedef enum {
 	TOK_IF_SYM, TOK_WHILE_SYM, TOK_STAR, TOK_AMP, TOK_COM, TOK_TRUE, TOK_FALSE,
 	TOK_SLASH, TOK_INT, TOK_FLOAT, TOK_OBRA, TOK_COL, TOK_SIZEOF, TOK_OSQBRA,
 	TOK_CSQBRA, TOK_CBRA, TOK_DOT, TOK_PLUS_EQ, TOK_MINUS_EQ, TOK_STAR_EQ,
-	TOK_SLASH_EQ, TOK_EOF, TOK_BREAK, TOK_CONTINUE,
+	TOK_SLASH_EQ, TOK_EOF, TOK_BREAK, TOK_CONTINUE, TOK_IMPORT, TOK_MACRO,
 } TokenType;
 
 typedef struct {
+	char *file;
 	size_t line_num;
 	char *line_start;
 	char *line_char;
@@ -36,7 +37,7 @@ typedef struct {
 } Lexer;
 
 void lexer_error(Location loc, char *error);
-Lexer lexer_lex(char *code);
+Lexer lexer_lex(char *file, char *code);
 void lexer_free(Lexer *lexer);
 
 #endif

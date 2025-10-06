@@ -9,8 +9,8 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 		goto fail;
 
 	int op = en->exp_binary.op;
-	int64_t lv = (int64_t) l.literal.lint;
-	int64_t rv = (int64_t) r.literal.lint;
+	int64_t lv = l.literal.lint;
+	int64_t rv = r.literal.lint;
 	int64_t res;
 
 	switch (op) {
