@@ -1,0 +1,39 @@
+extern print_int(var: int)
+
+func bubble_sort(arr: *int, cnt: iptr) {
+	while true {
+		change := false
+		for i: iptr = 0; i < cnt - 1; i+=1 {
+			if *(arr + i) > *(arr + i + 1) {
+				tmp := *(arr + i)
+				*(arr + i) = *(arr + i + 1)
+				*(arr + i + 1) = tmp
+				change = true
+			}
+		}
+
+		if !change { break; }
+	}
+}
+
+func main(): int {
+	arr: [10]int
+	*(arr + 0) = 20
+	*(arr + 1) = 2
+	*(arr + 2) = 0
+	*(arr + 3) = 23
+	*(arr + 4) = 8
+	*(arr + 5) = 15
+	*(arr + 6) = 110
+	*(arr + 7) = 2410
+	*(arr + 8) = 56
+	*(arr + 9) = 78
+
+	bubble_sort(arr: *int, 10)
+
+	for i: iptr = 0; i < 10; i+=1 {
+		print_int(*(arr + i))
+	}
+
+	return 0
+}
