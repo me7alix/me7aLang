@@ -365,16 +365,13 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			} break;
 
 			case OP_REF: {
-				if (ci.arg1.var.is_mem_addr) {
-					size_t off = iot_get(ci.arg1.var.index);
-					size_t ptr_off = iot_get(off);
-					sprintf(arg1, "[rbp - %zu]", off);
+				size_t off = iot_get(ci.arg1.var.index);
+				sprintf(arg1, "[rbp - %zu]", off);
+
+				if (ci.arg1.var.is_mem_addr)
 					sb_append_strf(&body, TAB"mov rax, %s\n", arg1);
-				} else {
-					size_t off = iot_get(ci.arg1.var.index);
-					sprintf(arg1, "[rbp - %zu]", off);
+				else
 					sb_append_strf(&body, TAB"lea rax, %s\n", arg1);
-				}
 
 				sprintf(dst, "%s", opr_to_nasm(ci.dst));
 				sb_append_strf(&body, TAB"mov %s, rax\n", dst);

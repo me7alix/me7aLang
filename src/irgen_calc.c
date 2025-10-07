@@ -29,7 +29,6 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 
 		int op = en->exp_binary.op;
 		int64_t lv = l.literal.lint;
-		int64_t res;
 
 		switch (op) {
 			case AST_OP_NEG: res = -lv; break;
@@ -44,7 +43,7 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 				.literal = {
 					.kind = LIT_INT,
 					.lint = (int8_t)res,
-					.type = l.literal.type.kind,
+					.type = l.literal.type,
 				},
 			};
 		case TYPE_INT:
@@ -54,7 +53,7 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 				.literal = {
 					.kind = LIT_INT,
 					.lint = (int32_t)res,
-					.type = l.literal.type.kind,
+					.type = l.literal.type,
 				},
 			};
 		case TYPE_I64:
@@ -63,7 +62,7 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 				.literal = {
 					.kind = LIT_INT,
 					.lint = (int64_t)res,
-					.type = l.literal.type.kind,
+					.type = l.literal.type,
 				},
 			};
 		default: goto fail;
