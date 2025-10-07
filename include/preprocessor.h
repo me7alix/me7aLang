@@ -4,6 +4,8 @@
 #include "lexer.h"
 
 typedef da(Lexer) Sources;
-void preprocessor(Sources *sources, Lexer *entry);
+typedef da(char*) Imports;
+char *read_file(const char *filename);
+void preprocessor(Imports *imports, Lexer *entry);
 
 #endif

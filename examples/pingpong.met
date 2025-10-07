@@ -1,4 +1,4 @@
-import "./examples/raylib.met"
+import "raylib.met"
 
 macro SCREEN_WIDTH  800
 macro SCREEN_HEIGHT 600

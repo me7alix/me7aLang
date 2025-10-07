@@ -15,7 +15,6 @@
 char *read_file(const char *filename) {
 	FILE* file = fopen(filename, "rb");
 	if (!file) {
-		perror("Failed to open file");
 		return NULL;
 	}
 
@@ -25,14 +24,12 @@ char *read_file(const char *filename) {
 
 	char *buffer = (char *)malloc(filesize + 1);
 	if (!buffer) {
-		perror("Failed to allocate buffer");
 		fclose(file);
 		return NULL;
 	}
 
 	size_t read_size = fread(buffer, 1, filesize, file);
 	if (read_size != filesize) {
-		perror("Failed to read entire file");
 		free(buffer);
 		fclose(file);
 		return NULL;
@@ -67,18 +64,25 @@ int write_to_file(const char *filename, const char *text) {
 
 void print_usage() {
 	printf(
-		"Usage: [options] file...\n"
+		"Usage: [options] file\n"
 		"Options:\n"
 		"  -o   Output file path\n"
-		"  -asm Saves asm output\n"
-		"  -ir  Saves IR output\n");
+		"  -c   Compile to object file\n"
+		"  -obj Object files\n"
+		"  -ld  Link dynamicly\n"
+		"  -asm Save assembler output\n"
+		"  -ir  Save IR output\n");
 }
 
 int main(int argc, char **argv) {
-	da(char*) input_files = {0};
+	char *input_file;
+	Imports imports = {0};
+	da_append(&imports, "");
+	da_append(&imports, ".");
 	char *output_bin = "a.out";
-	char *clibs = "";
+	char *ld = "";
 	char *obj_files = "";
+	bool compile_to_obj = false;
 	bool save_asm_output = false;
 	bool save_ir_output = false;
 
@@ -102,17 +106,26 @@ int main(int argc, char **argv) {
 			}
 
 			obj_files = argv[++i];
-		} else if (strcmp(argv[i], "-clibs") == 0) {
+		} else if (strcmp(argv[i], "-ld") == 0) {
 			if (i >= argc) {
-				fprintf(stderr, "invalid -clibs argument\n");
+				fprintf(stderr, "invalid -ld argument\n");
 				return 1;
 			}
 
-			clibs = argv[++i];
+			ld = argv[++i];
+		} else if (strcmp(argv[i], "-I") == 0) {
+			if (i >= argc) {
+				fprintf(stderr, "invalid -I argument\n");
+				return 1;
+			}
+
+			da_append(&imports, argv[++i]);
 		} else if (strcmp(argv[i], "-asm") == 0) {
 			save_asm_output = true;
 		} else if (strcmp(argv[i], "-ir") == 0) {
 			save_ir_output = true;
+		} else if (strcmp(argv[i], "-c") == 0) {
+			compile_to_obj = true;
 		} else if (
 			strcmp(argv[i], "-h") == 0 ||
 			strcmp(argv[i], "--help") == 0) {
@@ -124,41 +137,41 @@ int main(int argc, char **argv) {
 				return 1;
 			}
 
-			da_append(&input_files, argv[i]);
+			input_file = argv[i];
 		}
 	}
 
 	char buf[512];
 	char output_file[256];
 
-	Sources sources = {0};
-	da_foreach(char *, input_file, &input_files) {
-		char *code = read_file(*input_file);
-		if (code == NULL) {
-			perror("error while opening file\n");
-			return 1;
-		}
-
-		da_append(&sources, lexer_lex(*input_file, code));
+	char *ep_code = read_file(input_file);
+	if (!ep_code) {
+		printf("error: no such file %s\n", input_file);
+		return 1;
 	}
 
-	Lexer *entry = &da_get(&sources, 0);
-	preprocessor(&sources, entry);
+	Lexer entry_point = lexer_lex(input_file, ep_code);
+	preprocessor(&imports, &entry_point);
 
-	Parser parser = parser_parse(entry->tokens.items);
+	Parser parser = parser_parse(entry_point.tokens.items);
 	Program prog = ir_gen_prog(&parser);
 	const char *cg = nasm_gen_prog(&prog);
 
 	sprintf(output_file, "%s.asm", output_bin);
 	write_to_file(output_file, cg);
+	sprintf(buf, "nasm -f elf64 %s", output_file); system(buf);
+	if (!compile_to_obj) {
+		sprintf(buf,
+		  "ld -o %s %s.o %s %s -L/usr/lib -lc "
+		  "-dynamic-linker /lib64/ld-linux-x86-64.so.2 /usr/lib/crt1.o /usr/lib/crti.o /usr/lib/crtn.o",
+		  output_bin, output_bin, obj_files, ld); system(buf);
+		sprintf(buf, "rm %s.o", output_bin); system(buf);
+	}
 
-	sprintf(buf, "nasm -f elf64 %s", output_file);
-	system(buf); printf("[INFO] %s\n", buf);
-	sprintf(buf, "gcc -no-pie %s %s.o -o %s %s", obj_files, output_bin, output_bin, clibs);
-	system(buf); printf("[INFO] %s\n", buf);
-	sprintf(buf, "rm %s.o", output_bin);
-	system(buf);  printf("[INFO] %s\n", buf);
-	if (!save_asm_output) { sprintf(buf, "rm %s", output_file); system(buf); }
+	if (!save_asm_output) {
+		sprintf(buf, "rm %s", output_file); system(buf);
+	}
+
 	if (save_ir_output) {
 		sprintf(buf, "%s.ir", output_bin);
 		ir_dump_prog(&prog, buf);

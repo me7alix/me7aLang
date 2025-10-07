@@ -112,8 +112,7 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 			Operand l = ir_gen_expr(func, en->exp_binary.l);
 			Operand r = ir_gen_expr(func, en->exp_binary.r);
 
-			bool ret;
-			Operand calc = ir_opr_calc(en, l, r, &ret);
+			bool ret; Operand calc = ir_opr_calc(en, l, r, &ret);
 			if (ret) return calc;
 
 			Instruction inst = {
@@ -221,8 +220,12 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 				}
 			}
 
+			Operand arg = ir_gen_expr(func, en->exp_unary.v);
+			bool ret; Operand calc = ir_opr_calc(en, arg, (Operand){}, &ret);
+			if (ret) return calc;
+
 			Instruction inst = {
-				.arg1 = ir_gen_expr(func, en->exp_unary.v),
+				.arg1 = arg,
 				.dst = (Operand){
 					.type = OPR_VAR,
 					.var.type = en->exp_unary.type,

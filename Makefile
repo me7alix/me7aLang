@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -std=c99 -Wall -DDA_RUNTIME_CHECKS
+CFLAGS = -std=c99 -Wall -DDA_RUNTIME_CHECKS -D_GNU_SOURCE
 
 build:
 	mkdir -p build
