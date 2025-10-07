@@ -113,6 +113,7 @@ AST_Node *parse_func_call(Parser *p) {
 }
 
 AST_Node *expr_expand(AST_Nodes *nodes) {
+	size_t cur_count = nodes->count;
 	if (nodes->count == 1) {
 		return da_get(nodes, 0);
 	}
@@ -164,6 +165,8 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 		}
 	}
 
+	if (nodes->count == cur_count)
+		lexer_error(da_get(nodes, 0)->loc, "parser error: wrong expression");
 	return expr_expand(nodes);
 }
 

@@ -353,6 +353,59 @@ size_t lbl_st, lbl_ex;
 AST_Node *for_var_mut;
 bool loop_gen;
 
+void ir_gen_body(Func *func, AST_Node *fn);
+
+void ir_gen_if_chain(Func *func, AST_Node *cn) {
+	Operand res = ir_gen_expr(func, cn->stmt_if.exp);
+	size_t lbl = label_index++;
+	size_t lbl_ex = label_index++;
+
+	da_append(&func->body, ((Instruction){
+		.op = OP_JUMP_IF_NOT,
+		.arg1 = res,
+		.dst = (Operand) {
+			.type = OPR_LABEL,
+			.label_index = lbl,
+		},
+	}));
+
+	ir_gen_body(func, cn->stmt_if.body);
+
+	if (cn->stmt_if.next) {
+		da_append(&func->body, ((Instruction){
+			.op = OP_JUMP,
+			.dst = (Operand) {
+				.type = OPR_LABEL,
+				.label_index = lbl_ex,
+			},
+		}));
+	}
+
+	da_append(&func->body, ((Instruction){
+		.op = OP_LABEL,
+		.arg1 = (Operand) {
+			.type = OPR_LABEL,
+			.label_index = lbl,
+		},
+	}));
+
+	if (cn->stmt_if.next) {
+		if (cn->stmt_if.next->kind == AST_IF_STMT) {
+			ir_gen_if_chain(func, cn->stmt_if.next);
+		} else if (cn->stmt_if.next->kind == AST_ELSE_STMT) {
+			ir_gen_body(func, cn->stmt_if.next->stmt_else.body);
+		} else unreachable;
+
+		da_append(&func->body, ((Instruction){
+			.op = OP_LABEL,
+			.arg1 = (Operand) {
+				.type = OPR_LABEL,
+				.label_index = lbl_ex,
+			},
+		}));
+	}
+}
+
 void ir_gen_body(Func *func, AST_Node *fn) {
 	for (size_t i = 0; i < fn->body.stmts.count; i++) {
 		AST_Node *cn = da_get(&fn->body.stmts, i);
@@ -390,27 +443,7 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 			} break;
 
 			case AST_IF_STMT: {
-				Operand res = ir_gen_expr(func, cn->stmt_if.exp);
-				size_t lbl = label_index++;
-
-				da_append(&func->body, ((Instruction){
-					.op = OP_JUMP_IF_NOT,
-					.arg1 = res,
-					.dst = (Operand) {
-						.type = OPR_LABEL,
-						.label_index = lbl,
-					},
-				}));
-
-				ir_gen_body(func, cn->stmt_if.body);
-
-				da_append(&func->body, ((Instruction){
-					.op = OP_LABEL,
-					.arg1 = (Operand) {
-						.type = OPR_LABEL,
-						.label_index = lbl,
-					},
-				}));
+				ir_gen_if_chain(func, cn);
 			} break;
 
 			case AST_LOOP_BREAK:

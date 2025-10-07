@@ -252,6 +252,7 @@ Lexer lexer_lex(char *file, char *code) {
 				else if   (is_tok(&lexer, "for",     TOK_FOR_SYM, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "while",   TOK_WHILE_SYM, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "if",      TOK_IF_SYM, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "else",    TOK_ELSE_SYM, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "func",    TOK_FUNC, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "struct",  TOK_STRUCT, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "extern",  TOK_EXTERN, lexer.cur_char)) {

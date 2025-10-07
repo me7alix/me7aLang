@@ -105,6 +105,7 @@ typedef enum {
 	AST_STRING, AST_VAR_MUT, AST_FUNC_RET_TYPE,
 	AST_FOR_STMT, AST_UN_OP, AST_BIN_OP, AST_PROG,
 	AST_LOOP_BREAK, AST_LOOP_CONTINUE, AST_UN_EXP,
+	AST_ELSE_STMT,
 } AST_NodeKind;
 
 typedef struct AST_Node AST_Node;
@@ -145,7 +146,11 @@ struct AST_Node {
 		struct {
 			AST_Node *exp;
 			AST_Node *body;
+			AST_Node *next; // chain of if, else if and else
 		} stmt_if;
+		struct {
+			AST_Node *body;
+		} stmt_else;
 		struct {
 			AST_Node *exp;
 			AST_Node *body;

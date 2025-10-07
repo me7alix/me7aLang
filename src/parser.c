@@ -227,6 +227,20 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 	parser_next(p);
 	r->stmt_if.body = parse_body(p, func);
 
+	if (parser_looknext(p)->type == TOK_ELSE_SYM) {
+		parser_next(p);
+		if (parser_looknext(p)->type == TOK_IF_SYM) {
+			parser_next(p);
+			r->stmt_if.next = parse_if_stmt(p, func);
+		} else {
+			r->stmt_if.next = ast_new({
+				.kind = AST_ELSE_STMT,
+				.loc = parser_next(p)->loc,
+			});
+			r->stmt_if.next->stmt_else.body = parse_body(p, func);
+		}
+	} else r->stmt_if.next = NULL;
+
 	return r;
 }
 
