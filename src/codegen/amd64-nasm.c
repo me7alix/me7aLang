@@ -172,6 +172,11 @@ void type_to_reg(Type type, char *arg1, char *arg2) {
 }
 
 void reg_alloc(Instruction inst, char *arg1, char *arg2) {
+	if (inst.dst.type == OPR_LABEL) {
+		type_to_reg((Type){.kind = TYPE_BOOL}, arg1, arg2);
+		return;
+	}
+
 	Type type = inst.dst.var.type;
 	if (type.kind == TYPE_BOOL) {
 		switch (inst.arg1.type) {
@@ -376,7 +381,9 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			} break;
 
 			case OP_JUMP_IF_NOT: {
-				sb_append_strf(&body, TAB"cmp %s, 0\n", opr_to_nasm(ci.arg1));
+				reg_alloc(ci, arg1, arg2);
+				sb_append_strf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
+				sb_append_strf(&body, TAB"cmp %s, 0\n", arg1);
 				sb_append_strf(&body, TAB"je %s\n", opr_to_nasm(ci.dst));
 			} break;
 

@@ -66,7 +66,7 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 					.type = l.literal.type.kind,
 				},
 			};
-		default: unreachable;
+		default: goto fail;
 	}
 
 fail:

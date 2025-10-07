@@ -290,6 +290,7 @@ AST_Node *parse_body(Parser *p, AST_Node *func) {
 	AST_Node *body = ast_new({.kind = AST_BODY});
 	int br_cnt = 0;
 
+	expect_token(parser_peek(p), TOK_OBRA);
 	while (true) {
 		switch (parser_peek(p)->type) {
 			case TOK_OBRA: {
