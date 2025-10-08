@@ -12,7 +12,6 @@ typedef struct {
 
 da(Macro) macros;
 da(char *) imported;
-bool is_imported;
 StringBuilder path = {0};
 
 #ifdef __linux__
@@ -25,8 +24,8 @@ int pathcmp(const char *a, const char *b) {
 #endif
 
 bool check_path() {
-	for (size_t i = 0; i < imported.count; i++) {
-		if (pathcmp(path.str, da_get(&imported, i))) {
+	da_foreach(char *, imp, &imported) {
+		if (pathcmp(path.str, *imp)) {
 			return true;
 		}
 	}
@@ -34,21 +33,22 @@ bool check_path() {
 	return false;
 }
 
-Lexer *pp_get_src(Imports *imports, char *file) {
+Lexer *get_lexer(Imports *imports, char *file, bool *is_imported) {
 	for (size_t i = 0; i < imports->count; i++) {
 		sb_reset(&path);
 		sb_append_strf(&path, "%s/%s", da_get(imports, i), file);
+
 		char *code = read_file(sb_to_str(path));
 		if (code) {
-			Lexer *lexer = malloc(sizeof(Lexer));
-			*lexer = lexer_lex((char *) sb_to_str(path), code);
 			if (check_path()) {
-				is_imported = true;
+				*is_imported = true;
 				return NULL;
 			}
 
-			da_append(&imported, (char *) sb_to_str(path));
-			is_imported = false;
+			Lexer *lexer = malloc(sizeof(Lexer));
+			*lexer = lexer_lex((char *) sb_to_str(path), code);
+
+			*is_imported = false;
 			return lexer;
 		}
 	}
@@ -71,6 +71,7 @@ void get_path(char *dst, const char *file) {
 void preprocessor(Imports *imports, Lexer *entry) {
 	char cur_path[256]; get_path(cur_path, entry->cur_loc.file);
 	da_get(imports, 0) = cur_path;
+	da_append(&imported, (char *) sb_to_str(path));
 
 	for (size_t i = 0; i < entry->tokens.count; i++) {
 		switch (da_get(&entry->tokens, i).type) {
@@ -79,7 +80,8 @@ void preprocessor(Imports *imports, Lexer *entry) {
 				if (da_get(&entry->tokens, i).type != TOK_STRING)
 					lexer_error(da_get(&entry->tokens, i).loc, "preprocessor error: filepath expected");
 
-				Lexer *imp = pp_get_src(imports, da_get(&entry->tokens, i).data);
+				bool is_imported;
+				Lexer *imp = get_lexer(imports, da_get(&entry->tokens, i).data, &is_imported);
 				if (!imp && !is_imported)
 					lexer_error(da_get(&entry->tokens, i).loc, "preprocessor error: no such file");
 

@@ -33,7 +33,7 @@ void parser_symbols_add(Parser *p, Symbol smbl) {
 				break;
 			}
 
-			lexer_error(parser_peek(p)->loc, "parser error: redifinition of the symbol");
+			lexer_error(parser_peek(p)->loc, "error: redifinition of the symbol");
 		}
 	}
 
@@ -54,6 +54,30 @@ Symbol *parser_symbols_get(Parser *p, const char *id) {
 	}
 
 	return NULL;
+}
+
+Type parser_get_type(Parser *p, AST_Node *n) {
+	switch (n->kind) {
+		case AST_BIN_EXP: return n->exp_binary.type;
+		case AST_UN_EXP:  return n->exp_unary.type;
+		case AST_LITERAL: return n->literal.type;
+		case AST_VAR: {
+			Symbol *var_smbl = parser_symbols_get(p, n->var_id);
+			return var_smbl->variable.type;
+		} break;
+		default: unreachable;
+	}
+}
+
+bool compare_types(Type a, Type b) {
+	if (a.kind != b.kind) return false;
+	if (is_pointer(a) && is_pointer(b)) {
+		if (get_pointer_base(a)->kind != get_pointer_base(b)->kind &&
+			!(get_pointer_base(a)->kind == TYPE_NULL || get_pointer_base(b)->kind == TYPE_NULL)) {
+			return false;
+		}
+	}
+	return true;
 }
 
 Token *parser_peek(Parser *p) { return p->cur_token; }
@@ -97,7 +121,7 @@ Type parse_type(Parser *p) {
 		type.kind = TYPE_IPTR;
 	} else if (strcmp(type_name, "u0") == 0) {
 		type.kind = TYPE_NULL;
-	} else lexer_error(loc, "parser error: no such type");
+	} else lexer_error(loc, "error: no such type");
 
 	if (is_pointer) {
 		Type *base = malloc(sizeof(Type)); *base = type;
@@ -120,7 +144,7 @@ void expect_token(Token *token, TokenType type) {
 	if (token->type == type) return;
 
 	char err[256];
-	sprintf(err, "parser error: unexpected token");
+	sprintf(err, "error: unexpected token");
 	lexer_error(token->loc, err);
 	exit(1);
 }
@@ -406,12 +430,40 @@ AST_Node *parse_function(Parser *p) {
 		.type = SBL_FUNC_DEF,
 		.id = fdn->func_def.id,
 		.func_def.type = fdn->func_def.type,
+		.func_def.is_def = true,
 	};
 
 	for (size_t i = 0; i < fdn->func_def.args.count; i++)
 		da_append(&fds.func_def.args, da_get(&fdn->func_def.args, i));
 
-	parser_symbols_add(p, fds);
+	Symbol *fdsc = parser_symbols_get(p, fdn->func_def.id);
+	if (fdsc) {
+		if (fdsc->type == SBL_VAR) goto ex;
+		if (fdsc->type == SBL_FUNC_EXTERN)
+			lexer_error(fdn->loc, "error: the symbol is already in use");
+		if (fdsc->func_def.is_def)
+			lexer_error(fdn->loc, "error: function redefinition");
+		if (!compare_types(fdsc->func_def.type, fds.func_def.type))
+			lexer_error(fdn->loc, "error: wrong function return type in the function declaration");
+		if (fdsc->func_def.args.count != fds.func_def.args.count)
+			lexer_error(fdn->loc, "error: wrong number of arguments in the function declaration");
+		for (size_t i = 0; i < fds.func_def.args.count; i++) {
+			Type l = fds.func_def.args.items[i]->func_def_arg.type;
+			Type r = fdsc->func_def.args.items[i]->func_def_arg.type;
+			if (!compare_types(l, r))
+				lexer_error(fdn->loc, "error: wrong type in the function declaration");
+		}
+
+		fdsc->func_def.is_def = true;
+	} else {
+		if (parser_peek(p)->type == TOK_SEMI) {
+			fds.func_def.is_def = false;
+			parser_symbols_add(p, fds);
+			return NULL;
+		} else parser_symbols_add(p, fds);
+	}
+
+ex:
 	fdn->func_def.body = parse_body(p, fdn);
 	nested_uniq++;
 	return fdn;
@@ -421,6 +473,7 @@ void parse_extern(Parser *p) {
 	parser_next(p);
 
 	expect_token(parser_peek(p), TOK_ID);
+	Location loc = parser_peek(p)->loc;
 	char *extern_smb = parser_peek(p)->data;
 
 	if (parser_peek(p)[1].type == TOK_ID) {
@@ -447,6 +500,11 @@ void parse_extern(Parser *p) {
 		fes.func_extern.type = (Type) {.kind = TYPE_NULL};
 	}
 
+	Symbol *smbl = parser_symbols_get(p, fes.id);
+	if (smbl) if (smbl->type == SBL_FUNC_DEF || smbl->type == SBL_FUNC_EXTERN) {
+		lexer_error(loc, "error: the symbol is already in use used");
+	}
+
 	parser_symbols_add(p, fes);
 	expect_token(parser_peek(p), TOK_SEMI);
 	nested_uniq++;
@@ -458,11 +516,12 @@ Parser parser_parse(Token *tokens) {
 	p.program = prog;
 	p.cur_token = tokens;
 
-	while (p.cur_token->type != TOK_EOF) {
-		switch (p.cur_token->type) {
-			case TOK_FUNC:
-				da_append(&prog->program.stmts, parse_function(&p));
-				break;
+	while (parser_peek(&p)->type != TOK_EOF) {
+		switch (parser_peek(&p)->type) {
+			case TOK_FUNC: {
+				AST_Node *func = parse_function(&p);
+				if (func) da_append(&prog->program.stmts, func);
+			} break;
 
 			case TOK_EXTERN:
 				parse_extern(&p);
@@ -478,10 +537,10 @@ Parser parser_parse(Token *tokens) {
 					parser_next(&p);
 				break;
 
-			default: printf("%s\n", parser_peek(&p)->data); unreachable;
+			default: unreachable;
 		}
 
-		p.cur_token++;
+		parser_next(&p);
 	}
 
 	return p;

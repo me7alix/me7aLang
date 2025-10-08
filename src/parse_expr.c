@@ -59,7 +59,7 @@ AST_Node *parse_func_call(Parser *p) {
 	parser_next(p);
 
 	Symbol *fc = parser_symbols_get(p, fcn->func_call.id);
-	if (!fc) lexer_error(fcn->loc, "parser error: calling an undeclared function");
+	if (!fc) lexer_error(fcn->loc, "error: calling an undeclared function");
 
 	AST_Nodes fargs;
 	switch (fc->type) {
@@ -79,35 +79,19 @@ AST_Node *parse_func_call(Parser *p) {
 
 	size_t arg_cnt = 0;
 	while (parser_peek(p)->type != TOK_CPAR) {
-		if (arg_cnt + 1 > fargs.count) lexer_error(fcn->loc, "parser error: wrong amount of arguments");
+		if (arg_cnt + 1 > fargs.count) lexer_error(fcn->loc, "error: wrong number of arguments");
 		Type farg_type = fargs.items[arg_cnt++]->func_def_arg.type;
 		AST_Node *expr = parse_expr(p, EXPR_PARSING_FUNC_CALL, &farg_type);
-		Type expr_type;
+		Type expr_type = parser_get_type(p, expr);
 
-		switch (expr->kind) {
-			case AST_BIN_EXP: expr_type = expr->exp_binary.type; break;
-			case AST_UN_EXP:  expr_type = expr->exp_unary.type;  break;
-			case AST_LITERAL: expr_type = expr->literal.type;    break;
-			case AST_VAR: {
-				Symbol *var_smbl = parser_symbols_get(p, expr->var_id);
-				expr_type = var_smbl->variable.type;
-			} break;
-			default: unreachable;
-		}
-
-		if (expr_type.kind != farg_type.kind) lexer_error(expr->loc, "parser error: wrong type");
-		if (is_pointer(expr_type) && is_pointer(farg_type)) {
-			if (get_pointer_base(expr_type)->kind != get_pointer_base(farg_type)->kind &&
-				!(get_pointer_base(expr_type)->kind == TYPE_NULL || get_pointer_base(farg_type)->kind == TYPE_NULL)) {
-				lexer_error(expr->loc, "parser error: wrong type");
-			}
-		}
+		if (!compare_types(expr_type, farg_type))
+			lexer_error(expr->loc, "error: wrong type");
 
 		da_append(&fcn->func_call.args, expr);
 		parser_next(p);
 	}
 
-	if (arg_cnt < fargs.count) lexer_error(fcn->loc, "parser error: wrong amount of arguments");
+	if (arg_cnt < fargs.count) lexer_error(fcn->loc, "error: wrong number of arguments");
 	parser_next(p);
 	return fcn;
 }
@@ -144,7 +128,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 			}
 
 			if (l_cost > r_cost) is_lelf = true;
-			if (l_cost < -500 && r_cost < -500) lexer_error(da_get(nodes, i)->loc, "parser error: wrong expression");
+			if (l_cost < -500 && r_cost < -500) lexer_error(da_get(nodes, i)->loc, "error: wrong expression");
 
 			if (is_lelf) {
 				switch (da_get(nodes, i-1)->kind) {
@@ -166,7 +150,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 	}
 
 	if (nodes->count == cur_count)
-		lexer_error(da_get(nodes, 0)->loc, "parser error: wrong expression");
+		lexer_error(da_get(nodes, 0)->loc, "error: wrong expression");
 	return expr_expand(nodes);
 }
 
@@ -215,15 +199,8 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 					.kind = TYPE_POINTER,
 					.pointer.base = get_pointer_base(ptr_type)
 				};
-			} else if (lt.kind != rt.kind) {
-				lexer_error(expr->loc, "parser error: operation on different types");
-			}
-
-			if (is_pointer(lt) && is_pointer(rt)) {
-				if (get_pointer_base(lt)->kind != get_pointer_base(rt)->kind &&
-					!(get_pointer_base(lt)->kind == TYPE_NULL || get_pointer_base(rt)->kind == TYPE_NULL)) {
-					lexer_error(expr->loc, "parser error: operation on different types");
-				}
+			} else if (!compare_types(lt, rt)) {
+				lexer_error(expr->loc, "error: operation on different types");
 			}
 
 			switch (expr->exp_binary.op) {
@@ -254,7 +231,7 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 				case AST_OP_DEREF: {
 					Type vt = expr_calc_types(parser, expr->exp_unary.v, vart);
 					expr->exp_unary.type = vt;
-					if (!is_pointer(vt)) lexer_error(expr->exp_unary.v->loc, "parser error: pointer expected");
+					if (!is_pointer(vt)) lexer_error(expr->exp_unary.v->loc, "error: pointer expected");
 					expr->exp_unary.type = *vt.pointer.base;
 				} break;
 
@@ -301,7 +278,7 @@ AST_ExprOp tok_to_unary_expr_op(Token *tok) {
 		case TOK_EXC:       return AST_OP_NOT;
 		case TOK_MINUS:     return AST_OP_NEG;
 		default:
-			lexer_error(tok->loc, "parser error: wrong operation");
+			lexer_error(tok->loc, "error: wrong operation");
 			return 0;
 	};
 }
@@ -340,8 +317,12 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 		switch (parser_peek(p)->type) {
 			case TOK_ID:
 				if ((parser_peek(p)+1)->type != TOK_OPAR) {
-					if (!parser_symbols_get(p, parser_peek(p)->data))
-						lexer_error(parser_peek(p)->loc, "parser error: no such variable in the scope");
+					Symbol *var = parser_symbols_get(p, parser_peek(p)->data);
+					if (!var)
+						lexer_error(parser_peek(p)->loc, "error: no such variable in the scope");
+					if (var->type != SBL_VAR)
+						lexer_error(parser_peek(p)->loc, "error: no such variable in the scope");
+
 					da_append(&nodes, ast_new({
 						.kind = AST_VAR,
 						.loc = parser_peek(p)->loc,
@@ -474,7 +455,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				} else {
 					if (da_last(&nodes)->kind == AST_UN_EXP)
 						lexer_error(parser_peek(p)->loc,
-				  "parser error: invalid operator combination\n"
+				  "error: invalid operator combination\n"
 				  "hint: try to use parenthesis");
 
 					bool is_bin_op = da_last(&nodes)->kind == AST_BIN_EXP;
@@ -502,7 +483,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				}
 			} break;
 
-			default: lexer_error(parser_peek(p)->loc, "parser error: unexpected token");
+			default: lexer_error(parser_peek(p)->loc, "error: unexpected token");
 		}
 
 		parser_next(p);

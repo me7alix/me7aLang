@@ -19,7 +19,7 @@ Operand ir_opr_calc(AST_Node *en, Operand l, Operand r, bool *ret) {
 			case AST_OP_SUB: res = lv - rv; break;
 			case AST_OP_MUL: res = lv * rv; break;
 			case AST_OP_DIV:
-				if (rv == 0) lexer_error(en->loc, "irgen error: division by zero");
+				if (rv == 0) lexer_error(en->loc, "error: division by zero");
 				res = lv / rv; break;
 			default: goto fail;
 		}

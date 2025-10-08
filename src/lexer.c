@@ -220,7 +220,7 @@ Lexer lexer_lex(char *file, char *code) {
 					while (!(lexer.cur_char[1] == '\"' && *lexer.cur_char != '\\')) {
 						if (*(lexer.cur_char++) == '\0') {
 							lexer.cur_char = lmark;
-							lexer_error(lexer.cur_loc, "lexer error: unclosed string");
+							lexer_error(lexer.cur_loc, "error: unclosed string");
 						}
 					}
 
@@ -237,7 +237,7 @@ Lexer lexer_lex(char *file, char *code) {
 						lexer.cur_char++;
 						if      (*lexer.cur_char == 'n') add_token(&lexer, TOK_CHAR, "\n");
 						else if (*lexer.cur_char == '0') add_token(&lexer, TOK_CHAR, "\0");
-						else lexer_error(lexer.cur_loc, "lexer error: wrong character");
+						else lexer_error(lexer.cur_loc, "error: wrong character");
 						lexer.cur_char++;
 					} else {
 						add_token(&lexer, TOK_CHAR, lexer.cur_char);
@@ -245,7 +245,7 @@ Lexer lexer_lex(char *file, char *code) {
 					}
 
 					if (*lexer.cur_char != '\'') {
-						lexer_error(lexer.cur_loc, "lexer error: ' expected");
+						lexer_error(lexer.cur_loc, "error: ' expected");
 					}
 				}
 
@@ -267,7 +267,7 @@ Lexer lexer_lex(char *file, char *code) {
 				} else if (is_tok(&lexer, "macro",   TOK_MACRO, lexer.cur_char)) {
 				} else if (isalpha(*lexer.cur_char)) add_token(&lexer, TOK_ID, get_word(&lexer));
 
-				else lexer_error(lexer.cur_loc, "lexer error: unknown token");
+				else lexer_error(lexer.cur_loc, "error: unknown token");
 			} break;
 		}
 

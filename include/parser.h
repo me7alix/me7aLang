@@ -100,7 +100,7 @@ typedef enum {
 typedef enum {
 	AST_WHILE_STMT, AST_IF_STMT, AST_BIN_EXP,
 	AST_VAR_DEF, AST_VAR, AST_LITERAL, AST_TYPE,
-	AST_FUNC_CALL_ARG,AST_FUNC_CALL, AST_BODY,
+	AST_FUNC_CALL_ARG, AST_FUNC_CALL, AST_BODY,
 	AST_FUNC_DEF, AST_FUNC_DEF_ARG, AST_FUNC_RET,
 	AST_STRING, AST_VAR_MUT, AST_FUNC_RET_TYPE,
 	AST_FOR_STMT, AST_UN_OP, AST_BIN_OP, AST_PROG,
@@ -200,6 +200,7 @@ typedef struct {
 		struct {
 			AST_Nodes args;
 			Type type;
+			bool is_def;
 		} func_def;
 		struct {
 			AST_Nodes args;
@@ -224,6 +225,8 @@ typedef struct {
 Type parse_type(Parser *parser);
 void parser_symbols_add(Parser *parser, Symbol smbl);
 Symbol *parser_symbols_get(Parser *p, const char *id);
+Type parser_get_type(Parser *p, AST_Node *n);
+bool compare_types(Type a, Type b);
 
 Token *parser_peek(Parser *p);
 Token *parser_looknext(Parser *p);
