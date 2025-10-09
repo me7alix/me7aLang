@@ -58,23 +58,18 @@ AST_Node *parse_func_call(Parser *p) {
 	expect_token(parser_peek(p), TOK_OPAR);
 	parser_next(p);
 
-	Symbol *fc = parser_symbols_get(p, fcn->func_call.id);
-	if (!fc) lexer_error(fcn->loc, "error: calling an undeclared function");
+	Symbol *fc_f = parser_symbol_table_get(p, SBL_FUNC_DEF, fcn->func_call.id);
+	Symbol *fc_e = parser_symbol_table_get(p, SBL_FUNC_EXTERN, fcn->func_call.id);
+	if (!fc_f && !fc_e) lexer_error(fcn->loc, "error: calling an undeclared function");
 
 	AST_Nodes fargs;
-	switch (fc->type) {
-		case SBL_FUNC_DEF:
-			fcn->func_call.type = fc->func_def.type;
-			fargs = fc->func_def.args;
-			break;
-
-		case SBL_FUNC_EXTERN:
-			fcn->func_call.type = fc->func_extern.type;
-			fcn->func_call.id = fc->func_extern.extern_smb;
-			fargs = fc->func_extern.args;
-			break;
-
-		default: unreachable;
+	if (fc_f) {
+		fcn->func_call.type = fc_f->func_def.type;
+		fargs = fc_f->func_def.args;
+	} else if (fc_e) {
+		fcn->func_call.type = fc_e->func_extern.type;
+		fcn->func_call.id = fc_e->func_extern.extern_smb;
+		fargs = fc_e->func_extern.args;
 	}
 
 	size_t arg_cnt = 0;
@@ -156,7 +151,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 
 Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 	switch (expr->kind) {
-		case AST_VAR: return parser_symbols_get(parser, expr->var_id)->variable.type;
+		case AST_VAR: return parser_symbol_table_get(parser, SBL_VAR, expr->var_id)->variable.type;
 		case AST_FUNC_CALL: return expr->func_call.type;
 
 		case AST_LITERAL: {
@@ -171,6 +166,7 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 					case LIT_CHAR:  expr->literal.type = (Type) {.kind = TYPE_I8}; break;
 					case LIT_FLOAT: expr->literal.type = (Type) {.kind = TYPE_F32}; break;
 					case LIT_BOOL:  expr->literal.type = (Type) {.kind = TYPE_BOOL}; break;
+					//case LIT_STR:   expr->literal.type = (Type) {.kind = TYPE_POINTER, .pointer.base = }; break;
 				}
 			}
 
@@ -317,11 +313,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 		switch (parser_peek(p)->type) {
 			case TOK_ID:
 				if ((parser_peek(p)+1)->type != TOK_OPAR) {
-					Symbol *var = parser_symbols_get(p, parser_peek(p)->data);
-					if (!var)
-						lexer_error(parser_peek(p)->loc, "error: no such variable in the scope");
-					if (var->type != SBL_VAR)
-						lexer_error(parser_peek(p)->loc, "error: no such variable in the scope");
+					Symbol *var = parser_symbol_table_get(p, SBL_VAR, parser_peek(p)->data);
+					if (!var) lexer_error(parser_peek(p)->loc, "error: no such variable in the scope");
 
 					da_append(&nodes, ast_new({
 						.kind = AST_VAR,
@@ -403,7 +396,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				if (parser_looknext(p)->type == TOK_COL) {
 					da_append(&nodes, ast_new({
 						.kind = AST_UN_EXP,
-						.loc = parser_peek(p)->loc,
+							.loc = parser_peek(p)->loc,
 						.exp_unary.op = tok_to_unary_expr_op(parser_next(p)),
 						.exp_unary.type = (Type) {.kind = TYPE_IPTR},
 						.exp_unary.v = ast_new({

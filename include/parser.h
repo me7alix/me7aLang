@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <assert.h>
 
+#include "../thirdparty/ht.h"
 #include "../thirdparty/da.h"
 #include "../include/lexer.h"
 
@@ -53,6 +54,7 @@ typedef enum {
 	LIT_CHAR,
 	LIT_FLOAT,
 	LIT_BOOL,
+	LIT_STR,
 } LiteralKind;
 
 typedef struct {
@@ -63,6 +65,7 @@ typedef struct {
 		int64_t lint;
 		double lfloat;
 		uint8_t lbool;
+		char *str;
 	};
 } Literal;
 
@@ -192,10 +195,7 @@ typedef enum {
 } SymbolType;
 
 typedef struct {
-	SymbolType type;
-	char *id;
 	int nested[16];
-
 	union {
 		struct {
 			AST_Nodes args;
@@ -213,18 +213,21 @@ typedef struct {
 	};
 } Symbol;
 
-typedef da(Symbol) SymbolTable;
+
+typedef struct { SymbolType type; char *id; int *nested; } SymbolKey;
+HT_DECL(SymbolTable, SymbolKey, Symbol)
 
 typedef struct {
 	Token *cur_token;
-	SymbolTable symbols;
+	SymbolTable st;
 	int nested[16], nptr;
 	AST_Node *program;
 } Parser;
 
+void parser_symbol_table_add(Parser *p, SymbolType st, char *id, Symbol smbl);
+Symbol *parser_symbol_table_get(Parser *p, SymbolType st, char *id);
+
 Type parse_type(Parser *parser);
-void parser_symbols_add(Parser *parser, Symbol smbl);
-Symbol *parser_symbols_get(Parser *p, const char *id);
 Type parser_get_type(Parser *p, AST_Node *n);
 bool compare_types(Type a, Type b);
 

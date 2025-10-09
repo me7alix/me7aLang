@@ -1,17 +1,17 @@
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
 
+#include "../thirdparty/ht.h"
 #include "../thirdparty/sb.h"
 #include "../include/preprocessor.h"
 
-typedef struct {
-	char *id;
-	da(Token) changeto;
-} Macro;
-
-da(Macro) macros;
-da(char *) imported;
+typedef da(Token) Macro;
+HT(ImportedTable, char*, bool)
+HT_STR(MacroTable, Macro)
+ImportedTable it   = {0};
+MacroTable mt      = {0};
 StringBuilder path = {0};
 
 #ifdef __linux__
@@ -21,17 +21,21 @@ int pathcmp(const char *a, const char *b) {
 		return 0;
 	return strcmp(ra, rb) == 0;
 }
-#endif
 
-bool check_path() {
-	da_foreach(char *, imp, &imported) {
-		if (pathcmp(path.str, *imp)) {
-			return true;
-		}
-	}
-
-	return false;
+uint64_t ImportedTable_hashf(char *str) {
+	char ra[512];
+	char *path = realpath(str, ra);
+	uint64_t res; strhash(&res, path);
+	return res;
 }
+
+int ImportedTable_compare(char *cur_str, char *str) {
+	char ra[512];
+	char *p = realpath(str, ra);
+	uint64_t res; strhash(&res, p);
+	return res;
+}
+#endif
 
 Lexer *get_lexer(Imports *imports, char *file, bool *is_imported) {
 	for (size_t i = 0; i < imports->count; i++) {
@@ -40,7 +44,7 @@ Lexer *get_lexer(Imports *imports, char *file, bool *is_imported) {
 
 		char *code = read_file(sb_to_str(path));
 		if (code) {
-			if (check_path()) {
+			if (ImportedTable_get(&it, path.str)) {
 				*is_imported = true;
 				return NULL;
 			}
@@ -71,7 +75,7 @@ void get_path(char *dst, const char *file) {
 void preprocessor(Imports *imports, Lexer *entry) {
 	char cur_path[256]; get_path(cur_path, entry->cur_loc.file);
 	da_get(imports, 0) = cur_path;
-	da_append(&imported, (char *) sb_to_str(path));
+	ImportedTable_add(&it, strdup(cur_path), true);
 
 	for (size_t i = 0; i < entry->tokens.count; i++) {
 		switch (da_get(&entry->tokens, i).type) {
@@ -105,29 +109,26 @@ void preprocessor(Imports *imports, Lexer *entry) {
 				i++;
 				if (da_get(&entry->tokens, i).type != TOK_ID)
 					lexer_error(da_get(&entry->tokens, i).loc, "preprocessor error: identifier expected");
-				Macro macro = {.id = da_get(&entry->tokens, i).data};
+				char *macro_id = da_get(&entry->tokens, i).data;
+				Macro macro = {0};
 
 				i++;
 				for (size_t j = 0; da_get(&entry->tokens, i).type != TOK_SEMI; j++) {
-					da_append(&macro.changeto, da_get(&entry->tokens, i));
+					da_append(&macro, da_get(&entry->tokens, i));
 					i++;
 				}
 
-				da_append(&macros, macro);
+				MacroTable_add(&mt, macro_id, macro);
 			} break;
 
 			case TOK_ID: {
-				da_foreach(Macro, macro, &macros) {
-					if (strcmp(macro->id, da_get(&entry->tokens, i).data) == 0) {
-						da_remove_ordered(&entry->tokens, i);
+				Macro *macro = MacroTable_get(&mt, da_get(&entry->tokens, i).data);
+				if (!macro) break;
+				da_remove_ordered(&entry->tokens, i);
 
-						for (size_t j = 0; j < macro->changeto.count; j++) {
-							da_insert(&entry->tokens, i, da_get(&macro->changeto, j));
-							i++;
-						}
-
-						break;
-					}
+				for (size_t j = 0; j < macro->count; j++) {
+					da_insert(&entry->tokens, i, da_get(macro, j));
+					i++;
 				}
 			} break;
 

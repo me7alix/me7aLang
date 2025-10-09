@@ -12,37 +12,8 @@
 int64_t var_index = 0;
 size_t label_index = 0;
 
-typedef struct {
-	char *name;
-	Type type;
-	bool is_mem_addr;
-	int64_t index;
-} Variable;
-
-da(Variable) vt = {0};
-
-void vt_add(Variable var) {
-	da_append(&vt, var);
-}
-
-Variable vt_get(char *name) {
-	for (int i = vt.count - 1; i >= 0; i--) {
-		Variable cv = da_get(&vt, i);
-		if (strcmp(cv.name, name) == 0) {
-			return cv;
-		}
-	}
-
-	return (Variable) {0};
-}
-
-void vt_set(char *name, size_t index) {
-	for (int i = vt.count - 1; i >= 0; i--) {
-		if (strcmp(da_get(&vt, i).name, name) == 0) {
-			da_get(&vt, i).index = index;
-		}
-	}
-}
+HT_STR(ASTVarTable, Operand)
+ASTVarTable avt = {0};
 
 Type iptr = {.kind = TYPE_IPTR};
 Type *ir_get_opr_type(Operand *op) {
@@ -76,13 +47,8 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 		};
 
 		case AST_VAR: {
-			Variable v = vt_get(en->var_id);
 			last_var = -1;
-			return (Operand) {
-				.type = OPR_VAR,
-				.var.type = v.type,
-				.var.index = v.index,
-			};
+			return *ASTVarTable_get(&avt, en->var_id);
 		} break;
 
 		case AST_FUNC_CALL: {
@@ -199,7 +165,7 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 				Operand ret = (Operand) {
 					.type = OPR_VAR,
 					.var.type = en->exp_unary.type,
-					.var.is_mem_addr = true,
+					.var.vt = VAR_ADDR,
 					.var.index = arg1.var.index,
 				};
 
@@ -275,16 +241,18 @@ void ir_gen_var_def(Func *func, AST_Node *cn) {
 			},
 		}));
 
-		vt_add((Variable){
-			.name = cn->var_def.id,
-			.type = cn->var_def.type,
-			.index = var_index++,
+		ASTVarTable_add(&avt, cn->var_def.id, (Operand) {
+			.type = OPR_VAR,
+			.var.type = cn->var_def.type,
+			.var.vt = VAR_STACK,
+			.var.index = var_index++
 		});
 	} else {
-		vt_add((Variable){
-			.name = cn->var_def.id,
-			.type = cn->var_def.type,
-			.index = last_var,
+		ASTVarTable_add(&avt, cn->var_def.id, (Operand) {
+			.type = OPR_VAR,
+			.var.type = cn->var_def.type,
+			.var.vt = VAR_STACK,
+			.var.index = last_var,
 		});
 	}
 }
@@ -575,8 +543,9 @@ void ir_gen_body(Func *func, AST_Node *fn) {
 }
 
 void ir_gen_func(Program *prog, AST_Node *fn) {
-	da_resize(&vt, 0);
 	Func func = {.name = fn->func_def.id, .ret_type = fn->func_def.type};
+	ASTVarTable_free(&avt);
+	avt = (ASTVarTable){0};
 
 	for (size_t i = 0; i < fn->func_def.args.count; i++) {
 		AST_Node *cn = da_get(&fn->func_def.args, i);
@@ -593,10 +562,11 @@ void ir_gen_func(Program *prog, AST_Node *fn) {
 				.var.index = var_index,
 			},
 		}));
-		vt_add((Variable) {
-			.type = cn->func_def_arg.type,
-			.index = var_index++,
-			.name = cn->func_def_arg.id,
+		ASTVarTable_add(&avt, cn->func_def_arg.id, (Operand) {
+			.type = OPR_VAR,
+			.var.type = cn->func_def_arg.type,
+			.var.vt = VAR_STACK,
+			.var.index = var_index++
 		});
 	}
 
@@ -608,12 +578,11 @@ Program ir_gen_prog(Parser *p) {
 	Program prog = {0};
 	label_index = 0;
 
-	for (size_t i = 0; i < p->symbols.count; i++) {
-		Symbol cs = da_get(&p->symbols, i);
-		if (cs.type == SBL_FUNC_EXTERN) {
+	HT_FOREACH_NODE(SymbolTable, &p->st, n) {
+		if (n->key.type == SBL_FUNC_EXTERN) {
 			da_append(&prog.externs, ((Extern){
-				.name = cs.func_extern.extern_smb,
-				.ret_type = cs.func_extern.type,
+				.name = n->val.func_extern.extern_smb,
+				.ret_type = n->val.func_extern.type,
 			}));
 		}
 	}

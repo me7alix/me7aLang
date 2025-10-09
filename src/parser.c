@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/types.h>
 
 #include "../include/parser.h"
 
@@ -25,35 +26,26 @@ void set_nested(int pn[16], int n[16]) {
 	memcpy(n, pn, 16 * sizeof(int));
 }
 
-void parser_symbols_add(Parser *p, Symbol smbl) {
-	for (int i = p->symbols.count - 1; i >= 0; i--) {
-		if (strcmp(da_get(&p->symbols, i).id, smbl.id) == 0) {
-			bool nst = check_nested(p->nested, da_get(&p->symbols, i).nested);
-			if (da_get(&p->symbols, i).type == SBL_VAR && !nst) {
-				break;
-			}
+HT_IMPL(SymbolTable, SymbolKey, Symbol)
 
-			lexer_error(parser_peek(p)->loc, "error: redifinition of the symbol");
-		}
-	}
-
-	set_nested(p->nested, smbl.nested);
-	da_append(&p->symbols, smbl);
+uint64_t SymbolTable_hashf(SymbolKey key) {
+	uint64_t res; strhash(&res, key.id);
+	res = hash_combine(res, numhash(key.type));
+	return res;
 }
 
-Symbol *parser_symbols_get(Parser *p, const char *id) {
-	for (int i = p->symbols.count - 1; i >= 0; i--) {
-		if (strcmp(da_get(&p->symbols, i).id, id) == 0) {
-			bool nst = check_nested(p->nested, da_get(&p->symbols, i).nested);
-			if (da_get(&p->symbols, i).type == SBL_VAR && !nst) {
-				break;
-			}
+int SymbolTable_compare(SymbolKey cur_key, SymbolKey key) {
+	if (key.type == SBL_VAR && check_nested(key.nested, cur_key.nested) && strcmp(key.id, cur_key.id) == 0) return 0;
+	return !(strcmp(key.id, cur_key.id) == 0 && key.type == cur_key.type);
+}
 
-			return &da_get(&p->symbols, i);
-		}
-	}
+void parser_symbol_table_add(Parser *p, SymbolType st, char *id, Symbol smbl) {
+	set_nested(p->nested, smbl.nested);
+	SymbolTable_add(&p->st, (SymbolKey) { st, id, smbl.nested }, smbl);
+}
 
-	return NULL;
+Symbol *parser_symbol_table_get(Parser *p, SymbolType st, char *id) {
+	return SymbolTable_get(&p->st, (SymbolKey) { st, id, p->nested });
 }
 
 Type parser_get_type(Parser *p, AST_Node *n) {
@@ -61,10 +53,7 @@ Type parser_get_type(Parser *p, AST_Node *n) {
 		case AST_BIN_EXP: return n->exp_binary.type;
 		case AST_UN_EXP:  return n->exp_unary.type;
 		case AST_LITERAL: return n->literal.type;
-		case AST_VAR: {
-			Symbol *var_smbl = parser_symbols_get(p, n->var_id);
-			return var_smbl->variable.type;
-		} break;
+		case AST_VAR:     return parser_symbol_table_get(p, SBL_VAR, n->var_id)->variable.type;
 		default: unreachable;
 	}
 }
@@ -168,9 +157,7 @@ AST_Node *parse_var_def(Parser *p) {
 		vdn->var_def.exp = parse_expr(p, EXPR_PARSING_VAR, &type);
 	}
 
-	parser_symbols_add(p, (Symbol) {
-		.type = SBL_VAR,
-		.id = vdn->var_def.id,
+	parser_symbol_table_add(p, SBL_VAR, vdn->var_def.id, (Symbol) {
 		.variable.type = type,
 	});
 
@@ -197,17 +184,14 @@ AST_Node *parse_var_assign(Parser *p) {
 		case AST_UN_EXP:    vdn->var_def.type = exp->exp_unary.type;  break;
 		case AST_LITERAL:   vdn->var_def.type = exp->literal.type;    break;
 		case AST_FUNC_CALL: vdn->var_def.type = exp->func_call.type;  break;
-		case AST_VAR: {
-			Symbol *s = parser_symbols_get(p, exp->var_id);
-			vdn->var_def.type = s->variable.type;
-		} break;
+		case AST_VAR:       vdn->var_def.type = parser_symbol_table_get(p, SBL_VAR ,exp->var_id)->variable.type; break;
 		default: unreachable;
 	}
 
 	assert(vdn->var_def.type.kind);
-	parser_symbols_add(p, (Symbol) {
-		.type = SBL_VAR,
-		.id = vdn->var_def.id,
+	Symbol *vds = parser_symbol_table_get(p, SBL_VAR, vdn->var_def.id);
+	if (vds) lexer_error(vdn->loc, "parser error: redifinition of the variable");
+	parser_symbol_table_add(p, SBL_VAR, vdn->var_def.id, (Symbol) {
 		.variable.type = vdn->var_def.type,
 	});
 
@@ -384,9 +368,7 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 				da_append(fargs, arg);
 
 				nested_push_next(p);
-				parser_symbols_add(p, (Symbol) {
-					.id = arg->func_def_arg.id,
-					.type = SBL_VAR,
+				parser_symbol_table_add(p, SBL_VAR, arg->func_def_arg.id, (Symbol) {
 					.variable.type = arg->func_def_arg.type,
 				});
 				nested_pop(p);
@@ -427,8 +409,6 @@ AST_Node *parse_function(Parser *p) {
 	}
 
 	Symbol fds = {
-		.type = SBL_FUNC_DEF,
-		.id = fdn->func_def.id,
 		.func_def.type = fdn->func_def.type,
 		.func_def.is_def = true,
 	};
@@ -436,34 +416,32 @@ AST_Node *parse_function(Parser *p) {
 	for (size_t i = 0; i < fdn->func_def.args.count; i++)
 		da_append(&fds.func_def.args, da_get(&fdn->func_def.args, i));
 
-	Symbol *fdsc = parser_symbols_get(p, fdn->func_def.id);
-	if (fdsc) {
-		if (fdsc->type == SBL_VAR) goto ex;
-		if (fdsc->type == SBL_FUNC_EXTERN)
-			lexer_error(fdn->loc, "error: the symbol is already in use");
-		if (fdsc->func_def.is_def)
+	Symbol *fdsc_e = parser_symbol_table_get(p, SBL_FUNC_EXTERN, fdn->func_def.id);
+	Symbol *fdsc_f = parser_symbol_table_get(p, SBL_FUNC_DEF, fdn->func_def.id);
+	if (fdsc_e) lexer_error(fdn->loc, "error: the symbol is already in use");
+	if (fdsc_f) {
+		if (fdsc_f->func_def.is_def)
 			lexer_error(fdn->loc, "error: function redefinition");
-		if (!compare_types(fdsc->func_def.type, fds.func_def.type))
+		if (!compare_types(fdsc_f->func_def.type, fds.func_def.type))
 			lexer_error(fdn->loc, "error: wrong function return type in the function declaration");
-		if (fdsc->func_def.args.count != fds.func_def.args.count)
+		if (fdsc_f->func_def.args.count != fds.func_def.args.count)
 			lexer_error(fdn->loc, "error: wrong number of arguments in the function declaration");
 		for (size_t i = 0; i < fds.func_def.args.count; i++) {
 			Type l = fds.func_def.args.items[i]->func_def_arg.type;
-			Type r = fdsc->func_def.args.items[i]->func_def_arg.type;
+			Type r = fdsc_f->func_def.args.items[i]->func_def_arg.type;
 			if (!compare_types(l, r))
 				lexer_error(fdn->loc, "error: wrong type in the function declaration");
 		}
 
-		fdsc->func_def.is_def = true;
+		fdsc_f->func_def.is_def = true;
 	} else {
 		if (parser_peek(p)->type == TOK_SEMI) {
 			fds.func_def.is_def = false;
-			parser_symbols_add(p, fds);
+			parser_symbol_table_add(p, SBL_FUNC_DEF, fdn->func_def.id, fds);
 			return NULL;
-		} else parser_symbols_add(p, fds);
+		} else parser_symbol_table_add(p, SBL_FUNC_DEF, fdn->func_def.id, fds);
 	}
 
-ex:
 	fdn->func_def.body = parse_body(p, fdn);
 	nested_uniq++;
 	return fdn;
@@ -482,11 +460,8 @@ void parse_extern(Parser *p) {
 
 	expect_token(parser_peek(p), TOK_ID);
 
-	Symbol fes = {
-		.type = SBL_FUNC_EXTERN,
-		.id = parser_peek(p)->data,
-		.func_extern.extern_smb = extern_smb,
-	};
+	char *id = parser_peek(p)->data;
+	Symbol fes = { .func_extern.extern_smb = extern_smb };
 
 	parser_next(p);
 	expect_token(parser_next(p), TOK_OPAR);
@@ -500,12 +475,13 @@ void parse_extern(Parser *p) {
 		fes.func_extern.type = (Type) {.kind = TYPE_NULL};
 	}
 
-	Symbol *smbl = parser_symbols_get(p, fes.id);
-	if (smbl) if (smbl->type == SBL_FUNC_DEF || smbl->type == SBL_FUNC_EXTERN) {
+	Symbol *smbl_f = parser_symbol_table_get(p, SBL_FUNC_DEF, id);
+	Symbol *smbl_e = parser_symbol_table_get(p, SBL_FUNC_EXTERN, id);
+	if (smbl_f || smbl_e) {
 		lexer_error(loc, "error: the symbol is already in use used");
 	}
 
-	parser_symbols_add(p, fes);
+	parser_symbol_table_add(p, SBL_FUNC_EXTERN, id, fes);
 	expect_token(parser_peek(p), TOK_SEMI);
 	nested_uniq++;
 }

@@ -34,6 +34,12 @@ typedef enum {
 	OPR_SIZEOF,
 } OperandType;
 
+typedef enum {
+	VAR_STACK,
+	VAR_ADDR,
+	VAR_DATAOFF,
+} VarType;
+
 typedef struct {
 	OperandType type;
 
@@ -54,7 +60,7 @@ typedef struct {
 		} func_inp;
 		struct {
 			Type type;
-			bool is_mem_addr;
+			VarType vt;
 			int64_t index;
 		} var;
 	};

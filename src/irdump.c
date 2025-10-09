@@ -13,8 +13,11 @@ void ir_dump_opr(Operand opr, char *buf) {
 		case OPR_FUNC_RET:  sprintf(buf, "FR:%d", opr.func_ret.type.kind); break;
 		case OPR_NAME:      sprintf(buf, "\"%s\"", opr.name); break;
 		case OPR_VAR: {
-			if (!opr.var.is_mem_addr) sprintf(buf, "(%li):%d", opr.var.index, opr.var.type.kind);
-			else                      sprintf(buf, "[%li]:%d", opr.var.index, opr.var.type.kind);
+			switch (opr.var.vt) {
+				case VAR_STACK:   sprintf(buf, "(%li):%d", opr.var.index, opr.var.type.kind); break;
+				case VAR_ADDR:    sprintf(buf, "[%li]:%d", opr.var.index, opr.var.type.kind); break;
+				case VAR_DATAOFF: sprintf(buf, "{%li}:%d", opr.var.index, opr.var.type.kind); break;
+			}
 		} break;
 
 		case OPR_LITERAL: {

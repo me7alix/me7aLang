@@ -91,7 +91,7 @@ char *opr_to_nasm(Operand opr) {
 		case OPR_VAR: {
 			char ts[32]; type_to_stack(opr.var.type, ts);
 
-			if (!opr.var.is_mem_addr) {
+			if (opr.var.vt != VAR_ADDR) {
 				size_t off = iot_get(opr.var.index); assert(off != -1);
 				sprintf(opr_to_nasm_buf, "%s [rbp - %zu]", ts, off);
 			} else {
@@ -338,7 +338,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 
 			case OP_ASSIGN: {
 				bool is_first_assign = false;
-				if (!ci.dst.var.is_mem_addr) {
+				if (ci.dst.var.vt != VAR_ADDR) {
 					size_t off = iot_get(ci.dst.var.index);
 
 					if (off == 0) {
@@ -368,7 +368,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 				size_t off = iot_get(ci.arg1.var.index);
 				sprintf(arg1, "[rbp - %zu]", off);
 
-				if (ci.arg1.var.is_mem_addr)
+				if (ci.arg1.var.vt == VAR_ADDR)
 					sb_append_strf(&body, TAB"mov rax, %s\n", arg1);
 				else
 					sb_append_strf(&body, TAB"lea rax, %s\n", arg1);
