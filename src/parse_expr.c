@@ -447,7 +447,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 					.exp_binary.r = NULL
 				}));
 				parser_next(p);
-				da_append(&nodes, parse_expr(p, EXPR_PARSING_SQBRA, vart));
+				Type iptr = (Type){.kind = TYPE_IPTR};
+				da_append(&nodes, parse_expr(p, EXPR_PARSING_SQBRA, &iptr));
 				p->cur_token--;
 				break;
 

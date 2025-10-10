@@ -4,10 +4,10 @@ func bubble_sort(arr: *int, cnt: iptr) {
 	while true {
 		change := false
 		for i: iptr = 0; i < cnt - 1; i+=1 {
-			if *(arr + i) > *(arr + i + 1) {
-				tmp := *(arr + i)
-				*(arr + i) = *(arr + i + 1)
-				*(arr + i + 1) = tmp
+			if arr[i] > arr[i + 1] {
+				tmp := arr[i]
+				arr[i] = arr[i + 1]
+				arr[i + 1] = tmp
 				change = true
 			}
 		}
@@ -32,7 +32,7 @@ func main(): int {
 	bubble_sort(arr: *int, 10)
 
 	for i: iptr = 0; i < 10; i+=1 {
-		print_int(*(arr + i))
+		print_int(arr[i])
 	}
 
 	return 0
