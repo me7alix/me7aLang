@@ -11,12 +11,12 @@ func main(): int {
 	nums: [10]int
 
 	for i: iptr = 0; i < 10; i+=1 {
-		*(nums + i) = (i * i):int
+		nums[i] = (i * i):int
 	}
 
 	change_fifth(nums)
 	for i: iptr = 0; i < 10; i+=1 {
-		print_int(*(nums + i))
+		print_int(nums[i])
 	}
 
 	print_char('\n')
@@ -27,11 +27,11 @@ func main(): int {
 	nums2: *int = malloc(sizeof nums)
 
 	for i: iptr = 0; i < 10; i+=1 {
-		*(nums2 + i) = *(nums + i)
+		nums2[i] = nums[i]
 	}
 
 	for i: iptr = 0; i < 10; i+=1 {
-		print_int(*(nums2 + i))
+		print_int(nums2[i])
 	}
 
 	free(nums2)
