@@ -31,6 +31,33 @@ void ir_gen_func_call(Func *func, AST_Node *cn);
 
 bool before_eq;
 int64_t last_var;
+
+Operand ir_gen_deref(Func *func, Type type, Operand var) {
+	Operand ret = (Operand) {
+		.type = OPR_VAR,
+		.var.type = type,
+		.var.vt = VAR_ADDR,
+		.var.index = var.var.index,
+	};
+
+	if (!before_eq) {
+		last_var = -1;
+		return ret;
+	} else {
+		da_append(&func->body, ((Instruction){
+			.op = OP_ASSIGN,
+			.arg1 = ret,
+			.dst = (Operand) {
+				.type = OPR_VAR,
+				.var.type = type,
+				.var.index = var_index++,
+			}
+		}));
+
+		return da_last(&func->body).dst;
+	}
+}
+
 Operand ir_gen_expr(Func *func, AST_Node *en) {
 	if (!en) {
 		last_var = -1;
@@ -81,12 +108,17 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 			bool ret; Operand calc = ir_opr_calc(en, l, r, &ret);
 			if (ret) return calc;
 
+			bool is_arr = en->exp_binary.op == AST_OP_ARR;
+			Type exp_type = is_arr ?
+				(Type) { .kind = TYPE_POINTER, .pointer.base = &en->exp_binary.type } :
+				en->exp_binary.type;
+
 			Instruction inst = {
 				.arg1 = l,
 				.arg2 = r,
 				.dst = (Operand){
 					.type = OPR_VAR,
-					.var.type = en->exp_binary.type,
+					.var.type = exp_type,
 					.var.index = var_index++,
 				},
 			};
@@ -104,11 +136,12 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 				case AST_OP_NOT_EQ:   inst.op = OP_NOT_EQ;   break;
 				case AST_OP_AND:      inst.op = OP_AND;      break;
 				case AST_OP_OR:       inst.op = OP_OR;       break;
+				case AST_OP_ARR:      break;
 				default: unreachable;
 			}
 
 			// pointers arithmetic
-			if (inst.op == OP_ADD || inst.op == OP_SUB) {
+			if (inst.op == OP_ADD || inst.op == OP_SUB || is_arr) {
 				Type lt = *ir_get_opr_type(&l);
 				Type rt = *ir_get_opr_type(&r);
 
@@ -125,7 +158,7 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 
 					Operand dst = (Operand){
 						.type = OPR_VAR,
-						.var.type = en->exp_binary.type,
+						.var.type = exp_type,
 						.var.index = var_index++,
 					};
 
@@ -143,6 +176,11 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 					da_append(&func->body, mult);
 					if (is_pointer(lt)) inst.arg2 = dst;
 					if (is_pointer(rt)) inst.arg1 = dst;
+					if (is_arr) {
+						inst.op = OP_ADD;
+						da_append(&func->body, inst);
+						return ir_gen_deref(func, *exp_type.pointer.base, inst.dst);
+					}
 				}
 			}
 
@@ -162,28 +200,7 @@ Operand ir_gen_expr(Func *func, AST_Node *en) {
 				};
 			} else if (en->exp_unary.op == AST_OP_DEREF) {
 				Operand arg1 = ir_gen_expr(func, en->exp_unary.v);
-				Operand ret = (Operand) {
-					.type = OPR_VAR,
-					.var.type = en->exp_unary.type,
-					.var.vt = VAR_ADDR,
-					.var.index = arg1.var.index,
-				};
-
-				if (!before_eq) {
-					last_var = -1;
-					return ret;
-				} else {
-					da_append(&func->body, ((Instruction){
-						.op = OP_ASSIGN,
-						.arg1 = ret,
-						.dst = (Operand) {
-							.type = OPR_VAR,
-							.var.type = en->exp_unary.type,
-							.var.index = var_index++,
-						}
-					}));
-					return da_last(&func->body).dst;
-				}
+				return ir_gen_deref(func, en->exp_unary.type, arg1);
 			}
 
 			Operand arg = ir_gen_expr(func, en->exp_unary.v);

@@ -47,6 +47,7 @@ struct Type {
 typedef enum {
 	EXPR_PARSING_VAR, EXPR_PARSING_FUNC_CALL,
 	EXPR_PARSING_PAR, EXPR_PARSING_STMT,
+	EXPR_PARSING_SQBRA,
 } ExprParsingType;
 
 typedef enum {
@@ -97,6 +98,7 @@ typedef enum {
 	AST_OP_CAST,
 	AST_OP_REF,
 	AST_OP_DEREF,
+	AST_OP_ARR,
 	AST_OP_VAR_EQ,
 } AST_ExprOp;
 

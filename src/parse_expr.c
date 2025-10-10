@@ -33,6 +33,9 @@ float op_cost(AST_ExprOp op, bool is_left) {
 		case AST_OP_CAST:
 			if (is_left) return 0.0;
 			else         return 3.0;
+		case AST_OP_ARR:
+			if (is_left) return 3.0;
+			else         return 3.0;
 		case AST_OP_NOT:
 		case AST_OP_NEG: case AST_OP_SIZEOF:
 		case AST_OP_REF: case AST_OP_DEREF:
@@ -196,6 +199,7 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 					.pointer.base = get_pointer_base(ptr_type)
 				};
 			} else if (!compare_types(lt, rt)) {
+				printf("%d vs %d\n", lt.kind, rt.kind);
 				lexer_error(expr->loc, "error: operation on different types");
 			}
 
@@ -205,6 +209,10 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 				case AST_OP_GREAT: case AST_OP_LESS:
 					expr->exp_binary.type.kind = TYPE_BOOL;
 				default:;
+			}
+
+			if (expr->exp_binary.op == AST_OP_ARR) {
+				expr->exp_binary.type = *expr->exp_binary.type.pointer.base;
 			}
 
 			return expr->exp_binary.type;
@@ -261,6 +269,7 @@ AST_ExprOp tok_to_binary_expr_op(TokenType tok) {
 		case TOK_MINUS:     return AST_OP_SUB;
 		case TOK_STAR:      return AST_OP_MUL;
 		case TOK_SLASH:     return AST_OP_DIV;
+		case TOK_OSQBRA:    return AST_OP_ARR;
 		default: unreachable;
 	}
 }
@@ -296,6 +305,11 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			}
 		} else if (type == EXPR_PARSING_VAR) {
 			if (parser_peek(p)->type == TOK_SEMI) {
+				break;
+			}
+		} else if (type == EXPR_PARSING_SQBRA) {
+			if (parser_peek(p)->type == TOK_CSQBRA) {
+				parser_next(p);
 				break;
 			}
 		} else if (type == EXPR_PARSING_PAR) {
@@ -424,6 +438,19 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				}));
 				break;
 
+			case TOK_OSQBRA:
+				da_append(&nodes, ast_new({
+					.kind = AST_BIN_EXP,
+					.loc = parser_peek(p)->loc,
+					.exp_binary.op = tok_to_binary_expr_op(parser_peek(p)->type),
+					.exp_binary.l = NULL,
+					.exp_binary.r = NULL
+				}));
+				parser_next(p);
+				da_append(&nodes, parse_expr(p, EXPR_PARSING_SQBRA, vart));
+				p->cur_token--;
+				break;
+
 			case TOK_PLUS_EQ: case TOK_MINUS_EQ:
 			case TOK_STAR_EQ: case TOK_SLASH_EQ:
 			case TOK_NOT_EQ: case TOK_OR:
@@ -448,7 +475,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				} else {
 					if (da_last(&nodes)->kind == AST_UN_EXP)
 						lexer_error(parser_peek(p)->loc,
-				  "error: invalid operator combination\n"
+				  "error: invalid operators combination\n"
 				  "hint: try to use parenthesis");
 
 					bool is_bin_op = da_last(&nodes)->kind == AST_BIN_EXP;

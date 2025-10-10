@@ -157,8 +157,8 @@ void htype##_free(htype *ht) { \
         uint64_t h = 14695981039346656037ULL; \
         unsigned char *p = (unsigned char*)(str); \
         while (*p) { \
-        	h ^= (uint64_t)(*p++); \
-        	h *= 1099511628211ULL; \
+            h ^= (uint64_t)(*p++); \
+            h *= 1099511628211ULL; \
         } \
         *(dst) = h; \
     } while(0)
