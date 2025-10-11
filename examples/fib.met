@@ -1,6 +1,4 @@
-extern print_int(var: int)
-extern print_char(var: i8)
-extern input_int(): int
+import "std.met"
 
 func main(): int {
 	print_char('c')

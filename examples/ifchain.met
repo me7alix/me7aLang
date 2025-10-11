@@ -1,5 +1,4 @@
-extern print_char(var: i8)
-extern print_int(num: int)
+import "std.met"
 
 func main(): int {
 	for i := 0; i < 20; i+=1 {

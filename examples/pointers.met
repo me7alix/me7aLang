@@ -1,7 +1,4 @@
-extern malloc(cnt: iptr): *u0
-extern free(ptr: *u0)
-extern print_int(val: int)
-extern print_char(val: i8)
+import "std.met"
 
 func change_fifth(nums: [10]int) {
 	*(nums + 4) = 111
@@ -24,7 +21,7 @@ func main(): int {
 
 	// here we allocate the second array and copy the values from the first
 
-	nums2: *int = malloc(sizeof nums)
+	nums2: *int = heap_alloc(sizeof nums)
 
 	for i: iptr = 0; i < 10; i+=1 {
 		nums2[i] = nums[i]
@@ -34,7 +31,7 @@ func main(): int {
 		print_int(nums2[i])
 	}
 
-	free(nums2)
+	heap_free(nums2)
 	
 	return 0
 }
