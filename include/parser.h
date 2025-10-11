@@ -249,7 +249,7 @@ AST_Node *ast_alloc(AST_Node node);
 
 #define is_pointer(t) ((t).kind == TYPE_ARRAY || (t).kind == TYPE_POINTER)
 #define get_pointer_base(t) ((t).kind == TYPE_POINTER ? (t).pointer.base : (t).array.elem)
-#define unreachable assert(!"unreachable")
+#define unreachable do { fprintf(stderr, "%s:%d: unreachable\n", __FILE__, __LINE__); exit(1); } while(0)
 #define ast_new(...) ast_alloc((AST_Node) __VA_ARGS__ )
 
 #endif

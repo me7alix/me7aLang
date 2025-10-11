@@ -11,7 +11,7 @@ typedef da(Token) Macro;
 HT(ImportedTable, char*, bool)
 HT_STR(MacroTable, Macro)
 ImportedTable it   = {0};
-MacroTable mt      = {0};
+MacroTable    mt   = {0};
 StringBuilder path = {0};
 
 #ifdef __linux__

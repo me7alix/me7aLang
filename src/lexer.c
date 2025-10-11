@@ -48,7 +48,7 @@ bool is_tok(Lexer *lexer, char *tok, TokenType type, char *str) {
 void lexer_error(Location loc, char *error) {
 	size_t lines_num = loc.line_num + 1;
 	size_t chars_num = loc.line_char-loc.line_start + 1;
-	printf("%s:%zu:%zu %s\n", loc.file, lines_num, chars_num, error);
+	printf("%s:%zu:%zu: %s\n", loc.file, lines_num, chars_num, error);
 
 	loc.line_char = loc.line_start;
 	char error_pointer[128];

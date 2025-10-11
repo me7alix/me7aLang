@@ -9,6 +9,7 @@
 #include "../include/parser.h"
 #include "irgen_calc.c"
 
+int64_t dataoff_index = 0;
 int64_t var_index = 0;
 size_t label_index = 0;
 
