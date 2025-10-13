@@ -3,7 +3,7 @@ import "raylib.met"
 macro SCREEN_WIDTH  800
 macro SCREEN_HEIGHT 600
 
-func main(): int {
+main(): int {
 	title: [4]i8
 	title[0] = 'P'
 	title[1] = 'O'

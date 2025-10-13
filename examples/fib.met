@@ -1,6 +1,6 @@
 import "std.met"
 
-func main(): int {
+main(): int {
 	print_char('c')
 	print_char('n')
 	print_char('t')

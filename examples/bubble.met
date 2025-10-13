@@ -1,6 +1,6 @@
 extern print_int(var: int)
 
-func bubble_sort(arr: *int, cnt: iptr) {
+bubble_sort(arr: *int, cnt: iptr) {
 	while true {
 		change := false
 		for i: iptr = 0; i < cnt - 1; i+=1 {
@@ -16,7 +16,7 @@ func bubble_sort(arr: *int, cnt: iptr) {
 	}
 }
 
-func main(): int {
+main(): int {
 	arr: [10]int
 	arr[0] = 20
 	arr[1] = 2

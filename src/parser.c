@@ -391,9 +391,6 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 }
 
 AST_Node *parse_function(Parser *p) {
-	parser_next(p);
-
-	expect_token(parser_peek(p), TOK_ID);
 	AST_Node *fdn = ast_new({
 		.kind = AST_FUNC_DEF,
 		.loc = parser_peek(p)->loc,
@@ -498,11 +495,6 @@ Parser parser_parse(Token *tokens) {
 
 	while (parser_peek(&p)->type != TOK_EOF) {
 		switch (parser_peek(&p)->type) {
-			case TOK_FUNC: {
-				AST_Node *func = parse_function(&p);
-				if (func) da_append(&prog->program.stmts, func);
-			} break;
-
 			case TOK_EXTERN:
 				parse_extern(&p);
 				break;
@@ -518,10 +510,14 @@ Parser parser_parse(Token *tokens) {
 				break;
 
 			case TOK_ID:
-				if ((parser_looknext(&p))->type == TOK_COL)
+				if ((parser_looknext(&p))->type == TOK_OPAR) {
+					AST_Node *func = parse_function(&p);
+					if (func) da_append(&prog->program.stmts, func);
+				} else if ((parser_looknext(&p))->type == TOK_COL) {
 					parse_var_def(&p);
-				else if ((parser_looknext(&p))->type == TOK_ASSIGN)
+				} else if ((parser_looknext(&p))->type == TOK_ASSIGN) {
 					parse_var_assign(&p);
+				}
 				break;
 
 			default: unreachable;

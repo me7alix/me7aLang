@@ -1,10 +1,10 @@
 import "std.met"
 
-func change_fifth(nums: [10]int) {
+change_fifth(nums: [10]int) {
 	*(nums + 4) = 111
 }
 
-func main(): int {
+main(): int {
 	nums: [10]int
 
 	for i: iptr = 0; i < 10; i+=1 {

@@ -14,29 +14,29 @@ snake_dx:  int
 snake_dy:  int
 snake_len: iptr
 
-func draw_snake() {
+draw_snake() {
 	for i: iptr = 0; i < snake_len; i+=1 {
 		rl_draw_rect(snake_x[i] * TILE, snake_y[i] * TILE, TILE, TILE, rl_ColorGreen)
 	}
 }
 
-func draw_apple() {
+draw_apple() {
 	rl_draw_rect(apple_x * TILE, apple_y * TILE, TILE, TILE, rl_ColorRed)
 }
 
-func snake_follow() {
+snake_follow() {
 	for i: iptr = snake_len; i >= 1; i-=1 {
 		snake_x[i] = snake_x[i - 1]
 		snake_y[i] = snake_y[i - 1]
 	}
 }
 
-func apple_set_rand_pos() {
+apple_set_rand_pos() {
 	apple_x = rand() % MAP_W
 	apple_y = rand() % MAP_H
 }
 
-func snake_eat_apple() {
+snake_eat_apple() {
 	if snake_x[0] == apple_x && snake_y[0] == apple_y {
 		apple_set_rand_pos()
 		snake_x[snake_len] = snake_x[snake_len - 1]
@@ -45,7 +45,7 @@ func snake_eat_apple() {
 	}
 }
 
-func is_game_over(): bool {
+is_game_over(): bool {
 	for i: iptr = snake_len; i >= 1; i-=1 {
 		if snake_x[0] == snake_x[i] && snake_y[0] == snake_y[i] {
 			return true
@@ -55,7 +55,7 @@ func is_game_over(): bool {
 	return false
 }
 
-func snake_set_dir() {
+snake_set_dir() {
 	if rl_is_key_down(rl_KeyS) && snake_dy == 0 {
 		snake_dx = 0
 		snake_dy = 1
@@ -77,7 +77,7 @@ func snake_set_dir() {
 	}
 }
 
-func snake_movement() {
+snake_movement() {
 	snake_follow()
 	snake_x[0] += snake_dx
 	snake_y[0] += snake_dy
@@ -93,7 +93,7 @@ func snake_movement() {
 	}
 }
 
-func game_init() {
+game_init() {
 	apple_set_rand_pos()
 	snake_len = 2
 	snake_x[0] = 1
@@ -104,7 +104,7 @@ func game_init() {
 	snake_dy = 0
 }
 
-func main(): int {
+main(): int {
 	srand(time(null))
 	game_init()
 
