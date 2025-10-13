@@ -1,21 +1,22 @@
+macro rl_ColorGray   0xFF888888
 macro rl_ColorBlack  0xFF000000
 macro rl_ColorWhite  0xFFFFFFFF
-macro rl_ColorRed    0xFFFF0000
-macro rl_ColorBlue   0xFF0000FF
+macro rl_ColorRed    0xFF0000FF
 macro rl_ColorGreen  0xFF00FF00
+macro rl_ColorBlue   0xFFFF0000
 macro rl_ColorYellow 0xFF00FFFF
 macro rl_ColorPurple 0xFFFF00FF
-macro rl_ColorGray   0xFF888888
 
 macro rl_KeyD     68
 macro rl_KeyA     65
 macro rl_KeyS     83
 macro rl_KeyW     87
-macro rl_KeySpace 65
+macro rl_KeySpace 32
 
 extern InitWindow         rl_init_window(width: int, height: int, title: *i8)
 extern SetTargetFPS       rl_set_target_fps(fps: int)
 extern DrawRectangleLines rl_draw_rect_lines(x: int, y: int, w: int, h: int, clr: int)
+extern DrawRectangle      rl_draw_rect(x: int, y: int, w: int, h: int, clr: int)
 extern GetRandomValue     rl_rand(from: int, to: int): int
 extern IsKeyDown          rl_is_key_down(key: int): bool
 extern WindowShouldClose  rl_window_should_close(): bool
