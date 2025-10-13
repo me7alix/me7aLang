@@ -12,7 +12,7 @@
 typedef enum {
 	// Binops
 	OP_ADD, OP_SUB, OP_NEG, OP_MUL, OP_DIV,
-	OP_OR, OP_AND, OP_EQ, OP_NOT_EQ,
+	OP_MOD, OP_OR, OP_AND, OP_EQ, OP_NOT_EQ,
 	OP_LESS, OP_GREAT, OP_LESS_EQ,
 	OP_GREAT_EQ, OP_CAST, OP_NOT,
 	OP_REF, OP_DEREF,
@@ -38,7 +38,7 @@ typedef enum {
 	VAR_STACK,
 	VAR_ADDR,
 	VAR_DATAOFF,
-} VarType;
+} VarKind;
 
 typedef struct {
 	OperandType type;
@@ -59,9 +59,10 @@ typedef struct {
 			Type type;
 		} func_inp;
 		struct {
+			VarKind kind;
 			Type type;
-			VarType vt;
 			int64_t index;
+			VarKind addr_kind;
 		} var;
 	};
 } Operand;
@@ -98,7 +99,13 @@ typedef struct {
 } Extern;
 
 typedef struct {
+	Type type;
+	int64_t index;
+} GlobalVar;
+
+typedef struct {
 	da(Extern) externs;
+	da(GlobalVar) globals;
 	da(Func) funcs;
 } Program;
 

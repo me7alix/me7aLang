@@ -19,6 +19,7 @@ float op_cost(AST_ExprOp op, bool is_left) {
 		case AST_OP_ADD: case AST_OP_SUB:
 			if (is_left) return 1.1;
 			else         return 1.0;
+		case AST_OP_MOD:
 		case AST_OP_MUL: case AST_OP_DIV:
 			if (is_left) return 2.1;
 			else         return 2.0;
@@ -34,7 +35,7 @@ float op_cost(AST_ExprOp op, bool is_left) {
 			if (is_left) return 0.0;
 			else         return 3.0;
 		case AST_OP_ARR:
-			if (is_left) return 3.0;
+			if (is_left) return 3.1;
 			else         return 3.0;
 		case AST_OP_NOT:
 		case AST_OP_NEG: case AST_OP_SIZEOF:
@@ -199,7 +200,6 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 					.pointer.base = get_pointer_base(ptr_type)
 				};
 			} else if (!compare_types(lt, rt)) {
-				printf("%d vs %d\n", lt.kind, rt.kind);
 				lexer_error(expr->loc, "error: operation on different types");
 			}
 
@@ -269,6 +269,7 @@ AST_ExprOp tok_to_binary_expr_op(TokenType tok) {
 		case TOK_MINUS:     return AST_OP_SUB;
 		case TOK_STAR:      return AST_OP_MUL;
 		case TOK_SLASH:     return AST_OP_DIV;
+		case TOK_PS:        return AST_OP_MOD;
 		case TOK_OSQBRA:    return AST_OP_ARR;
 		default: unreachable;
 	}
@@ -459,7 +460,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			case TOK_LESS_EQ: case TOK_GREAT_EQ:
 			case TOK_EQ_EQ: case TOK_AND:
 			case TOK_PLUS: case TOK_SLASH:
-			case TOK_EQ: {
+			case TOK_EQ: case TOK_PS: {
 				da_append(&nodes, ast_new({
 					.kind = AST_BIN_EXP,
 					.loc = parser_peek(p)->loc,

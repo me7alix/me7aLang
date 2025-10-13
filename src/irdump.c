@@ -13,7 +13,7 @@ void ir_dump_opr(Operand opr, char *buf) {
 		case OPR_FUNC_RET:  sprintf(buf, "FR:%d", opr.func_ret.type.kind); break;
 		case OPR_NAME:      sprintf(buf, "\"%s\"", opr.name); break;
 		case OPR_VAR: {
-			switch (opr.var.vt) {
+			switch (opr.var.kind) {
 				case VAR_STACK:   sprintf(buf, "(%li):%d", opr.var.index, opr.var.type.kind); break;
 				case VAR_ADDR:    sprintf(buf, "[%li]:%d", opr.var.index, opr.var.type.kind); break;
 				case VAR_DATAOFF: sprintf(buf, "{%li}:%d", opr.var.index, opr.var.type.kind); break;
@@ -64,6 +64,7 @@ void ir_dump_inst(Instruction inst, char *res) {
 		case OP_DEREF:  sprintf(res, "    var%s = deref %s", dst, arg1);  break;
 		case OP_REF:    sprintf(res, "    var%s = ref %s", dst, arg1);  break;
 		case OP_DIV:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "/", arg2);  break;
+		case OP_MOD:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "%", arg2);  break;
 		case OP_ASSIGN: sprintf(res, "    var%s = %s", dst, arg1); break;
 		case OP_RETURN: sprintf(res, "    return %s", arg1); break;
 		case OP_FUNC_CALL: {

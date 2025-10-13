@@ -517,6 +517,13 @@ Parser parser_parse(Token *tokens) {
 					parser_next(&p);
 				break;
 
+			case TOK_ID:
+				if ((parser_looknext(&p))->type == TOK_COL)
+					parse_var_def(&p);
+				else if ((parser_looknext(&p))->type == TOK_ASSIGN)
+					parse_var_assign(&p);
+				break;
+
 			default: unreachable;
 		}
 

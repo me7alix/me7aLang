@@ -76,6 +76,7 @@ typedef enum {
 	AST_OP_SUB,
 	AST_OP_DIV,
 	AST_OP_MUL,
+	AST_OP_MOD,
 	AST_OP_NEG,
 	AST_OP_ADD_EQ,
 	AST_OP_SUB_EQ,
