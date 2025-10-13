@@ -98,6 +98,8 @@ func game_init() {
 	snake_len = 2
 	snake_x[0] = 1
 	snake_y[0] = 0
+	snake_x[1] = 0
+	snake_y[1] = 0
 	snake_dx = 1
 	snake_dy = 0
 }
