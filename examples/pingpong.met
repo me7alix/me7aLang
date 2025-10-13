@@ -46,7 +46,7 @@ func main(): int {
 		}
 
 		if rl_is_key_down(rl_KeyD) && paddle_x < SCREEN_WIDTH - paddle_w {
-			paddle_x += paddle_speed;
+			paddle_x += paddle_speed
 		}
 
 		if rl_is_key_down(rl_KeyA) && paddle_x > 0 {
