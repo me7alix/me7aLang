@@ -6,3 +6,4 @@ extern free   heap_free(ptr: *u0)
 extern srand(seed: int)
 extern rand(): int
 extern time(ptr: *u0): int
+extern printf print_str(str: *i8)

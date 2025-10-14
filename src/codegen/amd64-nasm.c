@@ -503,7 +503,15 @@ const char *nasm_gen_prog(Program *prog) {
 	da_foreach(GlobalVar, g, &prog->globals) {
 		if (g->type.kind == TYPE_ARRAY) {
 			size_t s = get_type_size(*g->type.array.elem) * g->type.array.length;
-			sb_append_strf(&code, TAB"U%zu times %zu db 0\n", uniq_data_off, s);
+			if (g->data) {
+				sb_append_strf(&code, TAB"U%zu db ", uniq_data_off, s);
+				for (size_t i = 0; i < g->type.array.length; i++) {
+					sb_append_strf(&code, "%#x", g->data[i]);
+					if (i != g->type.array.length - 1)
+						sb_append_str(&code, ", ");
+				}
+				sb_append_str(&code, "\n");
+			} else sb_append_strf(&code, TAB"U%zu times %zu db 0\n", uniq_data_off, s);
 			sb_append_strf(&code, TAB"D%zu dq U%zu\n", g->index, uniq_data_off++);
 		} else {
 			sb_append_strf(&code, TAB"D%zu times %li db 0\n", g->index, get_type_size(g->type));

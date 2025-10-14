@@ -85,11 +85,17 @@ Lexer lexer_lex(char *file, char *code) {
 			case '(': add_token(&lexer, TOK_OPAR,  "("); break;
 			case ')': add_token(&lexer, TOK_CPAR,  ")"); break;
 			case ';': add_token(&lexer, TOK_SEMI,  ";"); break;
-			case '.': add_token(&lexer, TOK_DOT,   "."); break;
 			case ',': add_token(&lexer, TOK_COM,   ","); break;
 			case '[': add_token(&lexer, TOK_OSQBRA,"["); break;
 			case ']': add_token(&lexer, TOK_CSQBRA,"]"); break;
 			case '%': add_token(&lexer, TOK_PS,    "%"); break;
+
+			case '.':
+				if (lexer.cur_char[1] == '.' && lexer.cur_char[2] == '.') {
+					add_token(&lexer, TOK_ANY,   "...");
+					lexer.cur_char += 2;
+				} else add_token(&lexer, TOK_DOT,   ".");
+				break;
 
 			case '+': {
 				if (lexer.cur_char[1] == '=') {

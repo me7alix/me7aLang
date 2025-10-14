@@ -1,11 +1,7 @@
 import "std.met"
 
 main(): int {
-	print_char('c')
-	print_char('n')
-	print_char('t')
-	print_char(':')
-	print_char(' ')
+	print_str("cnt: ")
 
 	cnt := input_int()
 	a: int = 1

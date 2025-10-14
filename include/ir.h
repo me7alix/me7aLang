@@ -101,6 +101,7 @@ typedef struct {
 typedef struct {
 	Type type;
 	int64_t index;
+	uint8_t *data;
 } GlobalVar;
 
 typedef struct {

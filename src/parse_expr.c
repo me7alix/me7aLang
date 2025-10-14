@@ -153,6 +153,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 	return expr_expand(nodes);
 }
 
+Type i8a = {.kind = TYPE_I8};
 Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 	switch (expr->kind) {
 		case AST_VAR: return parser_symbol_table_get(parser, SBL_VAR, expr->var_id)->variable.type;
@@ -170,7 +171,7 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 					case LIT_CHAR:  expr->literal.type = (Type) {.kind = TYPE_I8}; break;
 					case LIT_FLOAT: expr->literal.type = (Type) {.kind = TYPE_F32}; break;
 					case LIT_BOOL:  expr->literal.type = (Type) {.kind = TYPE_BOOL}; break;
-					//case LIT_STR:   expr->literal.type = (Type) {.kind = TYPE_POINTER, .pointer.base = }; break;
+					case LIT_STR:   expr->literal.type = (Type) {.kind = TYPE_POINTER, .pointer.base = &i8a}; break;
 				}
 			}
 
@@ -378,6 +379,15 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 					.literal.lint = 0,
 				}));
 			} break;
+
+			case TOK_STRING:
+				da_append(&nodes, ast_new({
+					.kind = AST_LITERAL,
+					.loc = parser_peek(p)->loc,
+					.literal.kind = LIT_STR,
+					.literal.str = parser_peek(p)->data,
+				}));
+				break;
 
 			case TOK_CHAR:
 				da_append(&nodes, ast_new({
