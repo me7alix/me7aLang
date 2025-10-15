@@ -89,6 +89,7 @@ Lexer lexer_lex(char *file, char *code) {
 			case '[': add_token(&lexer, TOK_OSQBRA,"["); break;
 			case ']': add_token(&lexer, TOK_CSQBRA,"]"); break;
 			case '%': add_token(&lexer, TOK_PS,    "%"); break;
+			case '#': add_token(&lexer, TOK_MACRO, "#"); break;
 
 			case '.':
 				if (lexer.cur_char[1] == '.' && lexer.cur_char[2] == '.') {
@@ -270,7 +271,6 @@ Lexer lexer_lex(char *file, char *code) {
 				} else if (is_tok(&lexer, "sizeof",  TOK_SIZEOF, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "return",  TOK_RET, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "import",  TOK_IMPORT, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "macro",   TOK_MACRO, lexer.cur_char)) {
 				} else if (isalpha(*lexer.cur_char)) add_token(&lexer, TOK_ID, get_word(&lexer));
 
 				else lexer_error(lexer.cur_loc, "error: unknown token");

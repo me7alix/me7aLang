@@ -1,17 +1,17 @@
-macro rl_ColorGray   0xFF888888
-macro rl_ColorBlack  0xFF000000
-macro rl_ColorWhite  0xFFFFFFFF
-macro rl_ColorRed    0xFF0000FF
-macro rl_ColorGreen  0xFF00FF00
-macro rl_ColorBlue   0xFFFF0000
-macro rl_ColorYellow 0xFF00FFFF
-macro rl_ColorPurple 0xFFFF00FF
+#rl_ColorGray   0xFF888888
+#rl_ColorBlack  0xFF000000
+#rl_ColorWhite  0xFFFFFFFF
+#rl_ColorRed    0xFF0000FF
+#rl_ColorGreen  0xFF00FF00
+#rl_ColorBlue   0xFFFF0000
+#rl_ColorYellow 0xFF00FFFF
+#rl_ColorPurple 0xFFFF00FF
 
-macro rl_KeyD     68
-macro rl_KeyA     65
-macro rl_KeyS     83
-macro rl_KeyW     87
-macro rl_KeySpace 32
+#rl_KeyD     68
+#rl_KeyA     65
+#rl_KeyS     83
+#rl_KeyW     87
+#rl_KeySpace 32
 
 extern InitWindow         rl_init_window(width: int, height: int, title: *i8)
 extern SetTargetFPS       rl_set_target_fps(fps: int)
