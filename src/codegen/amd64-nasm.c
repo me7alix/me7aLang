@@ -102,11 +102,11 @@ char *opr_to_nasm(Operand opr) {
 					sb_append_strf(&body, TAB"mov rdx, qword [rbp - %zu]\n", off);
 					sprintf(opr_to_nasm_buf, "%s [rdx]", ts);
 				} else if (opr.var.addr_kind == VAR_DATAOFF) {
-					sb_append_strf(&body, TAB"lea rdx, [D%zu]\n", opr.var.index);
+					sb_append_strf(&body, TAB"lea rdx, [rel D%zu]\n", opr.var.index);
 					sprintf(opr_to_nasm_buf, "%s [rdx]", ts);
 				} else unreachable;
 			} else if (opr.var.kind == VAR_DATAOFF) {
-				sprintf(opr_to_nasm_buf, "%s [D%zu]", ts, opr.var.index);
+				sprintf(opr_to_nasm_buf, "%s [rel D%zu]", ts, opr.var.index);
 			}
 		} break;
 
@@ -392,13 +392,13 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 						size_t off = OffTable_get(&stack_table, ci.arg1.var.index);
 						sb_append_strf(&body, TAB"mov rax, [rbp - %zu]\n", off);
 					} else if (ci.arg1.var.addr_kind == VAR_DATAOFF) {
-						sb_append_strf(&body, TAB"lea rax, [D%zu]\n", ci.arg1.var.index);
+						sb_append_strf(&body, TAB"lea rax, [rel D%zu]\n", ci.arg1.var.index);
 					}
 				} else if (ci.arg1.var.kind == VAR_STACK) {
 					size_t off = OffTable_get(&stack_table, ci.arg1.var.index);
 					sb_append_strf(&body, TAB"lea rax, [rbp - %zu]\n", off);
 				} else if (ci.arg1.var.kind == VAR_DATAOFF) {
-					sb_append_strf(&body, TAB"lea rax, [D%zu]\n", ci.arg1.var.index);
+					sb_append_strf(&body, TAB"lea rax, [rel D%zu]\n", ci.arg1.var.index);
 				}
 
 				sprintf(dst, "%s", opr_to_nasm(ci.dst));
