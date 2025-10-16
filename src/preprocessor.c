@@ -18,29 +18,28 @@ StringBuilder path = {0};
 int pathcmp(const char *a, const char *b) {
 	char ra[512], rb[512];
 	if (!realpath(a, ra) || !realpath(b, rb))
-		return 0;
-	return strcmp(ra, rb) == 0;
+		return 1;
+	return strcmp(ra, rb);
 }
 
 uint64_t ImportedTable_hashf(char *str) {
 	char ra[512];
-	char *path = realpath(str, ra);
-	uint64_t res; strhash(&res, path);
+	uint64_t res;
+	realpath(str, ra);
+	strhash(&res, ra);
 	return res;
 }
 
 int ImportedTable_compare(char *cur_str, char *str) {
-	char ra[512];
-	char *p = realpath(str, ra);
-	uint64_t res; strhash(&res, p);
-	return res;
+	return pathcmp(cur_str, str);
 }
 #endif
 
 Lexer *get_lexer(Imports *imports, char *file, bool *is_imported) {
-	for (size_t i = 0; i < imports->count; i++) {
+	*is_imported = false;
+	da_foreach(char*, imp, imports) {
 		sb_reset(&path);
-		sb_append_strf(&path, "%s/%s", da_get(imports, i), file);
+		sb_append_strf(&path, "%s/%s", *imp, file);
 
 		char *code = read_file(sb_to_str(path));
 		if (code) {
@@ -52,7 +51,6 @@ Lexer *get_lexer(Imports *imports, char *file, bool *is_imported) {
 			Lexer *lexer = malloc(sizeof(Lexer));
 			*lexer = lexer_lex((char *) sb_to_str(path), code);
 
-			*is_imported = false;
 			return lexer;
 		}
 	}
@@ -61,7 +59,7 @@ Lexer *get_lexer(Imports *imports, char *file, bool *is_imported) {
 }
 
 
-void get_path(char *dst, const char *file) {
+void get_folder(char *dst, const char *file) {
 	const char *slash = strrchr(file, '/');
 	if (slash) {
 		size_t len = slash - file;
@@ -73,10 +71,10 @@ void get_path(char *dst, const char *file) {
 }
 
 void preprocessor(Imports *imports, Lexer *entry) {
-	char *cur_path = malloc(256);
-	get_path(cur_path, entry->cur_loc.file);
-	da_get(imports, 0) = cur_path;
-	ImportedTable_add(&it, cur_path, true);
+	char *cur_folder = malloc(256);
+	get_folder(cur_folder, entry->cur_loc.file);
+	da_get(imports, 0) = cur_folder;
+	ImportedTable_add(&it, entry->cur_loc.file, true);
 
 	for (size_t i = 0; i < entry->tokens.count; i++) {
 		switch (da_get(&entry->tokens, i).type) {
