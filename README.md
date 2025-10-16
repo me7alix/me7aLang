@@ -12,7 +12,7 @@ The compiler is written in **C**, with a small number of dependencies and a simp
 ## Getting Started
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/me7aLang.git
+git clone https://github.com/me7alix/me7aLang.git
 cd me7aLang
 ```
 
