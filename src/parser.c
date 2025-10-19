@@ -487,6 +487,18 @@ void parse_extern(Parser *p) {
 	nested_uniq++;
 }
 
+void parse_struct(Parser *p) {
+	parser_next(p);
+	char *struct_id = parser_next(p)->data;
+	expect_token(parser_next(p), TOK_OBRA);
+	while (parser_peek(p)->type != TOK_CBRA) {
+		if (parser_peek(p)->type == TOK_ID) {
+			Type t = parse_type(p);
+		} else unreachable;
+		parser_next(p);
+	}
+}
+
 Parser parser_parse(Token *tokens) {
 	Parser p = {0};
 	AST_Node *prog = ast_new({.kind = AST_PROG});

@@ -5,9 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <threads.h>
 #include "../include/parser.h"
-#include "../thirdparty/da.h"
 
 typedef enum {
 	// Binops
@@ -88,14 +86,14 @@ typedef struct {
 typedef struct {
 	char *name;
 	Type ret_type;
-	da(FuncArg) args;
-	da(Instruction) body;
+	DA(FuncArg) args;
+	DA(Instruction) body;
 } Func;
 
 typedef struct {
 	char *name;
 	Type ret_type;
-	da(FuncArg) args;
+	DA(FuncArg) args;
 } Extern;
 
 typedef struct {
@@ -105,9 +103,9 @@ typedef struct {
 } GlobalVar;
 
 typedef struct {
-	da(Extern) externs;
-	da(GlobalVar) globals;
-	da(Func) funcs;
+	DA(Extern) externs;
+	DA(GlobalVar) globals;
+	DA(Func) funcs;
 } Program;
 
 Type *ir_get_opr_type(Operand *op);

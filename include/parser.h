@@ -5,10 +5,8 @@
 #include <stdint.h>
 #include <threads.h>
 #include <stdbool.h>
-#include <assert.h>
 
-#include "../thirdparty/ht.h"
-#include "../thirdparty/da.h"
+#include "../thirdparty/betterc.h"
 #include "../include/lexer.h"
 
 typedef enum {
@@ -31,6 +29,7 @@ typedef enum {
 	TYPE_STRUCT,
 } TypeKind;
 
+typedef struct Struct Struct;
 typedef struct Type Type;
 
 struct Type {
@@ -43,6 +42,15 @@ struct Type {
 		struct { char *name; } user;
 	};
 };
+
+struct Struct {
+	DA(struct {
+		Type t;
+		char *id;
+	}) fields;
+};
+
+HT_DECL(UserStructs, char*, Struct)
 
 typedef enum {
 	EXPR_PARSING_VAR, EXPR_PARSING_FUNC_CALL,
@@ -115,7 +123,7 @@ typedef enum {
 } AST_NodeKind;
 
 typedef struct AST_Node AST_Node;
-typedef da(AST_Node*) AST_Nodes;
+typedef DA(AST_Node*) AST_Nodes;
 
 struct AST_Node {
 	AST_NodeKind kind;
@@ -216,7 +224,6 @@ typedef struct {
 	};
 } Symbol;
 
-
 typedef struct { SymbolType type; char *id; int *nested; } SymbolKey;
 HT_DECL(SymbolTable, SymbolKey, Symbol)
 
@@ -251,6 +258,6 @@ AST_Node *ast_alloc(AST_Node node);
 #define is_pointer(t) ((t).kind == TYPE_ARRAY || (t).kind == TYPE_POINTER)
 #define get_pointer_base(t) ((t).kind == TYPE_POINTER ? (t).pointer.base : (t).array.elem)
 #define unreachable do { fprintf(stderr, "%s:%d: unreachable\n", __FILE__, __LINE__); exit(1); } while(0)
-#define ast_new(...) ast_alloc((AST_Node) __VA_ARGS__ )
+#define ast_new(...) ast_alloc((AST_Node) __VA_ARGS__)
 
 #endif

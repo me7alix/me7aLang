@@ -1,7 +1,7 @@
 #ifndef LEXER_H
 #define LEXER_H
 
-#include "../thirdparty/da.h"
+#include "../thirdparty/betterc.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -32,7 +32,7 @@ typedef struct {
 } Token;
 
 typedef struct {
-	da(Token) tokens;
+	DA(Token) tokens;
 	char *cur_char;
 	Location cur_loc;
 } Lexer;

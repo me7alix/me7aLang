@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <threads.h>
+#include <assert.h>
 
 #include "../include/ir.h"
 #include "../include/parser.h"
@@ -60,7 +60,7 @@ Operand ir_gen_deref(Func *func, Type type, Operand var) {
 	}
 }
 
-Type i8 = {.kind = TYPE_I8};
+Type i8_t = {.kind = TYPE_I8};
 Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 	if (!en) {
 		last_var = -1;
@@ -74,7 +74,7 @@ Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 				da_append(&prog->globals, ((GlobalVar){
 					.type = (Type) {
 						.kind = TYPE_ARRAY,
-						.array.elem = &i8,
+						.array.elem = &i8_t,
 						.array.length = strlen(en->literal.str) + 1
 					},
 					.index = dataoff_index,
@@ -83,7 +83,7 @@ Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 				return (Operand) {
 					.type = OPR_VAR,
 					.var.kind = VAR_ADDR,
-					.var.type = (Type) {.kind = TYPE_POINTER, .pointer.base = &i8},
+					.var.type = (Type) {.kind = TYPE_POINTER, .pointer.base = &i8_t},
 					.var.index = dataoff_index++,
 					.var.addr_kind = VAR_DATAOFF,
 				};

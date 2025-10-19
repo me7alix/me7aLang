@@ -3,7 +3,7 @@
 
 #include "lexer.h"
 
-typedef da(char*) Imports;
+typedef DA(char*) Imports;
 char *read_file(const char *filename);
 void preprocessor(Imports *imports, Lexer *entry);
 

@@ -6,11 +6,12 @@
 #include "../include/lexer.h"
 #include "../include/parser.h"
 #include "../include/ir.h"
-#include "../thirdparty/sb.h"
 
-#define SB_IMPLEMENTATION
 #include "./codegen/amd64-nasm.c"
 #include "irdump.c"
+
+#define BC_STRING_BUILDER_IMPL
+#include "../thirdparty/betterc.h"
 
 char *read_file(const char *filename) {
 	FILE* file = fopen(filename, "rb");
@@ -155,7 +156,11 @@ int main(int argc, char **argv) {
 
 	Parser parser = parser_parse(entry_point.tokens.items);
 	Program prog = ir_gen_prog(&parser);
-	const char *cg = nasm_gen_prog(&prog);
+	char *cg = nasm_gen_prog(&prog);
+	if (save_ir_output) {
+		sprintf(buf, "%s.ir", output_bin);
+		ir_dump_prog(&prog, buf);
+	}
 
 	sprintf(output_file, "%s.asm", output_bin);
 	write_to_file(output_file, cg);
@@ -170,11 +175,6 @@ int main(int argc, char **argv) {
 
 	if (!save_asm_output) {
 		sprintf(buf, "rm %s", output_file); system(buf);
-	}
-
-	if (save_ir_output) {
-		sprintf(buf, "%s.ir", output_bin);
-		ir_dump_prog(&prog, buf);
 	}
 
 	return 0;

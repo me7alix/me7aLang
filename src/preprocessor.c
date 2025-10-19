@@ -3,11 +3,10 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "../thirdparty/ht.h"
-#include "../thirdparty/sb.h"
+#include "../thirdparty/betterc.h"
 #include "../include/preprocessor.h"
 
-typedef da(Token) Macro;
+typedef DA(Token) Macro;
 HT(ImportedTable, char*, bool)
 HT_STR(MacroTable, Macro)
 ImportedTable it   = {0};
@@ -39,17 +38,17 @@ Lexer *get_lexer(Imports *imports, char *file, bool *is_imported) {
 	*is_imported = false;
 	da_foreach(char*, imp, imports) {
 		sb_reset(&path);
-		sb_append_strf(&path, "%s/%s", *imp, file);
+		sb_appendf(&path, "%s/%s", *imp, file);
 
-		char *code = read_file(sb_to_str(path));
+		char *code = read_file(path.items);
 		if (code) {
-			if (ImportedTable_get(&it, path.str)) {
+			if (ImportedTable_get(&it, path.items)) {
 				*is_imported = true;
 				return NULL;
 			}
 
 			Lexer *lexer = malloc(sizeof(Lexer));
-			*lexer = lexer_lex((char *) sb_to_str(path), code);
+			*lexer = lexer_lex(path.items, code);
 
 			return lexer;
 		}
