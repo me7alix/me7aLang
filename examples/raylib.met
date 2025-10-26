@@ -19,6 +19,7 @@ extern DrawRectangleLines rl_draw_rect_lines(x: int, y: int, w: int, h: int, clr
 extern DrawRectangle      rl_draw_rect(x: int, y: int, w: int, h: int, clr: int)
 extern GetRandomValue     rl_rand(from: int, to: int): int
 extern IsKeyDown          rl_is_key_down(key: int): bool
+extern IsKeyPressed       rl_is_key_pressed(key: int): bool
 extern WindowShouldClose  rl_window_should_close(): bool
 extern ClearBackground    rl_clear_bg(clr: int)
 extern BeginDrawing       rl_begin_drawing()

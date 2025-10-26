@@ -12,6 +12,7 @@ snake_x:   [1024]int
 snake_y:   [1024]int
 snake_dx:  int
 snake_dy:  int
+snake_da:  bool
 snake_len: iptr
 
 draw_snake() {
@@ -56,24 +57,32 @@ is_game_over(): bool {
 }
 
 snake_set_dir() {
-	if rl_is_key_down(rl_KeyS) && snake_dy == 0 {
+	if !snake_da {
+		return
+	}
+
+	if rl_is_key_pressed(rl_KeyS) && snake_dy == 0 {
 		snake_dx = 0
 		snake_dy = 1
+		snake_da = false
 	}
 
-	if rl_is_key_down(rl_KeyW) && snake_dy == 0 {
+	if rl_is_key_pressed(rl_KeyW) && snake_dy == 0 {
 		snake_dx = 0
 		snake_dy = -1
+		snake_da = false
 	}
 
-	if rl_is_key_down(rl_KeyD) && snake_dx == 0 {
+	if rl_is_key_pressed(rl_KeyD) && snake_dx == 0 {
 		snake_dx = 1
 		snake_dy = 0
+		snake_da = false
 	}
 
-	if rl_is_key_down(rl_KeyA) && snake_dx == 0 {
+	if rl_is_key_pressed(rl_KeyA) && snake_dx == 0 {
 		snake_dx = -1
 		snake_dy = 0
+		snake_da = false
 	}
 }
 
@@ -113,16 +122,21 @@ main(): int {
 
 	timer := 0
 	new_game := false
+	snake_da = true
 	while !rl_window_should_close() {
 		rl_begin_drawing()
 		rl_clear_bg(rl_ColorBlack)
 
 		if new_game {
-			if rl_is_key_down(rl_KeySpace) {
+			if rl_is_key_pressed(rl_KeySpace) {
 				game_init()
 				new_game = false
 			}
 		} else {
+			if timer % 12 == 0 {
+				snake_da = true
+			}
+
 			snake_set_dir()
 
 			if timer % 12 == 0 {

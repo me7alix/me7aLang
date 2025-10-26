@@ -1,0 +1,15 @@
+import "std.met"
+
+struct Person {
+	name: *i8,
+	salary: int,
+}
+
+main(): int {
+	me: Person
+	me.name = "Michael"
+	me.salary = -8211
+	print_str(me.name)
+	print_int(me.salary)
+	return 0
+}
