@@ -16,14 +16,14 @@ size_t label_index = 0;
 HT_STR(ASTVarTable, Operand)
 ASTVarTable avt = {0};
 
-Type iptr = {.kind = TYPE_IPTR};
 Type *ir_get_opr_type(Operand *op) {
+	static Type tiptr = {.kind = TYPE_IPTR};
 	switch (op->type) {
 		case OPR_VAR:      return &op->var.type;
 		case OPR_LITERAL:  return &op->literal.type;
 		case OPR_FUNC_INP: return &op->func_inp.type;
 		case OPR_FUNC_RET: return &op->func_ret.type;
-		case OPR_SIZEOF:   return &iptr;
+		case OPR_SIZEOF:   return &tiptr;
 		default: unreachable; return NULL;
 	}
 }
@@ -60,13 +60,13 @@ Operand ir_gen_deref(Func *func, Type type, Operand var) {
 	}
 }
 
-Type i8_t = {.kind = TYPE_I8};
 Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 	if (!en) {
 		last_var = -1;
 		return (Operand) {.type = OPR_NULL};
 	}
 
+	static Type ti8 = {.kind = TYPE_I8};
 	switch (en->kind) {
 		case AST_LITERAL: {
 			last_var = -1;
@@ -74,7 +74,7 @@ Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 				da_append(&prog->globals, ((GlobalVar){
 					.type = (Type) {
 						.kind = TYPE_ARRAY,
-						.array.elem = &i8_t,
+						.array.elem = &ti8,
 						.array.length = strlen(en->literal.str) + 1
 					},
 					.index = dataoff_index,
@@ -83,7 +83,7 @@ Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 				return (Operand) {
 					.type = OPR_VAR,
 					.var.kind = VAR_ADDR,
-					.var.type = (Type) {.kind = TYPE_POINTER, .pointer.base = &i8_t},
+					.var.type = (Type) {.kind = TYPE_POINTER, .pointer.base = &ti8},
 					.var.index = dataoff_index++,
 					.var.addr_kind = VAR_DATAOFF,
 				};
@@ -424,6 +424,14 @@ void ir_gen_body(Program *prog, Func *func, AST_Node *fn) {
 			case AST_FUNC_CALL: ir_gen_func_call(prog, func, cn); break;
 
 			case AST_FUNC_RET: {
+				if (cn->func_ret.type.kind == TYPE_NULL) {
+					da_append(&func->body, ((Instruction){
+						.op = OP_RETURN,
+						.arg1 = (Operand) {.type = OPR_NULL},
+					}));
+					break;
+				}
+
 				Operand res = ir_gen_expr(prog, func, cn->func_ret.exp);
 				switch (res.type) {
 					case OPR_LITERAL: {
@@ -615,7 +623,7 @@ Program ir_gen_prog(Parser *p) {
 	Program prog = {0};
 	label_index = 0;
 
-	HT_FOREACH_NODE(SymbolTable, &p->st, n) {
+	ht_foreach_node(SymbolTable, &p->st, n) {
 		if (n->key.type == SBL_FUNC_EXTERN) {
 			da_append(&prog.externs, ((Extern){
 				.name = n->val.func_extern.extern_smb,

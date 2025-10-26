@@ -1,50 +1,50 @@
-#ifndef _BC_H_
-#define _BC_H_
+#ifndef _CP_H_
+#define _CP_H_
 
 #include <stdio.h>
 #include <string.h>
 
-#ifndef BC_DA_INIT_CAP
-#define BC_DA_INIT_CAP 256
+#ifndef CP_DA_INIT_CAP
+#define CP_DA_INIT_CAP 256
 #endif
 
-#ifndef BC_REALLOC
+#ifndef CP_REALLOC
 #include <stdlib.h>
-#define BC_REALLOC realloc
+#define CP_REALLOC realloc
 #endif
 
-#ifndef BC_CALLOC
+#ifndef CP_CALLOC
 #include <stdlib.h>
-#define BC_CALLOC calloc
+#define CP_CALLOC calloc
 #endif
 
-#ifndef BC_FREE
+#ifndef CP_FREE
 #include <stdlib.h>
-#define BC_FREE free
+#define CP_FREE free
 #endif
 
-#ifndef BC_MEMCPY
+#ifndef CP_MEMMOVE
 #include <string.h>
-#define BC_MEMCPY memcpy
+#define CP_MEMMOVE memmove
 #endif
 
-#ifndef _BC_RUNTIME_CHECKS
-#define BC_ASSERT(a) ((void)0)
+#ifndef _CP_RUNTIME_CHECKS
+#define CP_ASSERT(a) ((void)0)
 #else
-#ifndef BC_ASSERT
+#ifndef CP_ASSERT
 #include <assert.h>
-#define BC_ASSERT assert
+#define CP_ASSERT assert
 #endif
 #endif
 
 #ifdef __cplusplus
-#define BC_DECLTYPE_CAST(T) (decltype(T))
+#define CP_DECLTYPE_CAST(T) (decltype(T))
 #else
-#define BC_DECLTYPE_CAST(T)
+#define CP_DECLTYPE_CAST(T)
 #endif // __cplusplus
 
-#ifndef BC_INT_DEFINED
-    #ifdef BC_USE_INT /* optional for any system that might not have stdint.h */
+#ifndef CP_INT_DEFINED
+    #ifdef CP_USE_INT /* optional for any system that might not have stdint.h */
         typedef unsigned char       u8;
         typedef signed char         i8;
         typedef unsigned short     u16;
@@ -65,7 +65,7 @@
         typedef uint64_t u64;
         typedef int64_t  i64;
     #endif
-    #define BC_INT_DEFINED
+    #define CP_INT_DEFINED
 #endif
 
 #ifndef ARR_LEN
@@ -82,14 +82,14 @@
 #define da_reserve(da, expected_capacity) \
     do { \
         if ((expected_capacity) > (da)->capacity) { \
-            size_t new_capacity = (da)->capacity ? (da)->capacity : BC_DA_INIT_CAP; \
+            size_t new_capacity = (da)->capacity ? (da)->capacity : CP_DA_INIT_CAP; \
             while ((expected_capacity) > new_capacity) { \
                 new_capacity *= 2; \
             } \
-            void *new_items = BC_REALLOC((da)->items, new_capacity * sizeof(*(da)->items)); \
-            BC_ASSERT(new_items != NULL || (expected_capacity) == 0); \
+            void *new_items = CP_REALLOC((da)->items, new_capacity * sizeof(*(da)->items)); \
+            CP_ASSERT(new_items != NULL || (expected_capacity) == 0); \
             if (new_items || (expected_capacity) == 0) { \
-                (da)->items = BC_DECLTYPE_CAST((da)->items)new_items; \
+                (da)->items = CP_DECLTYPE_CAST((da)->items)new_items; \
                 (da)->capacity = new_capacity; \
             } \
         } \
@@ -99,7 +99,7 @@
     do { \
         if ((da)->capacity == 0) break; \
         if ((da)->count <= (da)->capacity / 4) (da)->capacity = (da)->count * 2; \
-        (da)->items = BC_REALLOC((da)->items, sizeof(*(da)->items) * (da)->capacity); \
+        (da)->items = CP_REALLOC((da)->items, sizeof(*(da)->items) * (da)->capacity); \
     } while (0)
 
 #define da_append(da, item) \
@@ -110,17 +110,24 @@
 
 #define da_insert(da, index, item) \
     do { \
-        (da)->count++; \
-        da_reserve((da), (da)->count); \
-        BC_MEMCPY((da)->items+(index)+1, (da)->items+(index), sizeof(*(da)->items)*((da)->count-index)); \
-        da_get(da, (index)) = item; \
+        size_t _idx = (size_t)(index); \
+        size_t _old = (da)->count; \
+        CP_ASSERT(_idx <= _old); \
+        da_reserve((da), _old + 1); \
+        if (_idx < _old) { \
+            CP_MEMMOVE((da)->items + _idx + 1, \
+                       (da)->items + _idx, \
+                       sizeof *(da)->items * (_old - _idx)); \
+        } \
+        (da)->count = _old + 1; \
+        da_get(da, _idx) = (item); \
     } while (0)
 
 #define da_get(da, index) \
-    (da)->items[BC_ASSERT((index) >= 0 && (index) < (da)->count), (index)]
+    (da)->items[CP_ASSERT((index) >= 0 && (index) < (da)->count), (index)]
 
 #define da_last(da) \
-    (da)->items[BC_ASSERT((da)->count > 0), ((da)->count - 1)]
+    (da)->items[CP_ASSERT((da)->count > 0), ((da)->count - 1)]
 
 #define da_resize(da, cnt) \
     do { \
@@ -138,7 +145,7 @@
 #define da_remove_ordered(da, index) \
     do { \
         da_get(da, index) = da_last(da); \
-        BC_MEMCPY((da)->items+(index), (da)->items+(index)+1, \
+        CP_MEMMOVE((da)->items+(index), (da)->items+(index)+1, \
                 sizeof(*(da)->items)*((da)->count-index)); \
         (da)->count--; \
     } while (0)
@@ -146,22 +153,22 @@
 #define da_free(da) \
     do { \
         if ((da)->items) \
-            BC_FREE((da)->items); \
+            CP_FREE((da)->items); \
         (da)->count = 0; \
         (da)->capacity = 0; \
     } while (0)
 
 #define da_remove_last(da) \
     do { \
-        BC_ASSERT((da)->count > 0); \
+        CP_ASSERT((da)->count > 0); \
         (da)->count--; \
     } while (0)
 
 #define da_append_many(da, new_items, new_items_count) \
     do { \
-        BC_ASSERT(new_items); \
+        CP_ASSERT(new_items); \
         da_reserve((da), (da)->count + (new_items_count)); \
-        BC_MEMCPY((da)->items + (da)->count, (new_items), (new_items_count)*sizeof(*(da)->items)); \
+        CP_MEMMOVE((da)->items + (da)->count, (new_items), (new_items_count)*sizeof(*(da)->items)); \
         (da)->count += (new_items_count); \
     } while (0)
 
@@ -192,7 +199,7 @@ extern i32 hashtable_type##_compare(key_type a, key_type b); \
 static void hashtable_type##_ensure_capacity(hashtable_type *ht) { \
     if (ht->capacity != 0) return; \
     ht->capacity = 128; \
-    ht->arr = (hashtable_type##_node**) BC_CALLOC(ht->capacity, sizeof(hashtable_type##_node*)); \
+    ht->arr = (hashtable_type##_node**) CP_CALLOC(ht->capacity, sizeof(hashtable_type##_node*)); \
 } \
 \
 void hashtable_type##_add(hashtable_type *ht, key_type key, value_type val) { \
@@ -206,7 +213,7 @@ void hashtable_type##_add(hashtable_type *ht, key_type key, value_type val) { \
         } \
         cur = cur->next; \
     } \
-    hashtable_type##_node *n = (hashtable_type##_node*) BC_CALLOC(1, sizeof(hashtable_type##_node)); \
+    hashtable_type##_node *n = (hashtable_type##_node*) CP_CALLOC(1, sizeof(hashtable_type##_node)); \
     n->key = key; \
     n->val = val; \
     n->next = ht->arr[idx]; \
@@ -215,7 +222,7 @@ void hashtable_type##_add(hashtable_type *ht, key_type key, value_type val) { \
     if (ht->count > ht->capacity * 2) { \
         size_t old_cap = ht->capacity; \
         size_t new_cap = old_cap * 3; \
-        hashtable_type##_node **new_arr = (hashtable_type##_node**) BC_CALLOC(new_cap, sizeof(hashtable_type##_node*)); \
+        hashtable_type##_node **new_arr = (hashtable_type##_node**) CP_CALLOC(new_cap, sizeof(hashtable_type##_node*)); \
         for (size_t i = 0; i < old_cap; ++i) { \
             hashtable_type##_node *it = ht->arr[i]; \
             while (it) { \
@@ -226,7 +233,7 @@ void hashtable_type##_add(hashtable_type *ht, key_type key, value_type val) { \
                 it = next; \
             } \
         } \
-        BC_FREE(ht->arr); \
+        CP_FREE(ht->arr); \
         ht->arr = new_arr; \
         ht->capacity = new_cap; \
     } \
@@ -251,7 +258,7 @@ void hashtable_type##_remove(hashtable_type *ht, key_type key) { \
     while (cur) { \
         if (hashtable_type##_compare(cur->key, key) == 0) { \
             if (prev) prev->next = cur->next; else ht->arr[idx] = cur->next; \
-            BC_FREE(cur); \
+            CP_FREE(cur); \
             ht->count--; \
             return; \
         } \
@@ -266,11 +273,11 @@ void hashtable_type##_free(hashtable_type *ht) { \
         hashtable_type##_node *cur = ht->arr[i]; \
         while (cur) { \
             hashtable_type##_node *next = cur->next; \
-            BC_FREE(cur); \
+            CP_FREE(cur); \
             cur = next; \
         } \
     } \
-    BC_FREE(ht->arr); \
+    CP_FREE(ht->arr); \
     ht->arr = NULL; \
     ht->capacity = 0; \
     ht->count = 0; \
@@ -280,7 +287,7 @@ void hashtable_type##_free(hashtable_type *ht) { \
     HT_DECL(hashtable_type, key_type, value_type) \
     HT_IMPL(hashtable_type, key_type, value_type)
 
-#define HT_FOREACH_NODE(hashtable_type, ht, nodevar) \
+#define ht_foreach_node(hashtable_type, ht, nodevar) \
     for (size_t _ht_idx = 0; (ht)->capacity && _ht_idx < (ht)->capacity; ++_ht_idx) \
         for (hashtable_type##_node *nodevar = (ht)->arr[_ht_idx]; nodevar; nodevar = nodevar->next)
 
@@ -359,4 +366,4 @@ static inline int sb_appendf(StringBuilder *sb, const char *fmt, ...) {
 #define sb_reset(sb)     da_resize(sb, 0)
 #define sb_free(sb)      da_free(sb)
 
-#endif // _BC_H_
+#endif // _CP_H_

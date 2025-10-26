@@ -6,7 +6,7 @@
 #include <threads.h>
 #include <stdbool.h>
 
-#include "../thirdparty/betterc.h"
+#include "../thirdparty/cplus.h"
 #include "../include/lexer.h"
 
 typedef enum {
@@ -26,9 +26,11 @@ typedef enum {
 	TYPE_POINTER,
 	TYPE_ARRAY,
 	TYPE_FUNCTION,
+	// user types
 	TYPE_STRUCT,
 } TypeKind;
 
+typedef struct UserType UserType;
 typedef struct Struct Struct;
 typedef struct Type Type;
 
@@ -39,18 +41,26 @@ struct Type {
 		struct { Type *base; } pointer;
 		struct { Type *elem; size_t length; } array;
 		struct { Type **params; size_t param_count; Type* ret; } function;
-		struct { char *name; } user;
+		UserType *user;
 	};
 };
 
-struct Struct {
-	DA(struct {
-		Type t;
-		char *id;
-	}) fields;
+typedef  struct {
+	Type type;
+	char *id;
+} Field;
+
+struct UserType {
+	TypeKind kind;
+
+	union {
+		struct {
+			DA(Field) fields;
+		} user_struct;
+	};
 };
 
-HT_DECL(UserStructs, char*, Struct)
+HT_DECL_STR(UserTypes, UserType)
 
 typedef enum {
 	EXPR_PARSING_VAR, EXPR_PARSING_FUNC_CALL,
@@ -109,6 +119,7 @@ typedef enum {
 	AST_OP_DEREF,
 	AST_OP_ARR,
 	AST_OP_VAR_EQ,
+	AST_OP_FIELD,
 } AST_ExprOp;
 
 typedef enum {
@@ -230,6 +241,7 @@ HT_DECL(SymbolTable, SymbolKey, Symbol)
 typedef struct {
 	Token *cur_token;
 	SymbolTable st;
+	UserTypes ut;
 	int nested[16], nptr;
 	AST_Node *program;
 } Parser;

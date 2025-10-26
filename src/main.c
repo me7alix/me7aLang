@@ -11,7 +11,7 @@
 #include "irdump.c"
 
 #define BC_STRING_BUILDER_IMPL
-#include "../thirdparty/betterc.h"
+#include "../thirdparty/cplus.h"
 
 char *read_file(const char *filename) {
 	FILE* file = fopen(filename, "rb");

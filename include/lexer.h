@@ -1,7 +1,7 @@
 #ifndef LEXER_H
 #define LEXER_H
 
-#include "../thirdparty/betterc.h"
+#include "../thirdparty/cplus.h"
 
 #include <stdlib.h>
 #include <stdint.h>

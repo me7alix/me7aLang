@@ -18,21 +18,8 @@ static char *argreg16[] = {"di",  "si",  "dx",  "cx",  "r8w", "r9w"};
 static char *argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
 static char *argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8",  "r9" };
 
-typedef DA(struct {
-	size_t index;
-	size_t off;
-}) OffTable;
-
-void OffTable_add(OffTable *t, size_t index, size_t off) {
-	if (index >= t->count) da_resize(t, index + 1);
-	da_get(t, index).index = index;
-	da_get(t, index).off = off;
-}
-
-size_t OffTable_get(OffTable *t, size_t index) {
-	if (index >= t->count) return 0;
-	return da_get(t, index).off;
-}
+HT_DECL(OffTable, size_t, size_t)
+HT_IMPL_NUM(OffTable, size_t, size_t)
 
 OffTable stack_table = {0};
 OffTable data_table  = {0};
@@ -93,11 +80,11 @@ char *opr_to_nasm(Operand opr) {
 			char ts[32]; type_to_stack(opr.var.type, ts);
 
 			if (opr.var.kind == VAR_STACK) {
-				size_t off = OffTable_get(&stack_table, opr.var.index); assert(off != -1);
+				size_t off = *OffTable_get(&stack_table, opr.var.index);
 				sprintf(opr_to_nasm_buf, "%s [rbp - %zu]", ts, off);
 			} else if (opr.var.kind == VAR_ADDR) {
 				if (opr.var.addr_kind == VAR_STACK) {
-					size_t off = OffTable_get(&stack_table, opr.var.index); assert(off != -1);
+					size_t off = *OffTable_get(&stack_table, opr.var.index);
 					sb_appendf(&body, TAB"mov rdx, qword [rbp - %zu]\n", off);
 					sprintf(opr_to_nasm_buf, "%s [rdx]", ts);
 				} else if (opr.var.addr_kind == VAR_DATAOFF) {
@@ -360,13 +347,12 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			case OP_ASSIGN: {
 				bool is_first_assign = false;
 				if (ci.dst.var.kind != VAR_ADDR) {
-					size_t off = OffTable_get(&stack_table, ci.dst.var.index);
+					size_t *off = OffTable_get(&stack_table, ci.dst.var.index);
 
-					if (off == 0) {
+					if (!off) {
 						is_first_assign = true;
 						total_offset_add(get_type_size(ci.dst.var.type));
-						off = total_offset;
-						OffTable_add(&stack_table, ci.dst.var.index, off);
+						OffTable_add(&stack_table, ci.dst.var.index, total_offset);
 					}
 				}
 
@@ -388,13 +374,13 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			case OP_REF: {
 				if (ci.arg1.var.kind == VAR_ADDR) {
 					if (ci.arg1.var.addr_kind == VAR_STACK) {
-						size_t off = OffTable_get(&stack_table, ci.arg1.var.index);
+						size_t off = *OffTable_get(&stack_table, ci.arg1.var.index);
 						sb_appendf(&body, TAB"mov rax, [rbp - %zu]\n", off);
 					} else if (ci.arg1.var.addr_kind == VAR_DATAOFF) {
 						sb_appendf(&body, TAB"lea rax, [rel D%zu]\n", ci.arg1.var.index);
 					}
 				} else if (ci.arg1.var.kind == VAR_STACK) {
-					size_t off = OffTable_get(&stack_table, ci.arg1.var.index);
+					size_t off = *OffTable_get(&stack_table, ci.arg1.var.index);
 					sb_appendf(&body, TAB"lea rax, [rbp - %zu]\n", off);
 				} else if (ci.arg1.var.kind == VAR_DATAOFF) {
 					sb_appendf(&body, TAB"lea rax, [rel D%zu]\n", ci.arg1.var.index);
@@ -420,22 +406,24 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			} break;
 
 			case OP_RETURN: {
-				switch (func.ret_type.kind) {
-					case TYPE_POINTER:
-					case TYPE_I64:
-						sb_appendf(&body, TAB"mov rax, %s\n", opr_to_nasm(ci.arg1));
-						break;
+				if (ci.arg1.type != OPR_NULL) {
+					switch (func.ret_type.kind) {
+						case TYPE_POINTER:
+						case TYPE_I64:
+							sb_appendf(&body, TAB"mov rax, %s\n", opr_to_nasm(ci.arg1));
+							break;
 
-					case TYPE_INT:
-						sb_appendf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
-						break;
+						case TYPE_INT:
+							sb_appendf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
+							break;
 
-					case TYPE_I8:
-					case TYPE_BOOL:
-						sb_appendf(&body, TAB"mov al, %s\n", opr_to_nasm(ci.arg1));
-						break;
+						case TYPE_I8:
+						case TYPE_BOOL:
+							sb_appendf(&body, TAB"mov al, %s\n", opr_to_nasm(ci.arg1));
+							break;
 
-					default: unreachable;
+						default: unreachable;
+					}
 				}
 
 				sb_appendf(&body, TAB"mov rsp, rbp\n");

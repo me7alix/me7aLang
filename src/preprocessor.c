@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "../thirdparty/betterc.h"
+#include "../thirdparty/cplus.h"
 #include "../include/preprocessor.h"
 
 typedef DA(Token) Macro;

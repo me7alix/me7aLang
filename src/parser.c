@@ -26,12 +26,12 @@ void set_nested(int pn[16], int n[16]) {
 	memcpy(n, pn, 16 * sizeof(int));
 }
 
+HT_IMPL_STR(UserTypes, UserType)
 HT_IMPL(SymbolTable, SymbolKey, Symbol)
 
-uint64_t SymbolTable_hashf(SymbolKey key) {
-	uint64_t res; strhash(&res, key.id);
-	res = hash_combine(res, numhash(key.type));
-	return res;
+u64 SymbolTable_hashf(SymbolKey key) {
+	u64 res; strhash(&res, key.id);
+	return hash_combine(res, numhash(key.type));
 }
 
 int SymbolTable_compare(SymbolKey cur_key, SymbolKey key) {
@@ -97,22 +97,28 @@ Type parse_type(Parser *p) {
 		expect_token(parser_next(p), TOK_CSQBRA);
 	}
 
-	char *type_name = parser_peek(p)->data;
-	if (strcmp(type_name, "int") == 0) {
+	char *tname = parser_peek(p)->data;
+	if (strcmp(tname, "int") == 0) {
 		type.kind = TYPE_INT;
-	} else if (strcmp(type_name, "f32") == 0) {
+	} else if (strcmp(tname, "f32") == 0) {
 		type.kind = TYPE_F32;
-	} else if (strcmp(type_name, "bool") == 0) {
+	} else if (strcmp(tname, "bool") == 0) {
 		type.kind = TYPE_BOOL;
-	} else if (strcmp(type_name, "i8") == 0) {
+	} else if (strcmp(tname, "i8") == 0) {
 		type.kind = TYPE_I8;
-	} else if (strcmp(type_name, "i64") == 0) {
+	} else if (strcmp(tname, "i64") == 0) {
 		type.kind = TYPE_I64;
-	} else if (strcmp(type_name, "iptr") == 0) {
+	} else if (strcmp(tname, "iptr") == 0) {
 		type.kind = TYPE_IPTR;
-	} else if (strcmp(type_name, "u0") == 0) {
+	} else if (strcmp(tname, "u0") == 0) {
 		type.kind = TYPE_NULL;
-	} else lexer_error(loc, "error: no such type");
+	} else {
+		UserType *utype = UserTypes_get(&p->ut, tname);
+		if (utype) {
+			type.kind = utype->kind,
+				type.user = utype;
+		} else lexer_error(loc, "error: no such type");
+	}
 
 	if (is_pointer) {
 		Type *base = malloc(sizeof(Type)); *base = type;
@@ -218,11 +224,19 @@ AST_Node *parse_func_return(Parser *p, AST_Node *func) {
 	AST_Node *ret = ast_new({
 		.kind = AST_FUNC_RET,
 		.loc = parser_peek(p)->loc,
+		.func_ret.type = func->func_def.type,
 	});
 
 	parser_next(p);
-	ret->func_ret.exp = parse_expr(p, EXPR_PARSING_VAR, &func->func_def.type);
-	ret->func_ret.type = func->func_def.type;
+	if (parser_peek(p)->type == TOK_SEMI) {
+		if (ret->func_ret.type.kind != TYPE_NULL)
+			lexer_error(ret->loc, "error: you must return something");
+		ret->func_ret.type = (Type) {.kind = TYPE_NULL};
+	} else {
+		ret->func_ret.exp = parse_expr(p, EXPR_PARSING_VAR, NULL);
+		if (!compare_types(parser_get_type(p, ret->func_ret.exp), ret->func_ret.type))
+			lexer_error(ret->func_ret.exp->loc, "error: wrong type");
+	}
 	return ret;
 }
 
@@ -235,7 +249,7 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 		.loc = (parser_peek(p)-1)->loc,
 	});
 
-	r->stmt_if.exp = parse_expr(p, EXPR_PARSING_STMT, NULL);
+		r->stmt_if.exp = parse_expr(p, EXPR_PARSING_STMT, NULL);
 	parser_next(p);
 	r->stmt_if.body = parse_body(p, func);
 
@@ -489,14 +503,22 @@ void parse_extern(Parser *p) {
 
 void parse_struct(Parser *p) {
 	parser_next(p);
+
+	UserType st = { .kind = TYPE_STRUCT };
 	char *struct_id = parser_next(p)->data;
+
 	expect_token(parser_next(p), TOK_OBRA);
 	while (parser_peek(p)->type != TOK_CBRA) {
-		if (parser_peek(p)->type == TOK_ID) {
-			Type t = parse_type(p);
-		} else unreachable;
+		expect_token(parser_peek(p), TOK_ID);
+		char *id = parser_next(p)->data;
+		Type type = parse_type(p);
+		da_append(&st.user_struct.fields, ((Field){type, id}));
 		parser_next(p);
+		if (parser_peek(p)->type == TOK_COM)
+			parser_next(p);
 	}
+
+	UserTypes_add(&p->ut, struct_id, st);
 }
 
 Parser parser_parse(Token *tokens) {
@@ -507,6 +529,10 @@ Parser parser_parse(Token *tokens) {
 
 	while (parser_peek(&p)->type != TOK_EOF) {
 		switch (parser_peek(&p)->type) {
+			case TOK_STRUCT:
+				parse_struct(&p);
+				break;
+
 			case TOK_EXTERN:
 				parse_extern(&p);
 				break;
