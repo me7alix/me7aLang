@@ -113,7 +113,7 @@ game_init() {
 	snake_dy = 0
 }
 
-main(): int {
+main() {
 	srand(time(null))
 	game_init()
 
@@ -160,5 +160,4 @@ main(): int {
 	}
 
 	rl_close_window()
-	return 0
 }

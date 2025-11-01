@@ -4,7 +4,7 @@ change_fifth(nums: [10]int) {
 	*(nums + 4) = 111
 }
 
-main(): int {
+main() {
 	nums: [10]int
 
 	for i: iptr = 0; i < 10; i+=1 {
@@ -32,6 +32,4 @@ main(): int {
 	}
 
 	heap_free(nums2)
-	
-	return 0
 }

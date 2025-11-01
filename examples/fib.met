@@ -1,6 +1,6 @@
 import "std.met"
 
-main(): int {
+main() {
 	print_str("cnt: ")
 
 	cnt := input_int()
@@ -14,6 +14,4 @@ main(): int {
 		b = b + a
 		a = l
 	}
-
-	return 0
 }

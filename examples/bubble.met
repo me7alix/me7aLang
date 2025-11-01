@@ -16,7 +16,7 @@ bubble_sort(arr: *int, cnt: iptr) {
 	}
 }
 
-main(): int {
+main() {
 	arr: [10]int
 	arr[0] = 20
 	arr[1] = 2
@@ -34,6 +34,4 @@ main(): int {
 	for i: iptr = 0; i < 10; i+=1 {
 		print_int(arr[i])
 	}
-
-	return 0
 }

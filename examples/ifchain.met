@@ -1,6 +1,6 @@
 import "std.met"
 
-main(): int {
+main() {
 	for i := 0; i < 20; i+=1 {
 		if i < 5 {
 			print_char('a')
@@ -15,6 +15,4 @@ main(): int {
 		print_char(' ')
 		print_int(i)
 	}
-
-	return 0
 }
