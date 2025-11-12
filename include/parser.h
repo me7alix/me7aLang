@@ -40,7 +40,7 @@ struct Type {
 	union {
 		struct { Type *base; } pointer;
 		struct { Type *elem; size_t length; } array;
-		struct { Type **params; size_t param_count; Type* ret; } function;
+		struct { Type **params; size_t param_count; Type* ret; } func;
 		UserType *user;
 	};
 };
@@ -56,7 +56,7 @@ struct UserType {
 	union {
 		struct {
 			DA(Field) fields;
-		} user_struct;
+		} ustruct;
 	};
 };
 
@@ -124,7 +124,7 @@ typedef enum {
 
 typedef enum {
 	AST_WHILE_STMT, AST_IF_STMT, AST_BIN_EXP,
-	AST_VAR_DEF, AST_VAR, AST_LITERAL, AST_TYPE,
+	AST_VAR_DEF, AST_VID, AST_LITERAL, AST_TYPE,
 	AST_FUNC_CALL_ARG, AST_FUNC_CALL, AST_BODY,
 	AST_FUNC_DEF, AST_FUNC_DEF_ARG, AST_FUNC_RET,
 	AST_STRING, AST_VAR_MUT, AST_FUNC_RET_TYPE,
@@ -171,7 +171,7 @@ struct AST_Node {
 		struct {
 			AST_Node *exp;
 			AST_Node *body;
-			AST_Node *next; // chain of if, else if and else
+			AST_Node *next;
 		} stmt_if;
 		struct {
 			AST_Node *body;
@@ -182,7 +182,7 @@ struct AST_Node {
 		} stmt_while;
 		struct {
 			AST_Node *var;
-			AST_Node *exp;
+			AST_Node *expr;
 			AST_Node *mut;
 			AST_Node *body;
 		} stmt_for;
@@ -190,24 +190,24 @@ struct AST_Node {
 			AST_ExprOp op;
 			Type type;
 			AST_Node *v;
-		} exp_unary;
+		} expr_unary;
 		struct {
 			AST_ExprOp op;
 			Type type;
 			AST_Node *l, *r;
-		} exp_binary;
+		} expr_binary;
 		struct {
 			char *id;
 			Type type;
 		} func_def_arg;
 		struct {
-			AST_Node *exp;
+			AST_Node *expr;
 			Type type;
 		} func_ret;
 		Literal literal;
 		Type vtype;
 		AST_Node *func_ret_exp;
-		char *var_id;
+		char *vid;
 	};
 };
 

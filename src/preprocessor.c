@@ -21,9 +21,9 @@ int pathcmp(const char *a, const char *b) {
 	return strcmp(ra, rb);
 }
 
-uint64_t ImportedTable_hashf(char *str) {
+u64 ImportedTable_hashf(char *str) {
 	char ra[512];
-	uint64_t res;
+	u64 res;
 	realpath(str, ra);
 	strhash(&res, ra);
 	return res;

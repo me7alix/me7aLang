@@ -13,7 +13,7 @@ typedef enum {
 	OP_MOD, OP_OR, OP_AND, OP_EQ, OP_NOT_EQ,
 	OP_LESS, OP_GREAT, OP_LESS_EQ,
 	OP_GREAT_EQ, OP_CAST, OP_NOT,
-	OP_REF, OP_DEREF,
+	OP_REF, OP_DEREF, OP_FADDR,
 
 	OP_LABEL,
 	OP_JUMP, OP_JUMP_IF_NOT,
@@ -30,6 +30,7 @@ typedef enum {
 	OPR_NAME,
 	OPR_VAR,
 	OPR_SIZEOF,
+	OPR_FIELD,
 } OperandType;
 
 typedef enum {
@@ -43,7 +44,8 @@ typedef struct {
 
 	union {
 		Literal literal;
-		size_t label_index;
+		u64 label_id;
+		char *field_id;
 		char *name;
 		struct {
 			Type type;
@@ -53,14 +55,15 @@ typedef struct {
 			Type type;
 		} func_ret;
 		struct {
-			size_t arg_ind;
+			u64 arg_id;
 			Type type;
 		} func_inp;
 		struct {
 			VarKind kind;
 			Type type;
-			int64_t index;
 			VarKind addr_kind;
+			u64 addr_id;
+			DA(char*) off;
 		} var;
 	};
 } Operand;
@@ -98,8 +101,8 @@ typedef struct {
 
 typedef struct {
 	Type type;
-	int64_t index;
-	uint8_t *data;
+	u64 index;
+	u8 *data;
 } GlobalVar;
 
 typedef struct {
@@ -108,7 +111,7 @@ typedef struct {
 	DA(Func) funcs;
 } Program;
 
-Type *ir_get_opr_type(Operand *op);
+Type ir_get_opr_type(Operand op);
 Program ir_gen_prog(Parser *parser);
 
 #endif // IR_H

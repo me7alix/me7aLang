@@ -1,6 +1,5 @@
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -9,41 +8,67 @@
 #include "../include/parser.h"
 #include "irgen_calc.c"
 
-int64_t dataoff_index = 0;
-int64_t var_index = 0;
-size_t label_index = 0;
+u64 dataoff_id = 1;
+u64 var_id     = 1;
+u64 label_id   = 1;
 
 HT_STR(ASTVarTable, Operand)
 ASTVarTable avt = {0};
 
-Type *ir_get_opr_type(Operand *op) {
+Type get_struct_type(Operand var) {
+	Type res = var.var.type;
+
+	for (size_t i = 0; i < var.var.off.count; i++) {
+		char *off = da_get(&var.var.off, i);
+		da_foreach (Field, field, &var.var.type.user->ustruct.fields) {
+			if (strcmp(field->id, off) == 0) {
+				var.var.type = field->type;
+				res = field->type;
+				break;
+			}
+		}
+	}
+
+	return res;
+}
+
+Type ir_get_opr_type(Operand op) {
 	static Type tiptr = {.kind = TYPE_IPTR};
-	switch (op->type) {
-		case OPR_VAR:      return &op->var.type;
-		case OPR_LITERAL:  return &op->literal.type;
-		case OPR_FUNC_INP: return &op->func_inp.type;
-		case OPR_FUNC_RET: return &op->func_ret.type;
-		case OPR_SIZEOF:   return &tiptr;
-		default: unreachable; return NULL;
+
+	switch (op.type) {
+		case OPR_VAR: {
+			if (op.var.type.kind == TYPE_STRUCT)
+				return get_struct_type(op);
+			return op.var.type;
+		} break;
+		case OPR_LITERAL:  return op.literal.type;
+		case OPR_FUNC_INP: return op.func_inp.type;
+		case OPR_FUNC_RET: return op.func_ret.type;
+		case OPR_SIZEOF:   return tiptr;
+		default: printf("%d\n", op.type); unreachable; return (Type) {0};
 	}
 }
 
+typedef struct {
+	bool is_right_of_eq;
+	u64  last_var;
+	bool is_field_gen;
+	bool is_field_op;
+} IRGenExprCtx;
+
 void ir_gen_func_call(Program *prog, Func *func, AST_Node *cn);
 
-bool before_eq;
-int64_t last_var;
-
-Operand ir_gen_deref(Func *func, Type type, Operand var) {
+Operand ir_gen_deref(IRGenExprCtx *ctx, Func *func, Type type, Operand var) {
 	Operand ret = (Operand) {
 		.type = OPR_VAR,
 		.var.kind = VAR_ADDR,
 		.var.type = type,
-		.var.index = var.var.index,
+		.var.addr_id = var.var.addr_id,
 		.var.addr_kind = var.var.kind,
 	};
 
-	if (!before_eq) {
-		last_var = -1;
+	if (!ctx->is_right_of_eq) {
+		ctx->last_var = 0;
 		return ret;
 	} else {
 		da_append(&func->body, ((Instruction){
@@ -52,7 +77,7 @@ Operand ir_gen_deref(Func *func, Type type, Operand var) {
 			.dst = (Operand) {
 				.type = OPR_VAR,
 				.var.type = type,
-				.var.index = var_index++,
+				.var.addr_id = var_id++,
 			}
 		}));
 
@@ -60,16 +85,16 @@ Operand ir_gen_deref(Func *func, Type type, Operand var) {
 	}
 }
 
-Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
+Operand ir_gen_expr(IRGenExprCtx *ctx, Program *prog, Func *func, AST_Node *en) {
 	if (!en) {
-		last_var = -1;
+		ctx->last_var = 0;
 		return (Operand) {.type = OPR_NULL};
 	}
 
 	static Type ti8 = {.kind = TYPE_I8};
 	switch (en->kind) {
 		case AST_LITERAL: {
-			last_var = -1;
+			ctx->last_var = 0;
 			if (en->literal.kind == LIT_STR) {
 				da_append(&prog->globals, ((GlobalVar){
 					.type = (Type) {
@@ -77,26 +102,37 @@ Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 						.array.elem = &ti8,
 						.array.length = strlen(en->literal.str) + 1
 					},
-					.index = dataoff_index,
-					.data = (uint8_t*) en->literal.str,
+					.index = dataoff_id,
+					.data = (u8*) en->literal.str,
 				}));
+
 				return (Operand) {
 					.type = OPR_VAR,
 					.var.kind = VAR_ADDR,
 					.var.type = (Type) {.kind = TYPE_POINTER, .pointer.base = &ti8},
-					.var.index = dataoff_index++,
+					.var.addr_id = dataoff_id++,
 					.var.addr_kind = VAR_DATAOFF,
 				};
 			}
+
 			return (Operand) {
 				.type = OPR_LITERAL,
 				.literal = en->literal,
 			};
 		};
 
-		case AST_VAR: {
-			last_var = -1;
-			return *ASTVarTable_get(&avt, en->var_id);
+		case AST_VID: {
+			if (ctx->is_field_gen) {
+				ctx->last_var = 0;
+				return (Operand) {
+					.type = OPR_FIELD,
+					.field_id = en->vid,
+				};
+			} else {
+				Operand *var = ASTVarTable_get(&avt, en->vid);
+				ctx->last_var = 0;
+				return *var;
+			}
 		} break;
 
 		case AST_FUNC_CALL: {
@@ -113,26 +149,45 @@ Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 				.dst = (Operand) {
 					.type = OPR_VAR,
 					.var.type = en->func_call.type,
-					.var.index = var_index++,
+					.var.addr_id = var_id++,
 				},
 			};
 
-			last_var = inst.dst.var.index;
+			ctx->last_var = inst.dst.var.addr_id;
 			da_append(&func->body, inst);
 			return inst.dst;
 		} break;
 
 		case AST_BIN_EXP: {
-			Operand l = ir_gen_expr(prog, func, en->exp_binary.l);
-			Operand r = ir_gen_expr(prog, func, en->exp_binary.r);
+			bool is_op_field = en->expr_binary.op == AST_OP_FIELD;
+			if (is_op_field) ctx->is_field_gen = false;
+			Operand l = ir_gen_expr(ctx, prog, func, en->expr_binary.l);
+			if (is_op_field) ctx->is_field_gen = true;
+			Operand r = ir_gen_expr(ctx, prog, func, en->expr_binary.r);
 
-			bool ret; Operand calc = ir_opr_calc(en, l, r, &ret);
-			if (ret) return calc;
+			if (is_op_field) {
+				ctx->is_field_gen = false;
+				da_append(&l.var.off, r.field_id);
+				return l;
+			}
 
-			bool is_arr = en->exp_binary.op == AST_OP_ARR;
-			Type exp_type = is_arr ?
-				(Type) { .kind = TYPE_POINTER, .pointer.base = &en->exp_binary.type } :
-				en->exp_binary.type;
+			Operand ret; if (ir_opr_calc(en, l, r, &ret)) {
+				return ret;
+			}
+
+			Type exp_type;
+			switch (en->expr_binary.op) {
+				case AST_OP_FIELD:
+				case AST_OP_ARR:
+					exp_type = (Type) {
+						.kind = TYPE_POINTER,
+						.pointer.base = &en->expr_binary.type
+					};
+					break;
+				default:
+					exp_type = en->expr_binary.type;
+					break;
+			}
 
 			Instruction inst = {
 				.arg1 = l,
@@ -140,11 +195,12 @@ Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 				.dst = (Operand){
 					.type = OPR_VAR,
 					.var.type = exp_type,
-					.var.index = var_index++,
+					.var.kind = VAR_STACK,
+					.var.addr_id = var_id++,
 				},
 			};
 
-			switch (en->exp_binary.op) {
+			switch (en->expr_binary.op) {
 				case AST_OP_ADD:      inst.op = OP_ADD;      break;
 				case AST_OP_SUB:      inst.op = OP_SUB;      break;
 				case AST_OP_MUL:      inst.op = OP_MUL;      break;
@@ -158,14 +214,17 @@ Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 				case AST_OP_NOT_EQ:   inst.op = OP_NOT_EQ;   break;
 				case AST_OP_AND:      inst.op = OP_AND;      break;
 				case AST_OP_OR:       inst.op = OP_OR;       break;
-				case AST_OP_ARR:      break;
+				case AST_OP_FIELD:    inst.op = OP_FADDR;    break;
+				case AST_OP_ARR:                             break;
 				default: unreachable;
 			}
 
 			// pointers arithmetic
-			if (inst.op == OP_ADD || inst.op == OP_SUB || is_arr) {
-				Type lt = *ir_get_opr_type(&l);
-				Type rt = *ir_get_opr_type(&r);
+			if (inst.op == OP_ADD ||
+				inst.op == OP_SUB ||
+				en->expr_binary.op == AST_OP_ARR) {
+				Type lt = ir_get_opr_type(l);
+				Type rt = ir_get_opr_type(r);
 
 				if (is_pointer(lt) || is_pointer(rt)) {
 					Type ptr_base;
@@ -178,10 +237,10 @@ Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 						tm = l;
 					}
 
-					Operand dst = (Operand){
+					Operand dst = {
 						.type = OPR_VAR,
 						.var.type = exp_type,
-						.var.index = var_index++,
+						.var.addr_id = var_id++,
 					};
 
 					Instruction mult = {
@@ -198,63 +257,63 @@ Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 					da_append(&func->body, mult);
 					if (is_pointer(lt)) inst.arg2 = dst;
 					if (is_pointer(rt)) inst.arg1 = dst;
-					if (is_arr) {
+					if (en->expr_binary.op == AST_OP_ARR) {
 						inst.op = OP_ADD;
 						da_append(&func->body, inst);
-						return ir_gen_deref(func, *exp_type.pointer.base, inst.dst);
+						return ir_gen_deref(ctx, func, *exp_type.pointer.base, inst.dst);
 					}
 				}
 			}
 
-			last_var = inst.dst.var.index;
+			ctx->last_var = inst.dst.var.addr_id;
 			da_append(&func->body, inst);
 			return inst.dst;
 		} break;
 
 		case AST_UN_EXP: {
-			if (en->exp_unary.op == AST_OP_SIZEOF) {
-				Operand arg1 = ir_gen_expr(prog, func, en->exp_unary.v);
-				last_var = -1;
+			if (en->expr_unary.op == AST_OP_SIZEOF) {
+				Operand arg = ir_gen_expr(ctx, prog, func, en->expr_unary.v);
+				ctx->last_var = 0;
 				return (Operand) {
 					.type = OPR_SIZEOF,
-					.size_of.type = en->exp_unary.type,
-					.size_of.v_type = *ir_get_opr_type(&arg1),
+					.size_of.type = en->expr_unary.type,
+					.size_of.v_type = ir_get_opr_type(arg),
 				};
-			} else if (en->exp_unary.op == AST_OP_DEREF) {
-				Operand arg1 = ir_gen_expr(prog, func, en->exp_unary.v);
-				return ir_gen_deref(func, en->exp_unary.type, arg1);
+			} else if (en->expr_unary.op == AST_OP_DEREF) {
+				Operand arg = ir_gen_expr(ctx, prog, func, en->expr_unary.v);
+				return ir_gen_deref(ctx, func, en->expr_unary.type, arg);
 			}
 
-			Operand arg = ir_gen_expr(prog, func, en->exp_unary.v);
-			bool ret; Operand calc = ir_opr_calc(en, arg, (Operand){}, &ret);
-			if (ret) return calc;
+			Operand arg = ir_gen_expr(ctx, prog, func, en->expr_unary.v);
+			Operand ret; if (ir_opr_calc(en, arg, (Operand){}, &ret)) {
+				return ret;
+			}
 
 			Instruction inst = {
 				.arg1 = arg,
 				.dst = (Operand){
 					.type = OPR_VAR,
-					.var.type = en->exp_unary.type,
-					.var.index = var_index++,
+					.var.type = en->expr_unary.type,
+					.var.addr_id = var_id++,
 				},
 			};
 
-			switch (en->exp_unary.op) {
-				case AST_OP_CAST:  inst.op = OP_CAST;  break;
-				case AST_OP_NOT:   inst.op = OP_NOT;   break;
-				case AST_OP_NEG:   inst.op = OP_NEG;   break;
-				case AST_OP_REF:   inst.op = OP_REF;   break;
+			switch (en->expr_unary.op) {
+				case AST_OP_CAST: inst.op = OP_CAST; break;
+				case AST_OP_NOT:  inst.op = OP_NOT;  break;
+				case AST_OP_NEG:  inst.op = OP_NEG;  break;
+				case AST_OP_REF:  inst.op = OP_REF;  break;
 				default: unreachable;
 			}
 
 			if (inst.op == OP_CAST) {
-				Type *lt = ir_get_opr_type(&inst.arg1);
-				Type *rt = ir_get_opr_type(&inst.dst);
-				if (lt->kind == rt->kind || (is_pointer(*lt) && is_pointer(*rt))) {
+				Type lt = ir_get_opr_type(inst.arg1);
+				Type rt = ir_get_opr_type(inst.dst);
+				if (lt.kind == rt.kind || (is_pointer(lt) && is_pointer(rt)))
 					inst.op = OP_ASSIGN;
-				}
 			}
 
-			last_var = inst.dst.var.index;
+			ctx->last_var = inst.dst.var.addr_id;
 			da_append(&func->body, inst);
 			return inst.dst;
 		} break;
@@ -268,15 +327,17 @@ Operand ir_gen_expr(Program *prog, Func *func, AST_Node *en) {
 void ir_dump_opr(Operand opr, char *buf);
 
 void ir_gen_var_def(Program *prog, Func *func, AST_Node *cn) {
-	Operand res = ir_gen_expr(prog, func, cn->var_def.exp);
-	if (last_var == -1) {
+	IRGenExprCtx ctx = {0};
+	Operand res = ir_gen_expr(&ctx, prog, func, cn->var_def.exp);
+
+	if (ctx.last_var == 0) {
 		da_append(&func->body, ((Instruction){
 			.op = OP_ASSIGN,
 			.arg1 = res,
 			.dst = (Operand) {
 				.type = OPR_VAR,
 				.var.type = cn->var_def.type,
-				.var.index = var_index,
+				.var.addr_id = var_id,
 			},
 		}));
 
@@ -284,28 +345,28 @@ void ir_gen_var_def(Program *prog, Func *func, AST_Node *cn) {
 			.type = OPR_VAR,
 			.var.kind = VAR_STACK,
 			.var.type = cn->var_def.type,
-			.var.index = var_index++
+			.var.addr_id = var_id++
 		});
 	} else {
 		ASTVarTable_add(&avt, cn->var_def.id, (Operand) {
 			.type = OPR_VAR,
 			.var.kind = VAR_STACK,
 			.var.type = cn->var_def.type,
-			.var.index = last_var,
+			.var.addr_id = ctx.last_var,
 		});
 	}
 }
 
 void ir_gen_var_mut(Program *prog, Func *func, AST_Node *cn) {
-	before_eq = false;
-	Operand dst = ir_gen_expr(prog, func, cn->var_mut.exp->exp_binary.l);
-	before_eq = true;
-	Operand res = ir_gen_expr(prog, func, cn->var_mut.exp->exp_binary.r);
-	before_eq = false;
+	IRGenExprCtx ctx = {0};
+	ctx.is_right_of_eq = false;
+	Operand dst = ir_gen_expr(&ctx, prog, func, cn->var_mut.exp->expr_binary.l);
+	ctx.is_right_of_eq = true;
+	Operand res = ir_gen_expr(&ctx, prog, func, cn->var_mut.exp->expr_binary.r);
 
 	OpCode op_eq;
 	bool is_op_eq;
-	switch (cn->var_mut.exp->exp_binary.op) {
+	switch (cn->var_mut.exp->expr_binary.op) {
 		case AST_OP_ADD_EQ: op_eq = OP_ADD; is_op_eq = true; break;
 		case AST_OP_SUB_EQ: op_eq = OP_SUB; is_op_eq = true; break;
 		case AST_OP_MUL_EQ: op_eq = OP_MUL; is_op_eq = true; break;
@@ -321,7 +382,7 @@ void ir_gen_var_mut(Program *prog, Func *func, AST_Node *cn) {
 			.dst = (Operand) {
 				.type = OPR_VAR,
 				.var.type = cn->var_mut.type,
-				.var.index = var_index++,
+				.var.addr_id = var_id++,
 			},
 		};
 
@@ -352,41 +413,46 @@ void ir_gen_func_call(Program *prog, Func *func, AST_Node *cn) {
 	assert(cn->func_call.args.count < 7);
 	for (size_t i = 0; i < cn->func_call.args.count; i++) {
 		AST_Node *arg = da_get(&cn->func_call.args, i);
-		func_call.args[i] = ir_gen_expr(prog, func, arg);
+		IRGenExprCtx ctx = {0};
+		func_call.args[i] = ir_gen_expr(&ctx, prog, func, arg);
 	}
 
 	func_call.args[cn->func_call.args.count] = (Operand) {.type = OPR_NULL};
 	da_append(&func->body,  func_call);
 }
 
-size_t lbl_st, lbl_ex;
-AST_Node *for_var_mut;
-int loop_gen;
+typedef struct {
+	u64 label_start;
+	u64 label_end;
+	AST_Node *for_var_mut;
+	int loop_gen;
+} IRGenBodyCtx;
 
-void ir_gen_body(Program *prog, Func *func, AST_Node *fn);
+void ir_gen_body(IRGenBodyCtx *ctx, Program *prog, Func *func, AST_Node *fn);
 
-void ir_gen_if_chain(Program *prog, Func *func, AST_Node *cn) {
-	Operand res = ir_gen_expr(prog, func, cn->stmt_if.exp);
-	size_t lbl = label_index++;
-	size_t lbl_ex = label_index++;
+void ir_gen_if_chain(IRGenBodyCtx *ctx, Program *prog, Func *func, AST_Node *cn) {
+	IRGenExprCtx ectx = {0};
+	Operand res = ir_gen_expr(&ectx, prog, func, cn->stmt_if.exp);
+	u64 label_start = label_id++;
+	u64 label_end = label_id++;
 
 	da_append(&func->body, ((Instruction){
 		.op = OP_JUMP_IF_NOT,
 		.arg1 = res,
 		.dst = (Operand) {
 			.type = OPR_LABEL,
-			.label_index = lbl,
+			.label_id = label_start,
 		},
 	}));
 
-	ir_gen_body(prog, func, cn->stmt_if.body);
+	ir_gen_body(ctx, prog, func, cn->stmt_if.body);
 
 	if (cn->stmt_if.next) {
 		da_append(&func->body, ((Instruction){
 			.op = OP_JUMP,
 			.dst = (Operand) {
 				.type = OPR_LABEL,
-				.label_index = lbl_ex,
+				.label_id = label_end,
 			},
 		}));
 	}
@@ -395,33 +461,35 @@ void ir_gen_if_chain(Program *prog, Func *func, AST_Node *cn) {
 		.op = OP_LABEL,
 		.arg1 = (Operand) {
 			.type = OPR_LABEL,
-			.label_index = lbl,
+			.label_id = label_start,
 		},
 	}));
 
 	if (cn->stmt_if.next) {
 		if (cn->stmt_if.next->kind == AST_IF_STMT) {
-			ir_gen_if_chain(prog, func, cn->stmt_if.next);
+			ir_gen_if_chain(ctx, prog, func, cn->stmt_if.next);
 		} else if (cn->stmt_if.next->kind == AST_ELSE_STMT) {
-			ir_gen_body(prog, func, cn->stmt_if.next->stmt_else.body);
+			ir_gen_body(ctx, prog, func, cn->stmt_if.next->stmt_else.body);
 		} else unreachable;
 
 		da_append(&func->body, ((Instruction){
 			.op = OP_LABEL,
 			.arg1 = (Operand) {
 				.type = OPR_LABEL,
-				.label_index = lbl_ex,
+				.label_id = label_end,
 			},
 		}));
 	}
 }
 
-void ir_gen_body(Program *prog, Func *func, AST_Node *fn) {
+void ir_gen_body(IRGenBodyCtx *ctx, Program *prog, Func *func, AST_Node *fn) {
 	for (size_t i = 0; i < fn->body.stmts.count; i++) {
 		AST_Node *cn = da_get(&fn->body.stmts, i);
 		switch (cn->kind) {
-			case AST_VAR_DEF: ir_gen_var_def(prog, func, cn); break;
-			case AST_FUNC_CALL: ir_gen_func_call(prog, func, cn); break;
+			case AST_VAR_DEF:   ir_gen_var_def(prog, func, cn);       break;
+			case AST_FUNC_CALL: ir_gen_func_call(prog, func, cn);     break;
+			case AST_VAR_MUT:   ir_gen_var_mut(prog, func, cn);       break;
+			case AST_IF_STMT:   ir_gen_if_chain(ctx, prog, func, cn); break;
 
 			case AST_FUNC_RET: {
 				if (cn->func_ret.type.kind == TYPE_NULL) {
@@ -432,7 +500,8 @@ void ir_gen_body(Program *prog, Func *func, AST_Node *fn) {
 					break;
 				}
 
-				Operand res = ir_gen_expr(prog, func, cn->func_ret.exp);
+				IRGenExprCtx ctx = {0};
+				Operand res = ir_gen_expr(&ctx, prog, func, cn->func_ret.expr);
 				switch (res.type) {
 					case OPR_LITERAL: {
 						da_append(&func->body, ((Instruction){
@@ -447,7 +516,7 @@ void ir_gen_body(Program *prog, Func *func, AST_Node *fn) {
 							.arg1 = (Operand) {
 								.type = OPR_VAR,
 								.var.type = cn->func_ret.type,
-								.var.index = res.var.index,
+								.var.addr_id = res.var.addr_id,
 							},
 						}));
 					} break;
@@ -456,68 +525,61 @@ void ir_gen_body(Program *prog, Func *func, AST_Node *fn) {
 				}
 			} break;
 
-			case AST_VAR_MUT: {
-				ir_gen_var_mut(prog, func, cn);
-			} break;
-
-			case AST_IF_STMT: {
-				ir_gen_if_chain(prog, func, cn);
-			} break;
-
 			case AST_LOOP_BREAK:
-				if (loop_gen <= 0) lexer_error(cn->loc, "error: break outside of a loop");
+				if (ctx->loop_gen <= 0) lexer_error(cn->loc, "error: break outside of a loop");
 				da_append(&func->body, ((Instruction){
 					.op = OP_JUMP,
 					.dst = (Operand) {
 						.type = OPR_LABEL,
-						.label_index = lbl_ex,
+						.label_id = ctx->label_end,
 					},
 				}));
 				break;
 
 			case AST_LOOP_CONTINUE:
-				if (loop_gen <= 0) lexer_error(cn->loc, "error: continue outside of a loop");
-				if (for_var_mut) ir_gen_var_mut(prog, func, for_var_mut);
+				if (ctx->loop_gen <= 0) lexer_error(cn->loc, "error: continue outside of a loop");
+				if (ctx->for_var_mut) ir_gen_var_mut(prog, func, ctx->for_var_mut);
 				da_append(&func->body, ((Instruction){
 					.op = OP_JUMP,
 					.dst = (Operand) {
 						.type = OPR_LABEL,
-						.label_index = lbl_st,
+						.label_id = ctx->label_start,
 					},
 				}));
 				break;
 
 			case AST_WHILE_STMT: {
-				loop_gen++;
-				lbl_st = label_index++;
+				ctx->loop_gen++;
+				ctx->label_start = label_id++;
 
 				da_append(&func->body, ((Instruction){
 					.op = OP_LABEL,
 					.arg1 = (Operand) {
 						.type = OPR_LABEL,
-						.label_index = lbl_st,
+						.label_id = ctx->label_start,
 					},
 				}));
 
-				Operand res = ir_gen_expr(prog, func, cn->stmt_while.exp);
-				lbl_ex = label_index++;
+				IRGenExprCtx ectx = {0};
+				Operand res = ir_gen_expr(&ectx, prog, func, cn->stmt_while.exp);
+				ctx->label_end = label_id++;
 
 				da_append(&func->body, ((Instruction){
 					.op = OP_JUMP_IF_NOT,
 					.arg1 = res,
 					.dst = (Operand) {
 						.type = OPR_LABEL,
-						.label_index = lbl_ex,
+						.label_id = ctx->label_end,
 					},
 				}));
 
-				ir_gen_body(prog, func, cn->stmt_while.body);
+				ir_gen_body(ctx, prog, func, cn->stmt_while.body);
 
 				da_append(&func->body, ((Instruction){
 					.op = OP_JUMP,
 					.dst = (Operand) {
 						.type = OPR_LABEL,
-						.label_index = lbl_st,
+						.label_id = ctx->label_start,
 					},
 				}));
 
@@ -525,51 +587,54 @@ void ir_gen_body(Program *prog, Func *func, AST_Node *fn) {
 					.op = OP_LABEL,
 					.arg1 = (Operand) {
 						.type = OPR_LABEL,
-						.label_index = lbl_ex,
+						.label_id = ctx->label_end,
 					},
 				}));
-				loop_gen--;
+
+				ctx->loop_gen--;
 			} break;
 
 			case AST_FOR_STMT: {
-				loop_gen++;
+				ctx->loop_gen++;
 				switch (cn->stmt_for.var->kind) {
 					case AST_VAR_MUT: ir_gen_var_mut(prog, func, cn->stmt_for.var); break;
 					case AST_VAR_DEF: ir_gen_var_def(prog, func, cn->stmt_for.var); break;
 					default: unreachable;
 				}
 
-				size_t lbl_st = label_index++;
+				u64 label_start = label_id++;
 
 				da_append(&func->body, ((Instruction){
 					.op = OP_LABEL,
 					.arg1 = (Operand) {
 						.type = OPR_LABEL,
-						.label_index = lbl_st,
+						.label_id = label_start,
 					},
 				}));
 
-				Operand res = ir_gen_expr(prog, func, cn->stmt_for.exp);
-				size_t lbl_ex = label_index++;
+				IRGenExprCtx ectx = {0};
+				Operand res = ir_gen_expr(&ectx, prog, func, cn->stmt_for.expr);
+
+				u64 label_end = label_id++;
 
 				da_append(&func->body, ((Instruction){
 					.op = OP_JUMP_IF_NOT,
 					.arg1 = res,
 					.dst = (Operand) {
 						.type = OPR_LABEL,
-						.label_index = lbl_ex,
+						.label_id = label_end,
 					},
 				}));
 
-				for_var_mut = cn->stmt_for.mut;
-				ir_gen_body(prog, func, cn->stmt_for.body);
+				ctx->for_var_mut = cn->stmt_for.mut;
+				ir_gen_body(ctx, prog, func, cn->stmt_for.body);
 				ir_gen_var_mut(prog, func, cn->stmt_for.mut);
 
 				da_append(&func->body, ((Instruction){
 					.op = OP_JUMP,
 					.dst = (Operand) {
 						.type = OPR_LABEL,
-						.label_index = lbl_st,
+						.label_id = label_start,
 					},
 				}));
 
@@ -577,11 +642,11 @@ void ir_gen_body(Program *prog, Func *func, AST_Node *fn) {
 					.op = OP_LABEL,
 					.arg1 = (Operand) {
 						.type = OPR_LABEL,
-						.label_index = lbl_ex,
+						.label_id = label_end,
 					},
 				}));
-				loop_gen--;
-				for_var_mut = NULL;
+				ctx->loop_gen--;
+				ctx->for_var_mut = NULL;
 			} break;
 
 			default: unreachable;
@@ -599,29 +664,30 @@ void ir_gen_func(Program *prog, AST_Node *fn) {
 			.arg1 = (Operand) {
 				.type = OPR_FUNC_INP,
 				.func_inp.type = cn->func_def_arg.type,
-				.func_inp.arg_ind = i,
+				.func_inp.arg_id = (u64) i,
 			},
 			.dst = (Operand) {
 				.type = OPR_VAR,
 				.var.type = cn->func_def_arg.type,
-				.var.index = var_index,
+				.var.addr_id = var_id,
 			},
 		}));
 		ASTVarTable_add(&avt, cn->func_def_arg.id, (Operand) {
 			.type = OPR_VAR,
 			.var.kind = VAR_STACK,
 			.var.type = cn->func_def_arg.type,
-			.var.index = var_index++
+			.var.addr_id = var_id++
 		});
 	}
 
-	ir_gen_body(prog, &func, fn->func_def.body);
+	IRGenBodyCtx bctx = {0};
+	ir_gen_body(&bctx, prog, &func, fn->func_def.body);
 	da_append(&prog->funcs, func);
 }
 
 Program ir_gen_prog(Parser *p) {
 	Program prog = {0};
-	label_index = 0;
+	label_id = 0;
 
 	ht_foreach_node(SymbolTable, &p->st, n) {
 		if (n->key.type == SBL_FUNC_EXTERN) {
@@ -632,13 +698,13 @@ Program ir_gen_prog(Parser *p) {
 		} else if (n->key.type == SBL_VAR && n->key.nested[0] == 0) {
 			da_append(&prog.globals, ((GlobalVar){
 				.type = n->val.variable.type,
-				.index = dataoff_index,
+				.index = dataoff_id,
 			}));
 			ASTVarTable_add(&avt, n->key.id, (Operand){
 				.type = OPR_VAR,
 				.var.kind = VAR_DATAOFF,
 				.var.type = n->val.variable.type,
-				.var.index = dataoff_index++,
+				.var.addr_id = dataoff_id++,
 			});
 		}
 	}
@@ -650,7 +716,6 @@ Program ir_gen_prog(Parser *p) {
 			case AST_FUNC_DEF:
 				ir_gen_func(&prog, cn);
 				break;
-
 			default: unreachable;
 		}
 	}

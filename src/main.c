@@ -156,12 +156,12 @@ int main(int argc, char **argv) {
 
 	Parser parser = parser_parse(entry_point.tokens.items);
 	Program prog = ir_gen_prog(&parser);
-	char *cg = nasm_gen_prog(&prog);
 	if (save_ir_output) {
 		sprintf(buf, "%s.ir", output_bin);
 		ir_dump_prog(&prog, buf);
 	}
 
+	char *cg = nasm_gen_prog(&prog);
 	sprintf(output_file, "%s.asm", output_bin);
 	write_to_file(output_file, cg);
 	sprintf(buf, "nasm -f elf64 %s", output_file); system(buf);

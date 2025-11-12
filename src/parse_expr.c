@@ -8,92 +8,56 @@
 
 #include "../include/parser.h"
 
+Type iptr = (Type) {.kind = TYPE_IPTR};
+
 double parse_float(char *data) { return atof(data); }
 int64_t parse_int(char *data) {
 	char *end;
 	return strtol(data, &end, 0);
 }
 
-float op_cost(AST_ExprOp op, bool is_left) {
+float expr_op_precedence(AST_ExprOp op, bool l) {
 	switch (op) {
-		case AST_OP_ADD: case AST_OP_SUB:
-			if (is_left) return 1.1;
-			else         return 1.0;
+		case AST_OP_ADD:
+		case AST_OP_SUB:
+			if (l) return 1.1;
+			else   return 1.0;
 		case AST_OP_MOD:
-		case AST_OP_MUL: case AST_OP_DIV:
-			if (is_left) return 2.1;
-			else         return 2.0;
-		case AST_OP_EQ: case AST_OP_GREAT:
-		case AST_OP_LESS: case AST_OP_GREAT_EQ:
+		case AST_OP_MUL:
+		case AST_OP_DIV:
+			if (l) return 2.1;
+			else   return 2.0;
+		case AST_OP_EQ:      case AST_OP_GREAT:
+		case AST_OP_LESS:    case AST_OP_GREAT_EQ:
 		case AST_OP_LESS_EQ: case AST_OP_NOT_EQ:
-			if (is_left) return 0.9;
-			else         return 0.8;
+			if (l) return 0.9;
+			else   return 0.8;
 		case AST_OP_AND: case AST_OP_OR:
-			if (is_left) return 0.6;
-			else         return 0.5;
+			if (l) return 0.6;
+			else   return 0.5;
 		case AST_OP_CAST:
-			if (is_left) return 0.0;
-			else         return 3.0;
+			if (l) return 0.0;
+			else   return 3.0;
 		case AST_OP_FIELD:
 		case AST_OP_ARR:
-			if (is_left) return 3.1;
-			else         return 3.0;
+			if (l) return 3.1;
+			else   return 3.0;
 		case AST_OP_NOT:
 		case AST_OP_NEG: case AST_OP_SIZEOF:
 		case AST_OP_REF: case AST_OP_DEREF:
-			if (is_left) return 3.0;
-			else         return 0.0;
+			if (l) return 3.0;
+			else   return 0.0;
 		case AST_OP_VAR_EQ:
 		case AST_OP_ADD_EQ:
 		case AST_OP_SUB_EQ:
 		case AST_OP_DIV_EQ:
 		case AST_OP_MUL_EQ:
-			if (is_left) return -1.0;
-			else         return -1.1;
-		default:         break;
+			if (l) return -1.0;
+			else   return -1.1;
+		default:   break;
 	}
 
 	return 0.0;
-}
-
-AST_Node *parse_func_call(Parser *p) {
-	AST_Node *fcn = ast_new({ .kind = AST_FUNC_CALL });
-	fcn->loc = parser_peek(p)->loc;
-	fcn->func_call.id = parser_next(p)->data;
-	expect_token(parser_peek(p), TOK_OPAR);
-	parser_next(p);
-
-	Symbol *fc_f = parser_symbol_table_get(p, SBL_FUNC_DEF, fcn->func_call.id);
-	Symbol *fc_e = parser_symbol_table_get(p, SBL_FUNC_EXTERN, fcn->func_call.id);
-	if (!fc_f && !fc_e) lexer_error(fcn->loc, "error: calling an undeclared function");
-
-	AST_Nodes fargs;
-	if (fc_f) {
-		fcn->func_call.type = fc_f->func_def.type;
-		fargs = fc_f->func_def.args;
-	} else if (fc_e) {
-		fcn->func_call.type = fc_e->func_extern.type;
-		fcn->func_call.id = fc_e->func_extern.extern_smb;
-		fargs = fc_e->func_extern.args;
-	}
-
-	size_t arg_cnt = 0;
-	while (parser_peek(p)->type != TOK_CPAR) {
-		if (arg_cnt + 1 > fargs.count) lexer_error(fcn->loc, "error: wrong number of arguments");
-		Type farg_type = fargs.items[arg_cnt++]->func_def_arg.type;
-		AST_Node *expr = parse_expr(p, EXPR_PARSING_FUNC_CALL, &farg_type);
-		Type expr_type = parser_get_type(p, expr);
-
-		if (!compare_types(expr_type, farg_type))
-			lexer_error(expr->loc, "error: wrong type");
-
-		da_append(&fcn->func_call.args, expr);
-		parser_next(p);
-	}
-
-	if (arg_cnt < fargs.count) lexer_error(fcn->loc, "error: wrong number of arguments");
-	parser_next(p);
-	return fcn;
 }
 
 AST_Node *expr_expand(AST_Nodes *nodes) {
@@ -105,41 +69,50 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 	for (size_t i = 0; i < nodes->count; i++) {
 		if (nodes->count == 1) break;
 		AST_Node *node = da_get(nodes, i);
-		bool is_bin_op = node->kind == AST_BIN_EXP && !(node->exp_binary.l && node->exp_binary.r);
-		bool is_un_op = node->kind == AST_UN_EXP && !node->exp_unary.v;
+		bool is_bin_op = node->kind == AST_BIN_EXP && !(node->expr_binary.l && node->expr_binary.r);
+		bool is_un_op = node->kind == AST_UN_EXP && !node->expr_unary.v;
 		if (!is_bin_op && !is_un_op) {
 			bool is_lelf = false;
 			float l_cost = -999, r_cost = -999;
 
 			if (i != 0) {
 				switch (da_get(nodes, i-1)->kind) {
-					case AST_BIN_EXP: l_cost = op_cost(da_get(nodes, i-1)->exp_binary.op, true); break;
-					case AST_UN_EXP:  l_cost = op_cost(da_get(nodes, i-1)->exp_unary.op, true);  break;
+					case AST_BIN_EXP:
+						l_cost = expr_op_precedence(da_get(nodes, i-1)->expr_binary.op, true);
+						break;
+					case AST_UN_EXP:
+						l_cost = expr_op_precedence(da_get(nodes, i-1)->expr_unary.op, true);
+						break;
 					default: unreachable;
 				}
 			}
 
 			if (i != nodes->count-1) {
 				switch (da_get(nodes, i+1)->kind) {
-					case AST_BIN_EXP: r_cost = op_cost(da_get(nodes, i+1)->exp_binary.op, false); break;
-					case AST_UN_EXP:  r_cost = op_cost(da_get(nodes, i+1)->exp_unary.op, false);  break;
+					case AST_BIN_EXP:
+						r_cost = expr_op_precedence(da_get(nodes, i+1)->expr_binary.op, false);
+						break;
+					case AST_UN_EXP:
+						r_cost = expr_op_precedence(da_get(nodes, i+1)->expr_unary.op, false);
+						break;
 					default: unreachable;
 				}
 			}
 
 			if (l_cost > r_cost) is_lelf = true;
-			if (l_cost < -500 && r_cost < -500) lexer_error(da_get(nodes, i)->loc, "error: wrong expression");
+			if (l_cost < -500 && r_cost < -500)
+				lexer_error(da_get(nodes, i)->loc, "error: wrong expression");
 
 			if (is_lelf) {
 				switch (da_get(nodes, i-1)->kind) {
-					case AST_BIN_EXP: da_get(nodes, i-1)->exp_binary.r = node; break;
-					case AST_UN_EXP:  da_get(nodes, i-1)->exp_unary.v = node;  break;
+					case AST_BIN_EXP: da_get(nodes, i-1)->expr_binary.r = node; break;
+					case AST_UN_EXP:  da_get(nodes, i-1)->expr_unary.v = node;  break;
 					default: unreachable;
 				}
 			} else {
 				switch (da_get(nodes, i+1)->kind) {
-					case AST_BIN_EXP: da_get(nodes, i+1)->exp_binary.l = node; break;
-					case AST_UN_EXP:  da_get(nodes, i+1)->exp_unary.v = node;  break;
+					case AST_BIN_EXP: da_get(nodes, i+1)->expr_binary.l = node; break;
+					case AST_UN_EXP:  da_get(nodes, i+1)->expr_unary.v = node;  break;
 					default: unreachable;
 				}
 			}
@@ -154,9 +127,9 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 	return expr_expand(nodes);
 }
 
-Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
+Type expr_calc_types(Parser *p, AST_Node *expr, Type *vart) {
 	switch (expr->kind) {
-		case AST_VAR: return parser_symbol_table_get(parser, SBL_VAR, expr->var_id)->variable.type;
+		case AST_VID: return parser_symbol_table_get(p, SBL_VAR, expr->vid)->variable.type;
 		case AST_FUNC_CALL: return expr->func_call.type;
 
 		case AST_LITERAL: {
@@ -168,12 +141,12 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 						if(expr->literal.type.kind == TYPE_NULL)
 							expr->literal.type = (Type) {.kind = TYPE_INT};
 					} break;
-					case LIT_CHAR:  expr->literal.type = (Type) {.kind = TYPE_I8}; break;
-					case LIT_FLOAT: expr->literal.type = (Type) {.kind = TYPE_F32}; break;
+					case LIT_CHAR:  expr->literal.type = (Type) {.kind = TYPE_I8};   break;
+					case LIT_FLOAT: expr->literal.type = (Type) {.kind = TYPE_F32};  break;
 					case LIT_BOOL:  expr->literal.type = (Type) {.kind = TYPE_BOOL}; break;
 					case LIT_STR: {
 						static Type ti8 = {.kind = TYPE_I8};
-						expr->literal.type = (Type) {.kind = TYPE_POINTER, .pointer.base = &ti8}; break;
+						expr->literal.type = (Type) {.kind = TYPE_POINTER, .pointer.base = &ti8};
 					} break;
 				}
 			}
@@ -182,24 +155,39 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 		} break;
 
 		case AST_BIN_EXP: {
-			Type lt = expr_calc_types(parser, expr->exp_binary.l, vart);
-			if (expr->exp_binary.op == AST_OP_VAR_EQ) vart = &lt;
-			else if (expr->exp_binary.op == AST_OP_ADD_EQ) vart = &lt;
-			else if (expr->exp_binary.op == AST_OP_SUB_EQ) vart = &lt;
-			else if (expr->exp_binary.op == AST_OP_MUL_EQ) vart = &lt;
-			else if (expr->exp_binary.op == AST_OP_DIV_EQ) vart = &lt;
-			else if (is_pointer(lt)) {
-				Type iptr = (Type) {.kind = TYPE_IPTR};
-				vart = &iptr;
+			Type lt = expr_calc_types(p, expr->expr_binary.l, vart);
+			switch (expr->expr_binary.op) {
+				case AST_OP_VAR_EQ:
+				case AST_OP_ADD_EQ:
+				case AST_OP_SUB_EQ:
+				case AST_OP_MUL_EQ:
+				case AST_OP_DIV_EQ:
+					vart = &lt;
+					break;
+				default:
+					if (is_pointer(lt))
+						vart = &iptr;
+					break;
 			}
 
-			Type rt = expr_calc_types(parser, expr->exp_binary.r, vart);
-			expr->exp_binary.type = lt;
+			if (expr->expr_binary.op == AST_OP_FIELD) {
+				da_foreach (Field, field, &lt.user->ustruct.fields) {
+					if (strcmp(expr->expr_binary.r->vid, field->id) == 0) {
+						expr->expr_binary.type = field->type;
+						return field->type;
+					}
+				}
+
+				lexer_error(expr->expr_binary.l->loc, "error: the struct has no such field");
+			}
+
+			Type rt = expr_calc_types(p, expr->expr_binary.r, vart);
+			expr->expr_binary.type = lt;
 
 			if ((lt.kind == TYPE_IPTR && is_pointer(rt)) ||
 				(is_pointer(lt) && rt.kind == TYPE_IPTR)) {
 				Type ptr_type = is_pointer(lt) ? lt : rt;
-				expr->exp_binary.type = (Type) {
+				expr->expr_binary.type = (Type) {
 					.kind = TYPE_POINTER,
 					.pointer.base = get_pointer_base(ptr_type)
 				};
@@ -207,48 +195,49 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 				lexer_error(expr->loc, "error: operation on different types");
 			}
 
-			switch (expr->exp_binary.op) {
+			switch (expr->expr_binary.op) {
 				case AST_OP_EQ: case AST_OP_NOT_EQ:
 				case AST_OP_LESS_EQ: case AST_OP_GREAT_EQ:
 				case AST_OP_GREAT: case AST_OP_LESS:
-					expr->exp_binary.type.kind = TYPE_BOOL;
+					expr->expr_binary.type.kind = TYPE_BOOL;
 				default:;
 			}
 
-			if (expr->exp_binary.op == AST_OP_ARR) {
-				expr->exp_binary.type = *expr->exp_binary.type.pointer.base;
+			if (expr->expr_binary.op == AST_OP_ARR) {
+				expr->expr_binary.type = *expr->expr_binary.type.pointer.base;
 			}
 
-			return expr->exp_binary.type;
+			return expr->expr_binary.type;
 		} break;
 
 		case AST_UN_EXP: {
-			switch (expr->exp_unary.op) {
+			switch (expr->expr_unary.op) {
 				case AST_OP_SIZEOF: break;
 
 				case AST_OP_CAST: {
-					expr_calc_types(parser, expr->exp_unary.v, &expr->exp_unary.type);
+					expr_calc_types(p, expr->expr_unary.v, &expr->expr_unary.type);
 				} break;
 
 				case AST_OP_REF: {
-					Type vt = expr_calc_types(parser, expr->exp_unary.v, vart);
+					Type vt = expr_calc_types(p, expr->expr_unary.v, vart);
 					Type *base = malloc(sizeof(Type)); *base = vt;
-					expr->exp_unary.type = (Type) {.kind = TYPE_POINTER, .pointer.base = base};
+					expr->expr_unary.type = (Type) {.kind = TYPE_POINTER, .pointer.base = base};
 				} break;
 
 				case AST_OP_DEREF: {
-					Type vt = expr_calc_types(parser, expr->exp_unary.v, vart);
-					expr->exp_unary.type = vt;
-					if (!is_pointer(vt)) lexer_error(expr->exp_unary.v->loc, "error: pointer expected");
-					expr->exp_unary.type = *vt.pointer.base;
+					Type vt = expr_calc_types(p, expr->expr_unary.v, vart);
+					expr->expr_unary.type = vt;
+					if (!is_pointer(vt))
+						lexer_error(expr->expr_unary.v->loc, "error: pointer expected");
+					expr->expr_unary.type = *vt.pointer.base;
 				} break;
 
-				default: {
-					expr->exp_unary.type = expr_calc_types(parser, expr->exp_unary.v, vart);
-				} break;
+				default:
+					expr->expr_unary.type = expr_calc_types(p, expr->expr_unary.v, vart);
+					break;
 			}
 
-			return expr->exp_unary.type;
+			return expr->expr_unary.type;
 		} break;
 
 		default: unreachable;
@@ -257,37 +246,37 @@ Type expr_calc_types(Parser *parser, AST_Node *expr, Type *vart) {
 
 AST_ExprOp tok_to_binary_expr_op(TokenType tok) {
 	switch (tok) {
-		case TOK_PLUS_EQ:   return AST_OP_ADD_EQ;
-		case TOK_MINUS_EQ:  return AST_OP_SUB_EQ;
-		case TOK_STAR_EQ:   return AST_OP_MUL_EQ;
-		case TOK_SLASH_EQ:  return AST_OP_DIV_EQ;
-		case TOK_EQ_EQ:     return AST_OP_EQ;
-		case TOK_EQ:        return AST_OP_VAR_EQ;
-		case TOK_GREAT:     return AST_OP_GREAT;
-		case TOK_LESS:      return AST_OP_LESS;
-		case TOK_GREAT_EQ:  return AST_OP_GREAT_EQ;
-		case TOK_LESS_EQ:   return AST_OP_LESS_EQ;
-		case TOK_AND:       return AST_OP_AND;
-		case TOK_OR:        return AST_OP_OR;
-		case TOK_PLUS:      return AST_OP_ADD;
-		case TOK_MINUS:     return AST_OP_SUB;
-		case TOK_STAR:      return AST_OP_MUL;
-		case TOK_SLASH:     return AST_OP_DIV;
-		case TOK_PS:        return AST_OP_MOD;
-		case TOK_OSQBRA:    return AST_OP_ARR;
-		case TOK_DOT:       return AST_OP_FIELD;
+		case TOK_PLUS_EQ:  return AST_OP_ADD_EQ;
+		case TOK_MINUS_EQ: return AST_OP_SUB_EQ;
+		case TOK_STAR_EQ:  return AST_OP_MUL_EQ;
+		case TOK_SLASH_EQ: return AST_OP_DIV_EQ;
+		case TOK_EQ_EQ:    return AST_OP_EQ;
+		case TOK_EQ:       return AST_OP_VAR_EQ;
+		case TOK_GREAT:    return AST_OP_GREAT;
+		case TOK_LESS:     return AST_OP_LESS;
+		case TOK_GREAT_EQ: return AST_OP_GREAT_EQ;
+		case TOK_LESS_EQ:  return AST_OP_LESS_EQ;
+		case TOK_AND:      return AST_OP_AND;
+		case TOK_OR:       return AST_OP_OR;
+		case TOK_PLUS:     return AST_OP_ADD;
+		case TOK_MINUS:    return AST_OP_SUB;
+		case TOK_STAR:     return AST_OP_MUL;
+		case TOK_SLASH:    return AST_OP_DIV;
+		case TOK_PS:       return AST_OP_MOD;
+		case TOK_OSQBRA:   return AST_OP_ARR;
+		case TOK_DOT:      return AST_OP_FIELD;
 		default: unreachable;
 	}
 }
 
 AST_ExprOp tok_to_unary_expr_op(Token *tok) {
 	switch (tok->type) {
-		case TOK_SIZEOF:    return AST_OP_SIZEOF;
-		case TOK_COL:       return AST_OP_CAST;
-		case TOK_STAR:      return AST_OP_DEREF;
-		case TOK_AMP:       return AST_OP_REF;
-		case TOK_EXC:       return AST_OP_NOT;
-		case TOK_MINUS:     return AST_OP_NEG;
+		case TOK_SIZEOF: return AST_OP_SIZEOF;
+		case TOK_COL:    return AST_OP_CAST;
+		case TOK_STAR:   return AST_OP_DEREF;
+		case TOK_AMP:    return AST_OP_REF;
+		case TOK_EXC:    return AST_OP_NOT;
+		case TOK_MINUS:  return AST_OP_NEG;
 		default:
 			lexer_error(tok->loc, "error: wrong operation");
 			return 0;
@@ -336,13 +325,10 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 					da_append(&nodes, parse_func_call(p));
 					p->cur_token--;
 				} else {
-					if (!parser_symbol_table_get(p, SBL_VAR, parser_peek(p)->data))
-						lexer_error(parser_peek(p)->loc, "error: no such variable in the scope");
-
 					da_append(&nodes, ast_new({
-						.kind = AST_VAR,
+						.kind = AST_VID,
 						.loc = parser_peek(p)->loc,
-						.var_id = parser_peek(p)->data
+						.vid = parser_peek(p)->data
 					}));
 				}
 				break;
@@ -415,9 +401,9 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				da_append(&nodes, ast_new({
 					.kind = AST_UN_EXP,
 					.loc = parser_peek(p)->loc,
-					.exp_unary.type = t,
-					.exp_unary.op = AST_OP_CAST,
-					.exp_unary.v = NULL,
+					.expr_unary.type = t,
+					.expr_unary.op = AST_OP_CAST,
+					.expr_unary.v = NULL,
 				}));
 			} break;
 
@@ -426,9 +412,9 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 					da_append(&nodes, ast_new({
 						.kind = AST_UN_EXP,
 						.loc = parser_peek(p)->loc,
-						.exp_unary.op = tok_to_unary_expr_op(parser_next(p)),
-						.exp_unary.type = (Type) {.kind = TYPE_IPTR},
-						.exp_unary.v = ast_new({
+						.expr_unary.op = tok_to_unary_expr_op(parser_next(p)),
+						.expr_unary.type = (Type) {.kind = TYPE_IPTR},
+						.expr_unary.v = ast_new({
 							.kind = AST_LITERAL,
 							.literal.type = parse_type(p),
 						}),
@@ -437,9 +423,9 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 					da_append(&nodes, ast_new({
 						.kind = AST_UN_EXP,
 						.loc = parser_peek(p)->loc,
-						.exp_unary.op = tok_to_unary_expr_op(parser_peek(p)),
-						.exp_unary.type = (Type) {.kind = TYPE_IPTR},
-						.exp_unary.v = NULL,
+						.expr_unary.op = tok_to_unary_expr_op(parser_peek(p)),
+						.expr_unary.type = (Type) {.kind = TYPE_IPTR},
+						.expr_unary.v = NULL,
 					}));
 				}
 				break;
@@ -448,8 +434,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				da_append(&nodes, ast_new({
 					.kind = AST_UN_EXP,
 					.loc = parser_peek(p)->loc,
-					.exp_unary.op = tok_to_unary_expr_op(parser_peek(p)),
-					.exp_unary.v = NULL,
+					.expr_unary.op = tok_to_unary_expr_op(parser_peek(p)),
+					.expr_unary.v = NULL,
 				}));
 				break;
 
@@ -457,31 +443,30 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				da_append(&nodes, ast_new({
 					.kind = AST_BIN_EXP,
 					.loc = parser_peek(p)->loc,
-					.exp_binary.op = tok_to_binary_expr_op(parser_peek(p)->type),
-					.exp_binary.l = NULL,
-					.exp_binary.r = NULL
+					.expr_binary.op = tok_to_binary_expr_op(parser_peek(p)->type),
+					.expr_binary.l = NULL,
+					.expr_binary.r = NULL
 				}));
 				parser_next(p);
-				Type iptr = (Type){.kind = TYPE_IPTR};
 				da_append(&nodes, parse_expr(p, EXPR_PARSING_SQBRA, &iptr));
 				p->cur_token--;
 				break;
 
 			case TOK_PLUS_EQ: case TOK_MINUS_EQ:
 			case TOK_STAR_EQ: case TOK_SLASH_EQ:
-			case TOK_NOT_EQ: case TOK_OR:
-			case TOK_LESS: case TOK_GREAT:
+			case TOK_NOT_EQ:  case TOK_OR:
+			case TOK_LESS:    case TOK_GREAT:
 			case TOK_LESS_EQ: case TOK_GREAT_EQ:
-			case TOK_EQ_EQ: case TOK_AND:
-			case TOK_PLUS: case TOK_SLASH:
-			case TOK_EQ: case TOK_PS:
+			case TOK_EQ_EQ:   case TOK_AND:
+			case TOK_PLUS:    case TOK_SLASH:
+			case TOK_EQ:      case TOK_PS:
 			case TOK_DOT: {
 				da_append(&nodes, ast_new({
 					.kind = AST_BIN_EXP,
 					.loc = parser_peek(p)->loc,
-					.exp_binary.op = tok_to_binary_expr_op(parser_peek(p)->type),
-					.exp_binary.l = NULL,
-					.exp_binary.r = NULL
+					.expr_binary.op = tok_to_binary_expr_op(parser_peek(p)->type),
+					.expr_binary.l = NULL,
+					.expr_binary.r = NULL
 				}));
 			} break;
 
@@ -496,31 +481,31 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				  "hint: try to use parenthesis");
 
 					bool is_bin_op = da_last(&nodes)->kind == AST_BIN_EXP;
-					if (is_bin_op && da_last(&nodes)->exp_binary.l && da_last(&nodes)->exp_binary.r) is_bin_op = false;
-					if (is_bin_op) {
-						is_unary_op = true;
-					}
+					if (is_bin_op && da_last(&nodes)->expr_binary.l &&
+						da_last(&nodes)->expr_binary.r) is_bin_op = false;
+					if (is_bin_op) is_unary_op = true;
 				}
 
 				if (!is_unary_op) {
 					da_append(&nodes, ast_new({
 						.kind = AST_BIN_EXP,
 						.loc = parser_peek(p)->loc,
-						.exp_binary.op = tok_to_binary_expr_op(parser_peek(p)->type),
-						.exp_binary.l = NULL,
-						.exp_binary.r = NULL
+						.expr_binary.op = tok_to_binary_expr_op(parser_peek(p)->type),
+						.expr_binary.l = NULL,
+						.expr_binary.r = NULL
 					}));
 				} else {
 					da_append(&nodes, ast_new({
 						.kind = AST_UN_EXP,
 						.loc = parser_peek(p)->loc,
-						.exp_unary.op = tok_to_unary_expr_op(parser_peek(p)),
-						.exp_unary.v = NULL,
+						.expr_unary.op = tok_to_unary_expr_op(parser_peek(p)),
+						.expr_unary.v = NULL,
 					}));
 				}
 			} break;
 
-			default: lexer_error(parser_peek(p)->loc, "error: unexpected token");
+			default:
+				lexer_error(parser_peek(p)->loc, "error: unexpected token");
 		}
 
 		parser_next(p);

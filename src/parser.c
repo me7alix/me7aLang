@@ -51,11 +51,11 @@ Symbol *parser_symbol_table_get(Parser *p, SymbolType st, char *id) {
 
 Type parser_get_type(Parser *p, AST_Node *n) {
 	switch (n->kind) {
-		case AST_BIN_EXP:   return n->exp_binary.type;
-		case AST_UN_EXP:    return n->exp_unary.type;
+		case AST_BIN_EXP:   return n->expr_binary.type;
+		case AST_UN_EXP:    return n->expr_unary.type;
 		case AST_LITERAL:   return n->literal.type;
 		case AST_FUNC_CALL: return n->func_call.type;
-		case AST_VAR:       return parser_symbol_table_get(p, SBL_VAR, n->var_id)->variable.type;
+		case AST_VID:       return parser_symbol_table_get(p, SBL_VAR, n->vid)->variable.type;
 		default: unreachable;
 	}
 }
@@ -115,8 +115,8 @@ Type parse_type(Parser *p) {
 	} else {
 		UserType *utype = UserTypes_get(&p->ut, tname);
 		if (utype) {
-			type.kind = utype->kind,
-				type.user = utype;
+			type.kind = utype->kind;
+			type.user = utype;
 		} else lexer_error(loc, "error: no such type");
 	}
 
@@ -146,6 +146,49 @@ void expect_token(Token *token, TokenType type) {
 	exit(1);
 }
 
+AST_Node *parse_func_call(Parser *p) {
+	AST_Node *fcn = ast_new({ .kind = AST_FUNC_CALL });
+	fcn->loc = parser_peek(p)->loc;
+	fcn->func_call.id = parser_next(p)->data;
+	expect_token(parser_peek(p), TOK_OPAR);
+	parser_next(p);
+
+	Symbol *fcf = parser_symbol_table_get(p, SBL_FUNC_DEF, fcn->func_call.id);
+	Symbol *fce = parser_symbol_table_get(p, SBL_FUNC_EXTERN, fcn->func_call.id);
+	if (!fcf && !fce) lexer_error(fcn->loc, "error: calling an undeclared function");
+
+	AST_Nodes fargs;
+	if (fcf) {
+		fcn->func_call.type = fcf->func_def.type;
+		fargs = fcf->func_def.args;
+	} else if (fce) {
+		fcn->func_call.type = fce->func_extern.type;
+		fcn->func_call.id = fce->func_extern.extern_smb;
+		fargs = fce->func_extern.args;
+	}
+
+	size_t arg_cnt = 0;
+	while (parser_peek(p)->type != TOK_CPAR) {
+		if (arg_cnt + 1 > fargs.count)
+			lexer_error(fcn->loc, "error: wrong number of arguments");
+
+		Type farg_type = fargs.items[arg_cnt++]->func_def_arg.type;
+		AST_Node *expr = parse_expr(p, EXPR_PARSING_FUNC_CALL, &farg_type);
+		Type expr_type = parser_get_type(p, expr);
+
+		if (!compare_types(expr_type, farg_type))
+			lexer_error(expr->loc, "error: wrong type");
+
+		da_append(&fcn->func_call.args, expr);
+		parser_next(p);
+	}
+
+	if (arg_cnt < fargs.count)
+		lexer_error(fcn->loc, "error: wrong number of arguments");
+	parser_next(p);
+	return fcn;
+}
+
 AST_Node *parse_var_def(Parser *p) {
 	char *id = parser_peek(p)->data;
 	Location loc = parser_next(p)->loc;
@@ -167,6 +210,7 @@ AST_Node *parse_var_def(Parser *p) {
 
 	if (parser_symbol_table_get(p, SBL_VAR, vdn->var_def.id))
 		lexer_error(vdn->loc, "error: redifinition of the variable");
+
 	parser_symbol_table_add(p, SBL_VAR, vdn->var_def.id, (Symbol) {
 		.variable.type = type,
 	});
@@ -190,11 +234,11 @@ AST_Node *parse_var_assign(Parser *p) {
 	});
 
 	switch (exp->kind) {
-		case AST_BIN_EXP:   vdn->var_def.type = exp->exp_binary.type; break;
-		case AST_UN_EXP:    vdn->var_def.type = exp->exp_unary.type;  break;
+		case AST_BIN_EXP:   vdn->var_def.type = exp->expr_binary.type; break;
+		case AST_UN_EXP:    vdn->var_def.type = exp->expr_unary.type;  break;
 		case AST_LITERAL:   vdn->var_def.type = exp->literal.type;    break;
 		case AST_FUNC_CALL: vdn->var_def.type = exp->func_call.type;  break;
-		case AST_VAR:       vdn->var_def.type = parser_symbol_table_get(p, SBL_VAR, exp->var_id)->variable.type; break;
+		case AST_VID:       vdn->var_def.type = parser_symbol_table_get(p, SBL_VAR, exp->vid)->variable.type; break;
 		default: unreachable;
 	}
 
@@ -213,7 +257,7 @@ AST_Node *parse_var_mut(Parser *p, ExprParsingType pt) {
 	AST_Node *vmn = ast_new({
 		.kind = AST_VAR_MUT,
 		.loc = exp->loc,
-		.var_mut.type = exp->exp_binary.type,
+		.var_mut.type = exp->expr_binary.type,
 		.var_mut.exp = exp,
 	});
 
@@ -233,10 +277,11 @@ AST_Node *parse_func_return(Parser *p, AST_Node *func) {
 			lexer_error(ret->loc, "error: you must return something");
 		ret->func_ret.type = (Type) {.kind = TYPE_NULL};
 	} else {
-		ret->func_ret.exp = parse_expr(p, EXPR_PARSING_VAR, NULL);
-		if (!compare_types(parser_get_type(p, ret->func_ret.exp), ret->func_ret.type))
-			lexer_error(ret->func_ret.exp->loc, "error: wrong type");
+		ret->func_ret.expr = parse_expr(p, EXPR_PARSING_VAR, NULL);
+		if (!compare_types(parser_get_type(p, ret->func_ret.expr), ret->func_ret.type))
+			lexer_error(ret->func_ret.expr->loc, "error: wrong type");
 	}
+
 	return ret;
 }
 
@@ -299,7 +344,7 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 		r->stmt_for.var = parse_var_assign(p);
 	parser_next(p);
 
-	r->stmt_for.exp = parse_expr(p, EXPR_PARSING_VAR, &r->stmt_for.var->var_def.type);
+	r->stmt_for.expr = parse_expr(p, EXPR_PARSING_VAR, &r->stmt_for.var->var_def.type);
 	parser_next(p);
 	r->stmt_for.mut = parse_var_mut(p, EXPR_PARSING_STMT);
 	parser_next(p);
@@ -512,7 +557,7 @@ void parse_struct(Parser *p) {
 		expect_token(parser_peek(p), TOK_ID);
 		char *id = parser_next(p)->data;
 		Type type = parse_type(p);
-		da_append(&st.user_struct.fields, ((Field){type, id}));
+		da_append(&st.ustruct.fields, ((Field){type, id}));
 		parser_next(p);
 		if (parser_peek(p)->type == TOK_COM)
 			parser_next(p);

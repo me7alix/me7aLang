@@ -7,16 +7,19 @@
 
 void ir_dump_opr(Operand opr, char *buf) {
 	switch (opr.type) {
-		case OPR_NULL:      sprintf(buf, "NULL"); break;
-		case OPR_SIZEOF:    sprintf(buf, "sizeof:%d", opr.size_of.v_type.kind); break;
-		case OPR_FUNC_INP:  sprintf(buf, "FI(%zu):%d", opr.func_inp.arg_ind, opr.func_inp.type.kind); break;
-		case OPR_FUNC_RET:  sprintf(buf, "FR:%d", opr.func_ret.type.kind); break;
-		case OPR_NAME:      sprintf(buf, "\"%s\"", opr.name); break;
+		case OPR_NULL:     sprintf(buf, "NULL"); break;
+		case OPR_SIZEOF:   sprintf(buf, "sizeof:%d", opr.size_of.v_type.kind); break;
+		case OPR_FUNC_INP: sprintf(buf, "FI(%zu):%d", opr.func_inp.arg_id, opr.func_inp.type.kind); break;
+		case OPR_FUNC_RET: sprintf(buf, "FR:%d", opr.func_ret.type.kind); break;
+		case OPR_NAME:     sprintf(buf, "\"%s\"", opr.name); break;
+		case OPR_LABEL:    sprintf(buf, ".L%zu", opr.label_id);  break;
+		case OPR_FIELD:    sprintf(buf, ">%s", opr.field_id);  break;
+
 		case OPR_VAR: {
 			switch (opr.var.kind) {
-				case VAR_STACK:   sprintf(buf, "(%li):%d", opr.var.index, opr.var.type.kind); break;
-				case VAR_ADDR:    sprintf(buf, "[%li]:%d", opr.var.index, opr.var.type.kind); break;
-				case VAR_DATAOFF: sprintf(buf, "{%li}:%d", opr.var.index, opr.var.type.kind); break;
+				case VAR_STACK:   sprintf(buf, "(%li):%d", opr.var.addr_id, opr.var.type.kind); break;
+				case VAR_ADDR:    sprintf(buf, "[%li]:%d", opr.var.addr_id, opr.var.type.kind); break;
+				case VAR_DATAOFF: sprintf(buf, "{%li}:%d", opr.var.addr_id, opr.var.type.kind); break;
 			}
 		} break;
 
@@ -32,7 +35,6 @@ void ir_dump_opr(Operand opr, char *buf) {
 				default: sprintf(buf, "ERR\n"); break;
 			}
 		} break;
-		case OPR_LABEL:     sprintf(buf, ".L%zu", opr.label_index);  break;
 	}
 }
 
@@ -67,6 +69,7 @@ void ir_dump_inst(Instruction inst, char *res) {
 		case OP_MOD:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "%", arg2);  break;
 		case OP_ASSIGN: sprintf(res, "    var%s = %s", dst, arg1); break;
 		case OP_RETURN: sprintf(res, "    return %s", arg1); break;
+		case OP_FADDR:  sprintf(res, "    var%s = faddr %s %s", dst, arg1, arg2); break;
 		case OP_FUNC_CALL: {
 			char buf[128];
 			ir_dump_opr(inst.dst, dst);
