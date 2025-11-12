@@ -1,14 +1,30 @@
 import "std.met"
 
+struct Address {
+	city: *i8,
+	post_code: int,
+}
+
 struct Person {
-	name: *i8,
+	name:   *i8,
 	salary: int,
+	addr: Address,
+}
+
+person_print(p: *Person) {
+	print_str((*p).name)
+	print_char('\n')
+	print_int((*p).salary)
+	print_str((*p).addr.city)
+	print_char('\n')
+	print_int((*p).addr.post_code)
 }
 
 main() {
 	me: Person
 	me.name = "Michael"
-	me.salary = -8211
-	print_str(me.name)
-	print_int(me.salary)
+	me.salary = 777
+	me.addr.city = "New York"
+	me.addr.post_code = 100101
+	person_print(&me)
 }

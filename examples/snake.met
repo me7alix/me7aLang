@@ -4,12 +4,13 @@ import "raylib.met"
 #MAP_W 20
 #MAP_H 20
 #TILE  30
+#MAX_LEN 1024
 
 apple_x: int
 apple_y: int
 
-snake_x:   [1024]int
-snake_y:   [1024]int
+snake_x:   [MAX_LEN]int
+snake_y:   [MAX_LEN]int
 snake_dx:  int
 snake_dy:  int
 snake_da:  bool
