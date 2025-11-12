@@ -320,7 +320,7 @@ u64 hashtable_type##_hashf(char* s) { \
     return res; \
 } \
 \
-i32 hashtable_type##_compare(char* a, char* b) { \
+int hashtable_type##_compare(char* a, char* b) { \
     return strcmp(a, b); \
 }
 
@@ -335,7 +335,7 @@ u64 hashtable_type##_hashf(key_type num) { \
     return numhash(num); \
 } \
 \
-i32 hashtable_type##_compare(key_type a, key_type b) { \
+int hashtable_type##_compare(key_type a, key_type b) { \
     return !(a == b); \
 }
 
