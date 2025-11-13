@@ -129,8 +129,13 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 
 Type expr_calc_types(Parser *p, AST_Node *expr, Type *vart) {
 	switch (expr->kind) {
-		case AST_VID: return parser_symbol_table_get(p, SBL_VAR, expr->vid)->variable.type;
 		case AST_FUNC_CALL: return expr->func_call.type;
+
+		case AST_VID: {
+			Symbol *var = parser_symbol_table_get(p, SBL_VAR, expr->vid);
+			if (!var) lexer_error(expr->loc, "error: no such variable in the scope");
+			return var->variable.type;
+		} break;
 
 		case AST_LITERAL: {
 			if (vart && expr->literal.kind == LIT_INT) {
