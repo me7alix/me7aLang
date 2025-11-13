@@ -223,35 +223,46 @@ Lexer lexer_lex(char *file, char *code) {
 				}
 
 				else if (*(lexer.cur_char) == '"') {
-					char *lmark = lexer.cur_char++;
-					char *start = lexer.cur_char;
-					while (!(lexer.cur_char[1] == '\"' && *lexer.cur_char != '\\')) {
-						if (*(lexer.cur_char++) == '\0') {
-							lexer.cur_char = lmark;
+					StringBuilder sb = {0};
+					lexer.cur_char++;
+
+					while (!(lexer.cur_char[0] == '\"' && lexer.cur_char[-1] != '\\')) {
+						if (lexer.cur_char[0] == '\\') {
+							switch (lexer.cur_char[1]) {
+								case '\\': sb_append(&sb, '\\'); break;
+								case '0':  sb_append(&sb, '\0'); break;
+								case 'n':  sb_append(&sb, '\n'); break;
+								case '\"': sb_append(&sb, '\"'); break;
+								default: lexer_error(lexer.cur_loc, "error: wrong character");
+							}
+							lexer.cur_char++;
+						} else if (lexer.cur_char[0] == '\0') {
 							lexer_error(lexer.cur_loc, "error: unclosed string");
+						} else {
+							sb_append(&sb, lexer.cur_char[0]);
 						}
+
+						lexer.cur_char++;
 					}
 
-					size_t l = lexer.cur_char - start + 1;
-					char *str = malloc(sizeof(char) * (l+1));
-					memcpy(str, start, l); str[l] = '\0';
-					add_token(&lexer, TOK_STRING, str);
-					lexer.cur_char++;
+					sb_append(&sb, '\0');
+					add_token(&lexer, TOK_STRING, sb.items);
 				}
 
 				else if (*lexer.cur_char == '\'') {
 					lexer.cur_char++;
 					if (*lexer.cur_char == '\\') {
 						lexer.cur_char++;
-						if      (*lexer.cur_char == 'n') add_token(&lexer, TOK_CHAR, "\n");
-						else if (*lexer.cur_char == '0') add_token(&lexer, TOK_CHAR, "\0");
-						else lexer_error(lexer.cur_loc, "error: wrong character");
-						lexer.cur_char++;
-					} else {
-						add_token(&lexer, TOK_CHAR, lexer.cur_char);
-						lexer.cur_char++;
-					}
+						switch (*lexer.cur_char) {
+							case '0':  add_token(&lexer, TOK_CHAR, "\0"); break;
+							case 'n':  add_token(&lexer, TOK_CHAR, "\n"); break;
+							case '\\': add_token(&lexer, TOK_CHAR, "\\"); break;
+							case '\'': add_token(&lexer, TOK_CHAR, "'");  break;
+							default: lexer_error(lexer.cur_loc, "error: wrong character");
+						}
+					} else add_token(&lexer, TOK_CHAR, lexer.cur_char);
 
+					lexer.cur_char++;
 					if (*lexer.cur_char != '\'') {
 						lexer_error(lexer.cur_loc, "error: ' expected");
 					}
