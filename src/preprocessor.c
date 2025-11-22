@@ -13,12 +13,29 @@ ImportedTable it   = {0};
 MacroTable    mt   = {0};
 StringBuilder path = {0};
 
-#ifdef __linux__
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 int pathcmp(const char *a, const char *b) {
-	char ra[512], rb[512];
+#if defined(_WIN32)
+	char path1[32768], path2[32768];
+
+	DWORD r1 = GetFullPathNameA(a, sizeof(path1), path1, NULL);
+	DWORD r2 = GetFullPathNameA(b, sizeof(path2), path2, NULL);
+
+	if (r1 == 0 || r2 == 0)
+		return 1;
+
+	return _stricmp(path1, path2);
+#elif defined(__linux__)
+	char ra[1024], rb[1024];
 	if (!realpath(a, ra) || !realpath(b, rb))
 		return 1;
 	return strcmp(ra, rb);
+#else // Unsupported OS
+	return strcmp(a, b);
+#endif
 }
 
 u64 ImportedTable_hashf(char *str) {
@@ -32,7 +49,6 @@ u64 ImportedTable_hashf(char *str) {
 int ImportedTable_compare(char *cur_str, char *str) {
 	return pathcmp(cur_str, str);
 }
-#endif
 
 Lexer *get_lexer(Imports *imports, char *file, bool *is_imported) {
 	*is_imported = false;

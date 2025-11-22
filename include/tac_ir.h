@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+
 #include "../include/parser.h"
 
 typedef enum {
@@ -19,7 +20,7 @@ typedef enum {
 	OP_JUMP, OP_JUMP_IF_NOT,
 	OP_ASSIGN, OP_RETURN,
 	OP_FUNC_CALL,
-} OpCode;
+} TAC_OpCode;
 
 typedef enum {
 	OPR_NULL,
@@ -31,20 +32,20 @@ typedef enum {
 	OPR_VAR,
 	OPR_SIZEOF,
 	OPR_FIELD,
-} OperandType;
+} TAC_OperandKind;
 
 typedef enum {
 	VAR_STACK,
 	VAR_ADDR,
 	VAR_DATAOFF,
-} VarKind;
+} TAC_VarKind;
 
 typedef struct {
-	OperandType type;
+	TAC_OperandKind kind;
 
 	union {
 		Literal literal;
-		u64 label_id;
+		uint label_id;
 		char *field_id;
 		char *name;
 		struct {
@@ -55,63 +56,63 @@ typedef struct {
 			Type type;
 		} func_ret;
 		struct {
-			u64 arg_id;
+			uint arg_id;
 			Type type;
 		} func_inp;
 		struct {
-			VarKind kind;
+			TAC_VarKind kind;
 			Type type;
-			VarKind addr_kind;
-			u64 addr_id;
+			TAC_VarKind addr_kind;
+			uint addr_id;
 			DA(char*) off;
 		} var;
 	};
-} Operand;
+} TAC_Operand;
 
 typedef struct {
-	OpCode op;
-	Operand dst;
+	TAC_OpCode op;
+	TAC_Operand dst;
 
 	union {
-		Operand args[8];
+		TAC_Operand args[8];
 		struct {
-			Operand arg1;
-			Operand arg2;
+			TAC_Operand arg1;
+			TAC_Operand arg2;
 		};
 	};
-} Instruction;
+} TAC_Instruction;
 
 typedef struct {
 	Type type;
 	char *name;
-} FuncArg;
+} TAC_FuncArg;
 
 typedef struct {
 	char *name;
 	Type ret_type;
-	DA(FuncArg) args;
-	DA(Instruction) body;
-} Func;
+	DA(TAC_FuncArg) args;
+	DA(TAC_Instruction) body;
+} TAC_Func;
 
 typedef struct {
 	char *name;
 	Type ret_type;
-	DA(FuncArg) args;
-} Extern;
+	DA(TAC_FuncArg) args;
+} TAC_Extern;
 
 typedef struct {
 	Type type;
-	u64 index;
+	uint index;
 	u8 *data;
-} GlobalVar;
+} TAC_GlobalVar;
 
 typedef struct {
-	DA(Extern) externs;
-	DA(GlobalVar) globals;
-	DA(Func) funcs;
-} Program;
+	DA(TAC_Extern) externs;
+	DA(TAC_GlobalVar) globals;
+	DA(TAC_Func) funcs;
+} TAC_Program;
 
-Type ir_get_opr_type(Operand op);
-Program ir_gen_prog(Parser *parser);
+Type tac_ir_get_opr_type(TAC_Operand op);
+TAC_Program tac_ir_gen_prog(Parser *parser);
 
 #endif // IR_H

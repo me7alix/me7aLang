@@ -6,27 +6,25 @@
 #include <stdarg.h>
 #include <assert.h>
 
-#include "../../include/ir.h"
+#include "../../include/tac_ir.h"
 
 #define TAB "    "
 
-void ir_dump_opr(Operand opr, char *buf);
-void ir_dump_inst(Instruction inst, char *res);
+void ir_dump_opr(TAC_Operand opr, char *buf);
+void ir_dump_inst(TAC_Instruction inst, char *res);
 
 static char *argreg8[]  = {"dil", "sil", "dl",  "cl",  "r8b", "r9b"};
 static char *argreg16[] = {"di",  "si",  "dx",  "cx",  "r8w", "r9w"};
 static char *argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
 static char *argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8",  "r9" };
 
-HT_DECL(OffTable, u64, u64)
-HT_IMPL_NUM(OffTable, u64, u64)
+HT_DECL(OffTable, uint, uint)
+HT_IMPL_NUM(OffTable, uint, uint)
 
 OffTable stack_table = {0};
 OffTable data_table  = {0};
 
-Type get_struct_type(Operand var);
-
-size_t get_type_size(Type type) {
+uint get_type_size(Type type) {
 	switch (type.kind) {
 		case TYPE_STRUCT: {
 			size_t total = 0;
@@ -36,12 +34,18 @@ size_t get_type_size(Type type) {
 		} break;
 		case TYPE_ARRAY:
 		case TYPE_POINTER:
+		case TYPE_UPTR:
 		case TYPE_IPTR:
 		case TYPE_I64:
 			return 8;
+		case TYPE_FLOAT:
+		case TYPE_UINT:
 		case TYPE_INT:
 		case TYPE_I32:
 			return 4;
+		case TYPE_U16:
+		case TYPE_I16:
+			return 2;
 		case TYPE_BOOL:
 		case TYPE_I8:
 			return 1;
@@ -49,9 +53,9 @@ size_t get_type_size(Type type) {
 	}
 }
 
-u64 get_struct_alignment(Operand var, bool is_data) {
+uint get_struct_alignment(TAC_Operand var, bool is_data) {
 	Type vt = var.var.type, lt;
-	u64 total = 0;
+	uint total = 0;
 
 	for (size_t i = 0; i < var.var.off.count; i++) {
 		char *off = da_get(&var.var.off, i);
@@ -72,10 +76,10 @@ u64 get_struct_alignment(Operand var, bool is_data) {
 }
 
 StringBuilder body = {0};
-size_t total_offset = 0;
+uint total_offset = 0;
 
-void var_type_to_stack(Operand t, char *buf) {
-	switch (ir_get_opr_type(t).kind) {
+void var_type_to_stack(TAC_Operand t, char *buf) {
+	switch (tac_ir_get_opr_type(t).kind) {
 		case TYPE_ARRAY:
 		case TYPE_POINTER:
 		case TYPE_IPTR:
@@ -84,6 +88,7 @@ void var_type_to_stack(Operand t, char *buf) {
 			break;
 		case TYPE_INT:
 		case TYPE_I32:
+		case TYPE_FLOAT:
 			sprintf(buf, "dword");
 			break;
 		case TYPE_I16:
@@ -98,48 +103,56 @@ void var_type_to_stack(Operand t, char *buf) {
 }
 
 char opr_to_nasm_buf[64];
-char *opr_to_nasm(Operand opr) {
-	switch (opr.type) {
+char *opr_to_nasm(TAC_Operand opr) {
+	switch (opr.kind) {
 		case OPR_SIZEOF: {
-			size_t size = get_type_size(opr.size_of.v_type);
+			uint size = get_type_size(opr.size_of.v_type);
 			if (opr.size_of.v_type.kind == TYPE_ARRAY)
 				size = get_type_size(*opr.size_of.v_type.array.elem) * opr.size_of.v_type.array.length;
-			sprintf(opr_to_nasm_buf, "%zu", size);
+			sprintf(opr_to_nasm_buf, "%u", size);
 		} break;
 
 		case OPR_LABEL: {
-			sprintf(opr_to_nasm_buf, ".L%zu", opr.label_id);
+			sprintf(opr_to_nasm_buf, ".L%u", opr.label_id);
 		} break;
 
 		case OPR_VAR: {
 			char ts[32]; var_type_to_stack(opr, ts);
 
 			if (opr.var.kind == VAR_STACK) {
-				size_t off = *OffTable_get(&stack_table, opr.var.addr_id);
+				uint off = *OffTable_get(&stack_table, opr.var.addr_id);
 				if (opr.var.off.count != 0) off -= get_struct_alignment(opr, false);
-				sprintf(opr_to_nasm_buf, "%s [rbp - %zu]", ts, off);
+				sprintf(opr_to_nasm_buf, "%s [rbp - %u]", ts, off);
 			} else if (opr.var.kind == VAR_ADDR) {
 				if (opr.var.addr_kind == VAR_STACK) {
-					size_t off = *OffTable_get(&stack_table, opr.var.addr_id);
-					sb_appendf(&body, TAB"mov rdx, qword [rbp - %zu]\n", off);
-					size_t doff = 0;
+					uint off = *OffTable_get(&stack_table, opr.var.addr_id);
+					sb_appendf(&body, TAB"mov rdx, qword [rbp - %u]\n", off);
+					uint doff = 0;
 					if (opr.var.off.count != 0) doff = get_struct_alignment(opr, false);
-					sprintf(opr_to_nasm_buf, "%s [rdx + %zu]", ts, doff);
+					sprintf(opr_to_nasm_buf, "%s [rdx + %u]", ts, doff);
 				} else if (opr.var.addr_kind == VAR_DATAOFF) {
-					size_t off = 0;
+					uint off = 0;
 					if (opr.var.off.count != 0) off += get_struct_alignment(opr, true);
-					sb_appendf(&body, TAB"lea rax, [rel D%zu + %lu]\n", opr.var.addr_id, off);
+					sb_appendf(&body, TAB"lea rax, [rel D%u + %lu]\n", opr.var.addr_id, off);
 					sprintf(opr_to_nasm_buf, "%s [rax]", ts);
 				} else unreachable;
 			} else if (opr.var.kind == VAR_DATAOFF) {
 				size_t off = 0;
 				if (opr.var.off.count != 0) off += get_struct_alignment(opr, true);
-				sprintf(opr_to_nasm_buf, "%s [rel D%zu + %lu]", ts, opr.var.addr_id, off);
+				sprintf(opr_to_nasm_buf, "%s [rel D%u + %lu]", ts, opr.var.addr_id, off);
 			}
 		} break;
 
 		case OPR_LITERAL: {
 			switch (opr.literal.type.kind) {
+				case TYPE_F32: {
+					float x = (float)opr.literal.lfloat;
+					uint32_t bits;
+					memcpy(&bits, &x, 4);
+					sb_appendf(&body, TAB"mov r10d, 0x%08X\n", bits);
+					sb_appendf(&body, TAB"movd xmm0, r10d\n", bits);
+					sprintf(opr_to_nasm_buf, "xmm0");
+				} break;
 				case TYPE_INT:
 					sprintf(opr_to_nasm_buf, "%d", (i32) opr.literal.lint);
 					break;
@@ -153,7 +166,7 @@ char *opr_to_nasm(Operand opr) {
 				case TYPE_I64:
 					sprintf(opr_to_nasm_buf, "%li", opr.literal.lint);
 					break;
-				default: unreachable;
+				default: printf("%d\n", opr.literal.type.kind); unreachable;
 			}
 		} break;
 
@@ -201,12 +214,16 @@ char *opr_to_nasm(Operand opr) {
 	return opr_to_nasm_buf;
 }
 
-void type_to_reg(Operand opr, char *arg1, char *arg2) {
-	switch (ir_get_opr_type(opr).kind) {
+void type_to_reg(TAC_Operand opr, char *arg1, char *arg2) {
+	switch (tac_ir_get_opr_type(opr).kind) {
 		case TYPE_I8:
 		case TYPE_BOOL:
 			sprintf(arg1, "al");
 			sprintf(arg2, "bl");
+			break;
+		case TYPE_FLOAT:
+			sprintf(arg1, "xmm0");
+			sprintf(arg2, "xmm1");
 			break;
 		case TYPE_ARRAY:
 		case TYPE_POINTER:
@@ -223,9 +240,9 @@ void type_to_reg(Operand opr, char *arg1, char *arg2) {
 	}
 }
 
-void reg_alloc(Instruction inst, char *arg1, char *arg2) {
-	if (inst.dst.type == OPR_LABEL) {
-		inst.dst.type = OPR_VAR;
+void reg_alloc(TAC_Instruction inst, char *arg1, char *arg2) {
+	if (inst.dst.kind == OPR_LABEL) {
+		inst.dst.kind = OPR_VAR;
 		inst.dst.var.type = (Type){.kind = TYPE_BOOL};
 		type_to_reg(inst.dst, arg1, arg2);
 		return;
@@ -246,7 +263,15 @@ void total_offset_add(size_t off) {
 	}
 }
 
-void nasm_gen_func(StringBuilder *code, Func func) {
+void nasm_gen_new_stack_var(TAC_Instruction ci, char *dst, char *arg1, char *arg2) {
+	char ts[32]; var_type_to_stack(ci.dst, ts);
+	total_offset_add(get_type_size(ci.dst.var.type));
+	OffTable_add(&stack_table, ci.dst.var.addr_id, total_offset);
+	sprintf(dst, "%s [rbp - %u]", ts, total_offset);
+	reg_alloc(ci, arg1, arg2);
+}
+
+void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 	sb_appendf(code, "global %s\n", func.name);
 	sb_appendf(code, "%s:\n", func.name);
 
@@ -259,7 +284,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 
 	for (size_t i = 0; i < func.body.count; i++) {
 		char arg1[64], arg2[64], dst[64];
-		Instruction ci = da_get(&func.body, i);
+		TAC_Instruction ci = da_get(&func.body, i);
 
 		/*{ // debug information
 			char res[256];
@@ -276,11 +301,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			case OP_GREAT: case OP_LESS:
 			case OP_MOD:   case OP_LESS_EQ:
 			case OP_GREAT_EQ: {
-				char ts[32]; var_type_to_stack(ci.dst, ts);
-				total_offset_add(get_type_size(ci.dst.var.type));
-				OffTable_add(&stack_table, ci.dst.var.addr_id, total_offset);
-				sprintf(dst, "%s [rbp - %zu]", ts, total_offset);
-				reg_alloc(ci, arg1, arg2);
+				nasm_gen_new_stack_var(ci, dst, arg1, arg2);
 
 				sb_appendf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
 				sb_appendf(&body, TAB"mov %s, %s\n", arg2, opr_to_nasm(ci.arg2));
@@ -341,11 +362,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			} break;
 
 			case OP_NOT: case OP_NEG: {
-				char ts[32]; var_type_to_stack(ci.dst, ts);
-				total_offset_add(get_type_size(ci.dst.var.type));
-				OffTable_add(&stack_table, ci.dst.var.addr_id, total_offset);
-				sprintf(dst, "%s [rbp - %zu]", ts, total_offset);
-				reg_alloc(ci, arg1, arg2);
+				nasm_gen_new_stack_var(ci, dst, arg1, arg2);
 
 				sb_appendf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
 
@@ -361,20 +378,14 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 
 			case OP_CAST: {
 				Type dst_type = ci.dst.var.type;
-				Type arg1_type;
-
-				switch (ci.arg1.type) {
+				Type arg1_type; switch (ci.arg1.kind) {
 					case OPR_LITERAL: arg1_type = ci.arg1.literal.type; break;
 					case OPR_VAR:     arg1_type = ci.arg1.var.type;     break;
 					case OPR_SIZEOF:  arg1_type = ci.arg1.size_of.type; break;
 					default: unreachable;
 				}
 
-				char ts[32]; var_type_to_stack(ci.dst, ts);
-				total_offset_add(get_type_size(ci.dst.var.type));
-				OffTable_add(&stack_table, ci.dst.var.addr_id, total_offset);
-				sprintf(dst, "%s [rbp - %zu]", ts, total_offset);
-				reg_alloc(ci, arg1, arg2);
+				nasm_gen_new_stack_var(ci, dst, arg1, arg2);
 
 				if (dst_type.kind == arg1_type.kind) { unreachable;
 				} else if (dst_type.kind == TYPE_I8 && arg1_type.kind == TYPE_INT) {
@@ -400,7 +411,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			case OP_ASSIGN: {
 				bool is_first_assign = false;
 				if (ci.dst.var.kind != VAR_ADDR) {
-					size_t *off = OffTable_get(&stack_table, ci.dst.var.addr_id);
+					uint *off = OffTable_get(&stack_table, ci.dst.var.addr_id);
 
 					if (!off) {
 						is_first_assign = true;
@@ -413,13 +424,14 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 				if (ci.dst.var.type.kind == TYPE_ARRAY && is_first_assign) {
 					reg_alloc(ci, arg1, arg2);
 					total_offset_add(get_type_size(*ci.dst.var.type.array.elem) * ci.dst.var.type.array.length);
-					sb_appendf(&body, TAB"lea %s, [rbp - %zu]\n", arg1, total_offset);
+					sb_appendf(&body, TAB"lea %s, [rbp - %u]\n", arg1, total_offset);
 					sb_appendf(&body, TAB"mov %s, %s\n", opr_to_nasm(ci.dst), arg1);
 				}
 
-				if (ci.arg1.type != OPR_NULL) {
+				if (ci.arg1.kind != OPR_NULL) {
 					reg_alloc(ci, arg1, arg2);
 					sprintf(dst, "%s", opr_to_nasm(ci.dst));
+
 					sb_appendf(&body, TAB"mov %s, %s\n", arg2, opr_to_nasm(ci.arg1));
 					sb_appendf(&body, TAB"mov %s, %s\n", dst, arg2);
 				}
@@ -433,15 +445,15 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 				if (ci.arg1.var.kind == VAR_ADDR) {
 					if (ci.arg1.var.addr_kind == VAR_STACK) {
 						size_t off = *OffTable_get(&stack_table, ci.arg1.var.addr_id);
-						sb_appendf(&body, TAB"mov rax, [rbp - %zu]\n", off);
+						sb_appendf(&body, TAB"mov rax, [rbp - %u]\n", off);
 					} else if (ci.arg1.var.addr_kind == VAR_DATAOFF) {
-						sb_appendf(&body, TAB"lea rax, [rel D%zu]\n", ci.arg1.var.addr_id);
+						sb_appendf(&body, TAB"lea rax, [rel D%u]\n", ci.arg1.var.addr_id);
 					}
 				} else if (ci.arg1.var.kind == VAR_STACK) {
 					size_t off = *OffTable_get(&stack_table, ci.arg1.var.addr_id);
-					sb_appendf(&body, TAB"lea rax, [rbp - %zu]\n", off);
+					sb_appendf(&body, TAB"lea rax, [rbp - %u]\n", off);
 				} else if (ci.arg1.var.kind == VAR_DATAOFF) {
-					sb_appendf(&body, TAB"lea rax, [rel D%zu]\n", ci.arg1.var.addr_id);
+					sb_appendf(&body, TAB"lea rax, [rel D%u]\n", ci.arg1.var.addr_id);
 				}
 
 				sprintf(dst, "%s", opr_to_nasm(ci.dst));
@@ -464,13 +476,9 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			} break;
 
 			case OP_FADDR: {
-				char ts[32]; var_type_to_stack(ci.dst, ts);
-				total_offset_add(get_type_size(ci.dst.var.type));
-				OffTable_add(&stack_table, ci.dst.var.addr_id, total_offset);
-				sprintf(dst, "%s [rbp - %zu]", ts, total_offset);
-				reg_alloc(ci, arg1, arg2);
+				nasm_gen_new_stack_var(ci, dst, arg1, arg2);
 
-				u64 align = 0;
+				uint align = 0;
 				da_foreach(Field, field, &ci.arg1.var.type.user->ustruct.fields) {
 					if (strcmp(field->id, ci.arg2.field_id) == 0) {
 						align += get_type_size(field->type);
@@ -483,7 +491,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			} break;
 
 			case OP_RETURN: {
-				if (ci.arg1.type != OPR_NULL) {
+				if (ci.arg1.kind != OPR_NULL) {
 					switch (func.ret_type.kind) {
 						case TYPE_IPTR:
 						case TYPE_POINTER:
@@ -507,8 +515,8 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 			} break;
 
 			case OP_FUNC_CALL: {
-				for (size_t i = 0; ci.args[i].type != OPR_NULL; i++) {
-					switch (ir_get_opr_type(ci.args[i]).kind) {
+				for (size_t i = 0; ci.args[i].kind != OPR_NULL; i++) {
+					switch (tac_ir_get_opr_type(ci.args[i]).kind) {
 						case TYPE_ARRAY:
 						case TYPE_POINTER:
 						case TYPE_IPTR:
@@ -539,7 +547,7 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 		total_offset += 16 - total_offset % 16;
 	}
 
-	sb_appendf(code, TAB"sub rsp, %zu\n", total_offset);
+	sb_appendf(code, TAB"sub rsp, %u\n", total_offset);
 	sb_appendf(code, "%s", body.items);
 	if (da_last(&func.body).op != OP_RETURN) {
 		sb_appendf(code, TAB"mov rsp, rbp\n");
@@ -550,29 +558,29 @@ void nasm_gen_func(StringBuilder *code, Func func) {
 	sb_appendf(code, "\n");
 }
 
-char *nasm_gen_prog(Program *prog) {
+char *nasm_gen_prog(TAC_Program *prog) {
 	StringBuilder code = {0};
 
-	da_foreach(Extern, ext, &prog->externs) {
+	da_foreach(TAC_Extern, ext, &prog->externs) {
 		sb_appendf(&code, "extern %s\n", ext->name);
 	}
 	sb_appendf(&code, "\n");
 
 	sb_appendf(&code, "section .data\n");
-	size_t uniq_data_off = 0;
-	da_foreach(GlobalVar, g, &prog->globals) {
+	uint uniq_data_off = 0;
+	da_foreach(TAC_GlobalVar, g, &prog->globals) {
 		if (g->type.kind == TYPE_ARRAY) {
-			size_t s = get_type_size(*g->type.array.elem) * g->type.array.length;
+			uint arr_size = get_type_size(*g->type.array.elem) * g->type.array.length;
 			if (g->data) {
-				sb_appendf(&code, TAB"U%zu db ", uniq_data_off);
+				sb_appendf(&code, TAB"U%u db ", uniq_data_off);
 				for (size_t i = 0; i < g->type.array.length; i++) {
 					sb_appendf(&code, "%#x", g->data[i]);
 					if (i != g->type.array.length - 1) sb_appendf(&code, ", ");
 				}
 				sb_appendf(&code, "\n");
-			} else sb_appendf(&code, TAB"U%zu times %zu db 0\n", uniq_data_off, s);
-			sb_appendf(&code, TAB"D%zu dq U%zu\n", g->index, uniq_data_off++);
-		} else sb_appendf(&code, TAB"D%zu times %li db 0\n", g->index, get_type_size(g->type));
+			} else sb_appendf(&code, TAB"U%u times %u db 0\n", uniq_data_off, arr_size);
+			sb_appendf(&code, TAB"D%u dq U%u\n", g->index, uniq_data_off++);
+		} else sb_appendf(&code, TAB"D%u times %u db 0\n", g->index, get_type_size(g->type));
 	}
 	sb_appendf(&code, "\n");
 

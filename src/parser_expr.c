@@ -11,7 +11,7 @@
 Type iptr = (Type) {.kind = TYPE_IPTR};
 
 double parse_float(char *data) { return atof(data); }
-int64_t parse_int(char *data) {
+u64 parse_int(char *data) {
 	char *end;
 	return strtol(data, &end, 0);
 }

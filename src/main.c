@@ -5,13 +5,10 @@
 #include "../include/preprocessor.h"
 #include "../include/lexer.h"
 #include "../include/parser.h"
-#include "../include/ir.h"
+#include "../include/tac_ir.h"
 
 #include "./codegen/amd64-nasm.c"
-#include "irdump.c"
-
-#define BC_STRING_BUILDER_IMPL
-#include "../thirdparty/cplus.h"
+#include "tac_ir_dump.c"
 
 char *read_file(const char *filename) {
 	FILE* file = fopen(filename, "rb");
@@ -23,7 +20,7 @@ char *read_file(const char *filename) {
 	long filesize = ftell(file);
 	rewind(file);
 
-	char *buffer = (char *)malloc(filesize + 1);
+	char *buffer = (char*) malloc(filesize + 1);
 	if (!buffer) {
 		fclose(file);
 		return NULL;
@@ -155,7 +152,7 @@ int main(int argc, char **argv) {
 	preprocessor(&imports, &entry_point);
 
 	Parser parser = parser_parse(entry_point.tokens.items);
-	Program prog = ir_gen_prog(&parser);
+	TAC_Program prog = tac_ir_gen_prog(&parser);
 	if (save_ir_output) {
 		sprintf(buf, "%s.ir", output_bin);
 		ir_dump_prog(&prog, buf);

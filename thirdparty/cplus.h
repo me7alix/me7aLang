@@ -44,6 +44,7 @@
 #endif // __cplusplus
 
 #ifndef CP_INT_DEFINED
+    typedef unsigned int uint;
     #ifdef CP_USE_INT /* optional for any system that might not have stdint.h */
         typedef unsigned char       u8;
         typedef signed char         i8;
@@ -186,7 +187,7 @@
         size_t capacity; \
     } hashtable_type; \
     u64 hashtable_type##_hashf(key_type key); \
-    i32 hashtable_type##_compare(key_type a, key_type b); \
+    int hashtable_type##_compare(key_type a, key_type b); \
     void hashtable_type##_add(hashtable_type *ht, key_type key, value_type val); \
     value_type *hashtable_type##_get(hashtable_type *ht, key_type key); \
     void hashtable_type##_remove(hashtable_type *ht, key_type key); \
@@ -194,7 +195,7 @@
 
 #define HT_IMPL(hashtable_type, key_type, value_type) \
 extern u64 hashtable_type##_hashf(key_type key); \
-extern i32 hashtable_type##_compare(key_type a, key_type b); \
+extern int hashtable_type##_compare(key_type a, key_type b); \
 \
 static void hashtable_type##_ensure_capacity(hashtable_type *ht) { \
     if (ht->capacity != 0) return; \

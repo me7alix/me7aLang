@@ -2,65 +2,10 @@
 #define PARSER_H
 
 #include <stdlib.h>
-#include <stdint.h>
-#include <threads.h>
 #include <stdbool.h>
 
-#include "../thirdparty/cplus.h"
-#include "../include/lexer.h"
-
-typedef enum {
-	TYPE_NULL,
-	TYPE_INT,  TYPE_UINT,
-	TYPE_I8,   TYPE_U8,
-	TYPE_I16,  TYPE_U16,
-	TYPE_I32,  TYPE_U32,
-	TYPE_I64,  TYPE_U64,
-	TYPE_IPTR, TYPE_UPTR,
-
-	TYPE_F16,
-	TYPE_F32,
-	TYPE_F64,
-
-	TYPE_BOOL,
-	TYPE_POINTER,
-	TYPE_ARRAY,
-	TYPE_FUNCTION,
-	// user types
-	TYPE_STRUCT,
-} TypeKind;
-
-typedef struct UserType UserType;
-typedef struct Struct Struct;
-typedef struct Type Type;
-
-struct Type {
-	TypeKind kind;
-
-	union {
-		struct { Type *base; } pointer;
-		struct { Type *elem; size_t length; } array;
-		struct { Type **params; size_t param_count; Type* ret; } func;
-		UserType *user;
-	};
-};
-
-typedef  struct {
-	Type type;
-	char *id;
-} Field;
-
-struct UserType {
-	TypeKind kind;
-
-	union {
-		struct {
-			DA(Field) fields;
-		} ustruct;
-	};
-};
-
-HT_DECL_STR(UserTypes, UserType)
+#include "type.h"
+#include "lexer.h"
 
 typedef enum {
 	EXPR_PARSING_VAR, EXPR_PARSING_FUNC_CALL,
@@ -257,7 +202,7 @@ Token *parser_peek(Parser *p);
 Token *parser_looknext(Parser *p);
 Token *parser_next(Parser *p);
 
-int64_t parse_int(char *data);
+u64 parse_int(char *data);
 Symbol *st_get(SymbolTable *st, const char *id);
 void expect_token(Token *token, TokenType type);
 Parser parser_parse(Token *tokens);

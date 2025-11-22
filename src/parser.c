@@ -9,7 +9,7 @@
 
 #include "../include/parser.h"
 
-int nested_uniq = 1;
+uint nested_uniq = 1;
 #define nested_push_next(p) (p)->nested[(p)->nptr++] = nested_uniq
 #define nested_push(p) (p)->nested[(p)->nptr++] = nested_uniq++
 #define nested_pop(p) (p)->nested[--(p)->nptr] = 0
@@ -81,51 +81,59 @@ Type parse_type(Parser *p) {
 	Type type = {0};
 	parser_next(p);
 
-	bool is_pointer = false;
-	bool is_array = false;
+	bool is_ptr = false;
+	bool is_arr = false;
 	size_t arr_len;
 
 	if (parser_peek(p)->type == TOK_STAR) {
-		is_pointer = true;
+		is_ptr = true;
 		parser_next(p);
 	} else if (parser_peek(p)->type == TOK_OSQBRA) {
-		is_array = true;
+		is_arr = true;
 		parser_next(p);
 		expect_token(parser_peek(p), TOK_INT);
-		arr_len = parse_int(parser_peek(p)->data);
+		arr_len = (size_t) parse_int(parser_peek(p)->data);
 		parser_next(p);
 		expect_token(parser_next(p), TOK_CSQBRA);
 	}
 
-	char *tname = parser_peek(p)->data;
-	if (strcmp(tname, "int") == 0) {
-		type.kind = TYPE_INT;
-	} else if (strcmp(tname, "f32") == 0) {
-		type.kind = TYPE_F32;
-	} else if (strcmp(tname, "bool") == 0) {
-		type.kind = TYPE_BOOL;
-	} else if (strcmp(tname, "i8") == 0) {
-		type.kind = TYPE_I8;
-	} else if (strcmp(tname, "i64") == 0) {
-		type.kind = TYPE_I64;
-	} else if (strcmp(tname, "iptr") == 0) {
-		type.kind = TYPE_IPTR;
-	} else if (strcmp(tname, "u0") == 0) {
-		type.kind = TYPE_NULL;
-	} else {
-		UserType *utype = UserTypes_get(&p->ut, tname);
+	char *tn = parser_peek(p)->data;
+	if      (!strcmp(tn, "int"))   type.kind = TYPE_INT;
+	else if (!strcmp(tn, "uint"))  type.kind = TYPE_UINT;
+	else if (!strcmp(tn, "float")) type.kind = TYPE_FLOAT;
+	else if (!strcmp(tn, "bool"))  type.kind = TYPE_BOOL;
+	else if (!strcmp(tn, "i16"))   type.kind = TYPE_I16;
+	else if (!strcmp(tn, "i8"))    type.kind = TYPE_I8;
+	else if (!strcmp(tn, "i64"))   type.kind = TYPE_I64;
+	else if (!strcmp(tn, "u16"))   type.kind = TYPE_U16;
+	else if (!strcmp(tn, "u8"))    type.kind = TYPE_U8;
+	else if (!strcmp(tn, "u64"))   type.kind = TYPE_U64;
+	else if (!strcmp(tn, "iptr"))  type.kind = TYPE_IPTR;
+	else if (!strcmp(tn, "uptr"))  type.kind = TYPE_UPTR;
+	else if (!strcmp(tn, "u0"))    type.kind = TYPE_NULL;
+	else {
+		UserType *utype = UserTypes_get(&p->ut, tn);
 		if (utype) {
 			type.kind = utype->kind;
 			type.user = utype;
 		} else lexer_error(loc, "error: no such type");
 	}
 
-	if (is_pointer) {
-		Type *base = malloc(sizeof(Type)); *base = type;
-		type = (Type) { .kind = TYPE_POINTER, .pointer.base = base };
-	} else if (is_array) {
-		Type *base = malloc(sizeof(Type)); *base = type;
-		type = (Type) { .kind = TYPE_ARRAY, .array.elem = base, .array.length = arr_len };
+	if (is_ptr) {
+		Type *base = malloc(sizeof(Type));
+		*base = type;
+		type = (Type) {
+			.kind = TYPE_POINTER,
+			.pointer.base = base
+		};
+	} else if (is_arr) {
+		Type *base = malloc(sizeof(Type));
+		*base = type;
+		type = (Type) {
+			.kind = TYPE_ARRAY,
+			.array.elem = base,
+			.array.length = arr_len
+		};
 	}
 
 	return type;

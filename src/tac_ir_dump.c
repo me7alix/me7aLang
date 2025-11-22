@@ -3,31 +3,31 @@
 #include <assert.h>
 #include <string.h>
 
-#include "../include/ir.h"
+#include "../include/tac_ir.h"
 
-void ir_dump_opr(Operand opr, char *buf) {
-	switch (opr.type) {
+void ir_dump_opr(TAC_Operand opr, char *buf) {
+	switch (opr.kind) {
 		case OPR_NULL:     sprintf(buf, "NULL"); break;
 		case OPR_SIZEOF:   sprintf(buf, "sizeof:%d", opr.size_of.v_type.kind); break;
-		case OPR_FUNC_INP: sprintf(buf, "FI(%zu):%d", opr.func_inp.arg_id, opr.func_inp.type.kind); break;
+		case OPR_FUNC_INP: sprintf(buf, "FI(%u):%d", opr.func_inp.arg_id, opr.func_inp.type.kind); break;
 		case OPR_FUNC_RET: sprintf(buf, "FR:%d", opr.func_ret.type.kind); break;
 		case OPR_NAME:     sprintf(buf, "\"%s\"", opr.name); break;
-		case OPR_LABEL:    sprintf(buf, ".L%zu", opr.label_id);  break;
+		case OPR_LABEL:    sprintf(buf, ".L%u", opr.label_id);  break;
 		case OPR_FIELD:    sprintf(buf, ">%s", opr.field_id);  break;
 
 		case OPR_VAR: {
 			switch (opr.var.kind) {
-				case VAR_STACK:   sprintf(buf, "(%li):%d", opr.var.addr_id, opr.var.type.kind); break;
-				case VAR_ADDR:    sprintf(buf, "[%li]:%d", opr.var.addr_id, opr.var.type.kind); break;
-				case VAR_DATAOFF: sprintf(buf, "{%li}:%d", opr.var.addr_id, opr.var.type.kind); break;
+				case VAR_STACK:   sprintf(buf, "(%u):%d", opr.var.addr_id, opr.var.type.kind); break;
+				case VAR_ADDR:    sprintf(buf, "[%u]:%d", opr.var.addr_id, opr.var.type.kind); break;
+				case VAR_DATAOFF: sprintf(buf, "{%u}:%d", opr.var.addr_id, opr.var.type.kind); break;
 			}
 		} break;
 
 		case OPR_LITERAL: {
 			switch (opr.literal.type.kind) {
-				case TYPE_INT:   sprintf(buf, "%d:%d", (int32_t) opr.literal.lint, opr.literal.type.kind); break;
+				case TYPE_INT:   sprintf(buf, "%d:%d", (i32) opr.literal.lint, opr.literal.type.kind); break;
 				case TYPE_I8:
-				case TYPE_BOOL:  sprintf(buf, "%d:%d", (int8_t) opr.literal.lint, opr.literal.type.kind); break;
+				case TYPE_BOOL:  sprintf(buf, "%d:%d", (i8) opr.literal.lint, opr.literal.type.kind); break;
 				case TYPE_POINTER:
 				case TYPE_IPTR:
 				case TYPE_I64:   sprintf(buf, "%li:%d", opr.literal.lint, opr.literal.type.kind); break;
@@ -38,7 +38,7 @@ void ir_dump_opr(Operand opr, char *buf) {
 	}
 }
 
-void ir_dump_inst(Instruction inst, char *res) {
+void ir_dump_inst(TAC_Instruction inst, char *res) {
 	char arg1[64], arg2[64], dst[64];
 
 	ir_dump_opr(inst.arg1, arg1);
@@ -75,7 +75,7 @@ void ir_dump_inst(Instruction inst, char *res) {
 			ir_dump_opr(inst.dst, dst);
 			sprintf(res, "    call %s", dst);
 
-			for (size_t i = 0; inst.args[i].type != OPR_NULL; i++) {
+			for (size_t i = 0; inst.args[i].kind != OPR_NULL; i++) {
 				ir_dump_opr(inst.args[i], arg1);
 				sprintf(buf, " %s", arg1);
 				strncat(res, buf, 128);
@@ -86,7 +86,7 @@ void ir_dump_inst(Instruction inst, char *res) {
 	}
 }
 
-void ir_dump_func(Func func, FILE *fl) {
+void ir_dump_func(TAC_Func func, FILE *fl) {
 	fprintf(fl, "%s:\n", func.name);
 	for (size_t i = 0; i < func.body.count; i++) {
 		char res[256];
@@ -97,7 +97,7 @@ void ir_dump_func(Func func, FILE *fl) {
 	fprintf(fl, "\n");
 }
 
-void ir_dump_prog(Program *prog, char *filename) {
+void ir_dump_prog(TAC_Program *prog, char *filename) {
 	FILE *fl = fopen(filename, "w");
 	for (size_t i = 0; i < prog->funcs.count; i++) {
 		ir_dump_func(da_get(&prog->funcs, i), fl);

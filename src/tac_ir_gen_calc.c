@@ -1,10 +1,10 @@
-#include "../include/ir.h"
+#include "../include/tac_ir.h"
 
-bool ir_opr_calc(AST_Node *en, Operand l, Operand r, Operand *ret) {
+bool tac_ir_opr_calc(AST_Node *en, TAC_Operand l, TAC_Operand r, TAC_Operand *ret) {
 	int64_t res;
 
 	if (en->kind == AST_BIN_EXP) {
-		if (!(l.type == OPR_LITERAL && r.type == OPR_LITERAL))
+		if (!(l.kind == OPR_LITERAL && r.kind == OPR_LITERAL))
 			return false;
 
 		if (l.literal.type.kind != r.literal.type.kind)
@@ -26,7 +26,7 @@ bool ir_opr_calc(AST_Node *en, Operand l, Operand r, Operand *ret) {
 			default: return false;
 		}
 	} else if (en->kind == AST_BIN_EXP) {
-		if (!(l.type == OPR_LITERAL))
+		if (!(l.kind == OPR_LITERAL))
 			return false;
 
 		int op = en->expr_binary.op;
@@ -40,8 +40,8 @@ bool ir_opr_calc(AST_Node *en, Operand l, Operand r, Operand *ret) {
 
 	switch (l.literal.type.kind) {
 		case TYPE_I8:
-			*ret = (Operand){
-				.type = OPR_LITERAL,
+			*ret = (TAC_Operand){
+				.kind = OPR_LITERAL,
 				.literal = {
 					.kind = LIT_INT,
 					.lint = (int8_t)res,
@@ -52,8 +52,8 @@ bool ir_opr_calc(AST_Node *en, Operand l, Operand r, Operand *ret) {
 
 		case TYPE_INT:
 		case TYPE_I32:
-			*ret = (Operand){
-				.type = OPR_LITERAL,
+			*ret = (TAC_Operand){
+				.kind = OPR_LITERAL,
 				.literal = {
 					.kind = LIT_INT,
 					.lint = (int32_t)res,
@@ -63,8 +63,8 @@ bool ir_opr_calc(AST_Node *en, Operand l, Operand r, Operand *ret) {
 			return true;
 
 		case TYPE_I64:
-			*ret = (Operand){
-				.type = OPR_LITERAL,
+			*ret = (TAC_Operand){
+				.kind = OPR_LITERAL,
 				.literal = {
 					.kind = LIT_INT,
 					.lint = (int64_t)res,
