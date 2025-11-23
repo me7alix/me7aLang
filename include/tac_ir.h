@@ -74,7 +74,7 @@ typedef struct {
 	TAC_Operand dst;
 
 	union {
-		TAC_Operand args[8];
+		TAC_Operand args[16];
 		struct {
 			TAC_Operand arg1;
 			TAC_Operand arg2;

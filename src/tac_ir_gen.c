@@ -40,7 +40,7 @@ Type tac_ir_get_opr_type(TAC_Operand op) {
 		case OPR_FUNC_INP: return op.func_inp.type;
 		case OPR_FUNC_RET: return op.func_ret.type;
 		case OPR_SIZEOF:   return tiptr;
-		default: unreachable; return (Type) {0};
+		default: UNREACHABLE; return (Type) {0};
 	}
 }
 
@@ -211,7 +211,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 				case AST_OP_OR:       inst.op = OP_OR;       break;
 				case AST_OP_FIELD:    inst.op = OP_FADDR;    break;
 				case AST_OP_ARR:                             break;
-				default: unreachable;
+				default: UNREACHABLE;
 			}
 
 			// pointers arithmetic
@@ -298,7 +298,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 				case AST_OP_NOT:  inst.op = OP_NOT;  break;
 				case AST_OP_NEG:  inst.op = OP_NEG;  break;
 				case AST_OP_REF:  inst.op = OP_REF;  break;
-				default: unreachable;
+				default: UNREACHABLE;
 			}
 
 			if (inst.op == OP_CAST) {
@@ -313,7 +313,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			return inst.dst;
 		} break;
 
-		default: unreachable;
+		default: UNREACHABLE;
 	}
 
 	return (TAC_Operand){0};
@@ -405,7 +405,7 @@ void tac_ir_gen_func_call(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 		},
 	};
 
-	assert(cn->func_call.args.count < 7);
+	assert(cn->func_call.args.count < 13);
 	for (size_t i = 0; i < cn->func_call.args.count; i++) {
 		AST_Node *arg = da_get(&cn->func_call.args, i);
 		IRGenExprCtx ctx = {0};
@@ -465,7 +465,7 @@ void tac_ir_gen_if_chain(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, A
 			tac_ir_gen_if_chain(ctx, prog, func, cn->stmt_if.next);
 		} else if (cn->stmt_if.next->kind == AST_ELSE_STMT) {
 			tac_ir_gen_body(ctx, prog, func, cn->stmt_if.next->stmt_else.body);
-		} else unreachable;
+		} else UNREACHABLE;
 
 		da_append(&func->body, ((TAC_Instruction){
 			.op = OP_LABEL,
@@ -516,7 +516,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 						}));
 					} break;
 
-					default: unreachable;
+					default: UNREACHABLE;
 				}
 			} break;
 
@@ -594,7 +594,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 				switch (cn->stmt_for.var->kind) {
 					case AST_VAR_MUT: tac_ir_gen_var_mut(prog, func, cn->stmt_for.var); break;
 					case AST_VAR_DEF: tac_ir_gen_var_def(prog, func, cn->stmt_for.var); break;
-					default: unreachable;
+					default: UNREACHABLE;
 				}
 
 				uint label_start = label_id++;
@@ -644,7 +644,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 				ctx->for_var_mut = NULL;
 			} break;
 
-			default: unreachable;
+			default: UNREACHABLE;
 		}
 	}
 }
@@ -711,7 +711,7 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 			case AST_FUNC_DEF:
 				tac_ir_gen_func(&prog, cn);
 				break;
-			default: unreachable;
+			default: UNREACHABLE;
 		}
 	}
 

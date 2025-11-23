@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <threads.h>
 #include <stdbool.h>
 #include <stdarg.h>
 #include <assert.h>
@@ -10,19 +9,36 @@
 
 #define TAB "    "
 
-void ir_dump_opr(TAC_Operand opr, char *buf);
-void ir_dump_inst(TAC_Instruction inst, char *res);
+typedef enum : u8 {
+	TP_LINUX,
+	TP_WINDOWS,
+	TP_MACOS,
+} TargetPlatform;
 
-static char *argreg8[]  = {"dil", "sil", "dl",  "cl",  "r8b", "r9b"};
-static char *argreg16[] = {"di",  "si",  "dx",  "cx",  "r8w", "r9w"};
-static char *argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
-static char *argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8",  "r9" };
+const int sysv_ar_cnt = 6;
+const char* sysv_ar8[]  = { "dil",  "sil",  "dl",   "cl",   "r8b",  "r9b" };
+const char* sysv_ar16[] = { "di",   "si",   "dx",   "cx",   "r8w",  "r9w" };
+const char* sysv_ar32[] = { "edi",  "esi",  "edx",  "ecx",  "r8d",  "r9d" };
+const char* sysv_ar64[] = { "rdi",  "rsi",  "rdx",  "rcx",  "r8",   "r9"  };
+
+const int win_ar_cnt = 4;
+const char* win_ar8[]  = { "cl",   "dl",   "r8b",  "r9b" };
+const char* win_ar16[] = { "cx",   "dx",   "r8w",  "r9w" };
+const char* win_ar32[] = { "ecx",  "edx",  "r8d",  "r9d" };
+const char* win_ar64[] = { "rcx",  "rdx",  "r8",   "r9"  };
 
 HT_DECL(OffTable, uint, uint)
 HT_IMPL_NUM(OffTable, uint, uint)
 
 OffTable stack_table = {0};
 OffTable data_table  = {0};
+
+StringBuilder body = {0};
+uint total_offset;
+TargetPlatform tp;
+
+void ir_dump_opr(TAC_Operand opr, char *buf);
+void ir_dump_inst(TAC_Instruction inst, char *res);
 
 uint get_type_size(Type type) {
 	switch (type.kind) {
@@ -49,7 +65,7 @@ uint get_type_size(Type type) {
 		case TYPE_BOOL:
 		case TYPE_I8:
 			return 1;
-		default: unreachable;
+		default: UNREACHABLE;
 	}
 }
 
@@ -75,9 +91,6 @@ uint get_struct_alignment(TAC_Operand var, bool is_data) {
 	return get_type_size(vt) - total;
 }
 
-StringBuilder body = {0};
-uint total_offset = 0;
-
 void var_type_to_stack(TAC_Operand t, char *buf) {
 	switch (tac_ir_get_opr_type(t).kind) {
 		case TYPE_ARRAY:
@@ -98,7 +111,7 @@ void var_type_to_stack(TAC_Operand t, char *buf) {
 		case TYPE_I8:
 			sprintf(buf, "byte");
 			break;
-		default: unreachable;
+		default: UNREACHABLE;
 	}
 }
 
@@ -135,11 +148,11 @@ char *opr_to_nasm(TAC_Operand opr) {
 					if (opr.var.off.count != 0) off += get_struct_alignment(opr, true);
 					sb_appendf(&body, TAB"lea rax, [rel D%u + %lu]\n", opr.var.addr_id, off);
 					sprintf(opr_to_nasm_buf, "%s [rax]", ts);
-				} else unreachable;
+				} else UNREACHABLE;
 			} else if (opr.var.kind == VAR_DATAOFF) {
-				size_t off = 0;
+				uint off = 0;
 				if (opr.var.off.count != 0) off += get_struct_alignment(opr, true);
-				sprintf(opr_to_nasm_buf, "%s [rel D%u + %lu]", ts, opr.var.addr_id, off);
+				sprintf(opr_to_nasm_buf, "%s [rel D%u + %u]", ts, opr.var.addr_id, off);
 			}
 		} break;
 
@@ -166,7 +179,7 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TYPE_I64:
 					sprintf(opr_to_nasm_buf, "%li", opr.literal.lint);
 					break;
-				default: printf("%d\n", opr.literal.type.kind); unreachable;
+				default: printf("%d\n", opr.literal.type.kind); UNREACHABLE;
 			}
 		} break;
 
@@ -185,30 +198,83 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TYPE_I64:
 					sprintf(opr_to_nasm_buf, "rax");
 					break;
-				default: unreachable;
+				default: UNREACHABLE;
 			}
 		} break;
 
 		case OPR_FUNC_INP: {
+			uint arg_id = opr.func_inp.arg_id;
 			switch (opr.func_inp.type.kind) {
+				case TYPE_I32:
 				case TYPE_INT:
-					sprintf(opr_to_nasm_buf, "%s", argreg32[opr.func_inp.arg_id]);
-					break;
+					switch (tp) {
+						case TP_MACOS:
+						case TP_LINUX: {
+							if (arg_id >= sysv_ar_cnt) {
+								sb_appendf(&body, TAB"mov r10d, dword [rbp + %u]\n", (arg_id - sysv_ar_cnt) * 8 + 48);
+								sprintf(opr_to_nasm_buf, "r10d");
+							} else {
+								sprintf(opr_to_nasm_buf, "%s", sysv_ar32[arg_id]);
+							}
+						} break;
+						case TP_WINDOWS: {
+							if (arg_id >= sysv_ar_cnt) {
+								sb_appendf(&body, TAB"mov r10d, dword [rbp + %u]\n", (arg_id - sysv_ar_cnt) * 8 + 48);
+								sprintf(opr_to_nasm_buf, "r10d");
+							} else {
+								sprintf(opr_to_nasm_buf, "%s", win_ar32[arg_id]);
+							}
+						} break;
+					} break;
 				case TYPE_BOOL:
 				case TYPE_I8:
-					sprintf(opr_to_nasm_buf, "%s", argreg8[opr.func_inp.arg_id]);
-					break;
+					switch (tp) {
+						case TP_MACOS:
+						case TP_LINUX: {
+							if (arg_id >= sysv_ar_cnt) {
+								sb_appendf(&body, TAB"mov r10b, byte [rbp + %u]\n", (arg_id - sysv_ar_cnt) * 8 + 48);
+								sprintf(opr_to_nasm_buf, "r10b");
+							} else {
+								sprintf(opr_to_nasm_buf, "%s", sysv_ar8[arg_id]);
+							}
+						} break;
+						case TP_WINDOWS: {
+							if (arg_id >= sysv_ar_cnt) {
+								sb_appendf(&body, TAB"mov r10b, byte [rbp + %u]\n", (arg_id - sysv_ar_cnt) * 8 + 48);
+								sprintf(opr_to_nasm_buf, "r10b");
+							} else {
+								sprintf(opr_to_nasm_buf, "%s", win_ar8[arg_id]);
+							}
+						} break;
+					} break;
 				case TYPE_ARRAY:
 				case TYPE_POINTER:
 				case TYPE_IPTR:
 				case TYPE_I64:
-					sprintf(opr_to_nasm_buf, "%s", argreg64[opr.func_inp.arg_id]);
-					break;
-				default: unreachable;
+					switch (tp) {
+						case TP_MACOS:
+						case TP_LINUX: {
+							if (arg_id >= sysv_ar_cnt) {
+								sb_appendf(&body, TAB"mov r10, qword [rbp + %u]\n", (arg_id - sysv_ar_cnt) * 8 + 48);
+								sprintf(opr_to_nasm_buf, "r10");
+							} else {
+								sprintf(opr_to_nasm_buf, "%s", sysv_ar64[arg_id]);
+							}
+						} break;
+						case TP_WINDOWS: {
+							if (arg_id >= sysv_ar_cnt) {
+								sb_appendf(&body, TAB"mov r10, %s\n", win_ar64[arg_id]);
+								sprintf(opr_to_nasm_buf, "r10");
+							} else {
+								sprintf(opr_to_nasm_buf, "%s", win_ar64[arg_id]);
+							}
+						} break;
+					} break;
+				default: UNREACHABLE;
 			}
 		} break;
 
-		default: unreachable;
+		default: UNREACHABLE;
 	}
 
 	return opr_to_nasm_buf;
@@ -236,7 +302,7 @@ void type_to_reg(TAC_Operand opr, char *arg1, char *arg2) {
 			sprintf(arg1, "eax");
 			sprintf(arg2, "ecx");
 			break;
-		default: unreachable;
+		default: UNREACHABLE;
 	}
 }
 
@@ -273,7 +339,7 @@ void nasm_gen_new_stack_var(TAC_Instruction ci, char *dst, char *arg1, char *arg
 
 void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 	sb_appendf(code, "global %s\n", func.name);
-	sb_appendf(code, "%s:\n", func.name);
+	sb_appendf(code, "%s%s:\n", (tp == TP_MACOS ? "_" : ""), func.name);
 
 	sb_appendf(code, TAB"push rbp\n");
 	sb_appendf(code, TAB"mov rbp, rsp\n");
@@ -313,7 +379,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					switch (ci.dst.var.type.kind) {
 						case TYPE_INT: sb_appendf(&body, TAB"mov edx, 0\n"); break;
 						case TYPE_I64: sb_appendf(&body, TAB"mov rdx, 0\n"); break;
-						default: unreachable;
+						default: UNREACHABLE;
 					}
 
 					sb_appendf(&body, TAB"idiv %s\n", arg2);
@@ -321,7 +387,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						switch (ci.dst.var.type.kind) {
 							case TYPE_INT: sprintf(arg1, "edx"); break;
 							case TYPE_I64: sprintf(arg1, "rdx"); break;
-							default: unreachable;
+							default: UNREACHABLE;
 						}
 					}
 				}
@@ -382,12 +448,12 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					case OPR_LITERAL: arg1_type = ci.arg1.literal.type; break;
 					case OPR_VAR:     arg1_type = ci.arg1.var.type;     break;
 					case OPR_SIZEOF:  arg1_type = ci.arg1.size_of.type; break;
-					default: unreachable;
+					default: UNREACHABLE;
 				}
 
 				nasm_gen_new_stack_var(ci, dst, arg1, arg2);
 
-				if (dst_type.kind == arg1_type.kind) { unreachable;
+				if (dst_type.kind == arg1_type.kind) { UNREACHABLE;
 				} else if (dst_type.kind == TYPE_I8 && arg1_type.kind == TYPE_INT) {
 					sb_appendf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
 					sb_appendf(&body, TAB"mov al, al\n");
@@ -405,7 +471,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					sb_appendf(&body, TAB"mov eax, eax\n");
 					sb_appendf(&body, TAB"movsx rax, eax\n");
 					sb_appendf(&body, TAB"mov %s, eax\n", opr_to_nasm(ci.dst));
-				} else unreachable;
+				} else UNREACHABLE;
 			} break;
 
 			case OP_ASSIGN: {
@@ -505,7 +571,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						case TYPE_BOOL:
 							sb_appendf(&body, TAB"mov al, %s\n", opr_to_nasm(ci.arg1));
 							break;
-						default: unreachable;
+						default: UNREACHABLE;
 					}
 				}
 
@@ -515,33 +581,88 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			} break;
 
 			case OP_FUNC_CALL: {
+				sb_appendf(&body, TAB"sub rsp, 32\n");
+
 				for (size_t i = 0; ci.args[i].kind != OPR_NULL; i++) {
 					switch (tac_ir_get_opr_type(ci.args[i]).kind) {
 						case TYPE_ARRAY:
 						case TYPE_POINTER:
 						case TYPE_IPTR:
 						case TYPE_I64:
-							sb_appendf(&body, TAB"mov %s, %s\n", argreg64[i], opr_to_nasm(ci.args[i]));
-							break;
+							switch (tp) {
+								case TP_MACOS:
+								case TP_LINUX: {
+									if (i >= sysv_ar_cnt) {
+										sb_appendf(&body, TAB"mov r10, %s\n", opr_to_nasm(ci.args[i]));
+										sb_appendf(&body, TAB"mov qword [rsp + %u], r10\n", (i - sysv_ar_cnt) * 8 + 32);
+									} else {
+										sb_appendf(&body, TAB"mov %s, %s\n", sysv_ar64[i], opr_to_nasm(ci.args[i]));
+									}
+								} break;
+								case TP_WINDOWS: {
+									if (i >= sysv_ar_cnt) {
+										sb_appendf(&body, TAB"mov r10, %s\n", opr_to_nasm(ci.args[i]));
+										sb_appendf(&body, TAB"mov qword [rsp + %u], r10\n", (i - sysv_ar_cnt) * 8 + 32);
+									} else {
+										sb_appendf(&body, TAB"mov %s, %s\n", win_ar64[i], opr_to_nasm(ci.args[i]));
+									}
+								} break;
+							} break;
+						case TYPE_I32:
 						case TYPE_INT:
-							sb_appendf(&body, TAB"mov %s, %s\n", argreg32[i], opr_to_nasm(ci.args[i]));
-							break;
+						switch (tp) {
+								case TP_MACOS:
+								case TP_LINUX: {
+									if (i >= sysv_ar_cnt) {
+										sb_appendf(&body, TAB"mov r10d, %s\n", opr_to_nasm(ci.args[i]));
+										sb_appendf(&body, TAB"mov dword [rsp + %u], r10d\n", (i - sysv_ar_cnt) * 8 + 32);
+									} else {
+										sb_appendf(&body, TAB"mov %s, %s\n", sysv_ar32[i], opr_to_nasm(ci.args[i]));
+									}
+								} break;
+								case TP_WINDOWS: {
+									if (i >= sysv_ar_cnt) {
+										sb_appendf(&body, TAB"mov r10d, %s\n", opr_to_nasm(ci.args[i]));
+										sb_appendf(&body, TAB"mov dword [rsp + %u], r10d\n", (i - sysv_ar_cnt) * 8 + 32);
+									} else {
+										sb_appendf(&body, TAB"mov %s, %s\n", win_ar32[i], opr_to_nasm(ci.args[i]));
+									}
+								} break;
+							} break;
 						case TYPE_I8:
 						case TYPE_BOOL:
-							sb_appendf(&body, TAB"mov %s, %s\n", argreg8[i], opr_to_nasm(ci.args[i]));
-							break;
-						default: unreachable;
+							switch (tp) {
+								case TP_MACOS:
+								case TP_LINUX: {
+									if (i >= sysv_ar_cnt) {
+										sb_appendf(&body, TAB"mov r10b, %s\n", opr_to_nasm(ci.args[i]));
+										sb_appendf(&body, TAB"mov byte [rsp + %u], r10b\n", (i - sysv_ar_cnt) * 8 + 32);
+									} else {
+										sb_appendf(&body, TAB"mov %s, %s\n", sysv_ar8[i], opr_to_nasm(ci.args[i]));
+									}
+								} break;
+								case TP_WINDOWS: {
+									if (i >= sysv_ar_cnt) {
+										sb_appendf(&body, TAB"mov r10b, %s\n", opr_to_nasm(ci.args[i]));
+										sb_appendf(&body, TAB"mov byte [rsp + %u], r10b\n", (i - sysv_ar_cnt) * 8 + 32);
+									} else {
+										sb_appendf(&body, TAB"mov %s, %s\n", win_ar8[i], opr_to_nasm(ci.args[i]));
+									}
+								} break;
+							} break;
+						default: UNREACHABLE;
 					}
 				}
 
-				sb_appendf(&body, TAB"call %s\n", ci.dst.name);
+				sb_appendf(&body, TAB"call %s%s\n", (tp == TP_MACOS ? "_" : ""), ci.dst.name);
+				sb_appendf(&body, TAB"add rsp, 32\n");
 			} break;
 
-			default: unreachable;
+			default: UNREACHABLE;
 		}
 	}
 
-	total_offset += 8;
+	total_offset += 16 + 32;
 
 	if (total_offset % 16 != 0) {
 		total_offset += 16 - total_offset % 16;
@@ -558,8 +679,9 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 	sb_appendf(code, "\n");
 }
 
-char *nasm_gen_prog(TAC_Program *prog) {
+char *nasm_gen_prog(TAC_Program *prog, TargetPlatform tp) {
 	StringBuilder code = {0};
+	tp = tp;
 
 	da_foreach(TAC_Extern, ext, &prog->externs) {
 		sb_appendf(&code, "extern %s\n", ext->name);

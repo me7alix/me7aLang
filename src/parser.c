@@ -56,7 +56,7 @@ Type parser_get_type(Parser *p, AST_Node *n) {
 		case AST_LITERAL:   return n->literal.type;
 		case AST_FUNC_CALL: return n->func_call.type;
 		case AST_VID:       return parser_symbol_table_get(p, SBL_VAR, n->vid)->variable.type;
-		default: unreachable;
+		default: UNREACHABLE;
 	}
 }
 
@@ -145,7 +145,7 @@ AST_Node *ast_alloc(AST_Node node) {
 	return new;
 }
 
-void expect_token(Token *token, TokenType type) {
+void expect_token(Token *token, TokenKind type) {
 	if (token->type == type) return;
 
 	char err[256];
@@ -247,7 +247,7 @@ AST_Node *parse_var_assign(Parser *p) {
 		case AST_LITERAL:   vdn->var_def.type = exp->literal.type;    break;
 		case AST_FUNC_CALL: vdn->var_def.type = exp->func_call.type;  break;
 		case AST_VID:       vdn->var_def.type = parser_symbol_table_get(p, SBL_VAR, exp->vid)->variable.type; break;
-		default: unreachable;
+		default: UNREACHABLE;
 	}
 
 	assert(vdn->var_def.type.kind);
@@ -611,7 +611,7 @@ Parser parser_parse(Token *tokens) {
 				}
 				break;
 
-			default: unreachable;
+			default: UNREACHABLE;
 		}
 
 		parser_next(&p);

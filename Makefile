@@ -1,10 +1,17 @@
 CC ?= gcc
 CFLAGS ?= -std=c99 -Wall -D_CP_RUNTIME_CHECKS -D_GNU_SOURCE
 
-SRCS := src/main.c src/preprocessor.c src/lexer.c src/parser.c src/parser_expr.c src/tac_ir_gen.c
 RUNTIME_SRC := examples/runtime.c
 OUT := build/metc
 RUNTIME_OBJ := build/runtime.o
+
+SRCS := \
+	src/main.c \
+	src/preprocessor.c \
+	src/lexer.c \
+	src/parser.c \
+	src/parser_expr.c \
+	src/tac_ir_gen.c
 
 ifeq ($(OS),Windows_NT)
 	MKDIR_CMD = if not exist build mkdir build

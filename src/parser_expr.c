@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <threads.h>
 #include <string.h>
 
 #include "../include/parser.h"
@@ -11,7 +10,7 @@
 Type iptr = (Type) {.kind = TYPE_IPTR};
 
 double parse_float(char *data) { return atof(data); }
-u64 parse_int(char *data) {
+long int parse_int(char *data) {
 	char *end;
 	return strtol(data, &end, 0);
 }
@@ -83,7 +82,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 					case AST_UN_EXP:
 						l_cost = expr_op_precedence(da_get(nodes, i-1)->expr_unary.op, true);
 						break;
-					default: unreachable;
+					default: UNREACHABLE;
 				}
 			}
 
@@ -95,7 +94,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 					case AST_UN_EXP:
 						r_cost = expr_op_precedence(da_get(nodes, i+1)->expr_unary.op, false);
 						break;
-					default: unreachable;
+					default: UNREACHABLE;
 				}
 			}
 
@@ -107,13 +106,13 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 				switch (da_get(nodes, i-1)->kind) {
 					case AST_BIN_EXP: da_get(nodes, i-1)->expr_binary.r = node; break;
 					case AST_UN_EXP:  da_get(nodes, i-1)->expr_unary.v = node;  break;
-					default: unreachable;
+					default: UNREACHABLE;
 				}
 			} else {
 				switch (da_get(nodes, i+1)->kind) {
 					case AST_BIN_EXP: da_get(nodes, i+1)->expr_binary.l = node; break;
 					case AST_UN_EXP:  da_get(nodes, i+1)->expr_unary.v = node;  break;
-					default: unreachable;
+					default: UNREACHABLE;
 				}
 			}
 
@@ -245,11 +244,11 @@ Type expr_calc_types(Parser *p, AST_Node *expr, Type *vart) {
 			return expr->expr_unary.type;
 		} break;
 
-		default: unreachable;
+		default: UNREACHABLE;
 	}
 }
 
-AST_ExprOp tok_to_binary_expr_op(TokenType tok) {
+AST_ExprOp tok_to_binary_expr_op(TokenKind tok) {
 	switch (tok) {
 		case TOK_PLUS_EQ:  return AST_OP_ADD_EQ;
 		case TOK_MINUS_EQ: return AST_OP_SUB_EQ;
@@ -270,7 +269,7 @@ AST_ExprOp tok_to_binary_expr_op(TokenType tok) {
 		case TOK_PS:       return AST_OP_MOD;
 		case TOK_OSQBRA:   return AST_OP_ARR;
 		case TOK_DOT:      return AST_OP_FIELD;
-		default: unreachable;
+		default: UNREACHABLE;
 	}
 }
 

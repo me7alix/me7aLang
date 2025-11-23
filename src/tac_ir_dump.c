@@ -82,7 +82,7 @@ void ir_dump_inst(TAC_Instruction inst, char *res) {
 			}
 		} break;
 
-		default: unreachable;
+		default: UNREACHABLE;
 	}
 }
 

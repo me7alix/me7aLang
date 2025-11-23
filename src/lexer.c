@@ -3,7 +3,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <threads.h>
 #include "../include/lexer.h"
 
 char *get_word(Lexer *lexer) {
@@ -24,7 +23,7 @@ char *get_word(Lexer *lexer) {
 	return word;
 }
 
-void add_token(Lexer *lexer, TokenType type, char *data) {
+void add_token(Lexer *lexer, TokenKind type, char *data) {
 	da_append(&lexer->tokens, ((Token) {
 		.type = type,
 		.data = data,
@@ -32,7 +31,7 @@ void add_token(Lexer *lexer, TokenType type, char *data) {
 	}));
 }
 
-bool is_tok(Lexer *lexer, char *tok, TokenType type, char *str) {
+bool is_tok(Lexer *lexer, char *tok, TokenKind type, char *str) {
 	for (size_t i = 0; i < strlen(tok); i++) {
 		if (tok[i] != str[i]) return false;
 	}

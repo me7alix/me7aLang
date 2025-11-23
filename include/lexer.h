@@ -16,7 +16,7 @@ typedef enum {
 	TOK_CSQBRA, TOK_CBRA, TOK_DOT, TOK_PLUS_EQ, TOK_MINUS_EQ, TOK_STAR_EQ,
 	TOK_SLASH_EQ, TOK_EOF, TOK_BREAK, TOK_CONTINUE, TOK_IMPORT, TOK_MACRO,
 	TOK_ELSE_SYM, TOK_PS, TOK_ANY,
-} TokenType;
+} TokenKind;
 
 typedef struct {
 	char *file;
@@ -26,7 +26,7 @@ typedef struct {
 } Location;
 
 typedef struct {
-	TokenType type;
+	TokenKind type;
 	Location loc;
 	char *data;
 } Token;

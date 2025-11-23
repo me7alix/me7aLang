@@ -10,6 +10,14 @@
 #include "./codegen/amd64-nasm.c"
 #include "tac_ir_dump.c"
 
+#if defined(_WIN32)
+TargetPlatform tp = TP_WINDOWS;
+#elif defined(__linux__)
+TargetPlatform tp = TP_LINUX;
+#elif defined(__APPLE__)
+TargetPlatform tp = TP_MACOS;
+#endif
+
 char *read_file(const char *filename) {
 	FILE* file = fopen(filename, "rb");
 	if (!file) {
@@ -59,6 +67,8 @@ int write_to_file(const char *filename, const char *text) {
 
 	return 0;
 }
+
+#define systemf(...) sprintf(buf, __VA_ARGS__); system(buf);
 
 void print_usage() {
 	printf(
@@ -158,20 +168,31 @@ int main(int argc, char **argv) {
 		ir_dump_prog(&prog, buf);
 	}
 
-	char *cg = nasm_gen_prog(&prog);
+	char *cg = nasm_gen_prog(&prog, tp);
 	sprintf(output_file, "%s.asm", output_bin);
 	write_to_file(output_file, cg);
-	sprintf(buf, "nasm -f elf64 %s", output_file); system(buf);
+
+	systemf("nasm -f %s %s", tp == TP_WINDOWS ? "win64" : "elf64", output_file);
+
 	if (!compile_to_obj) {
-		sprintf(buf,
-		  "ld -o %s %s.o %s %s -L/usr/lib -lc "
-		  "-dynamic-linker /lib64/ld-linux-x86-64.so.2 /usr/lib/crt1.o /usr/lib/crti.o /usr/lib/crtn.o",
-		  output_bin, output_bin, obj_files, ld); system(buf);
-		sprintf(buf, "rm %s.o", output_bin); system(buf);
+		switch (tp) {
+			case TP_MACOS:
+			case TP_LINUX:
+				systemf(
+					"ld -o %s %s.o %s %s -L/usr/lib -lc "
+					"-dynamic-linker /lib64/ld-linux-x86-64.so.2 /usr/lib/crt1.o /usr/lib/crti.o /usr/lib/crtn.o",
+					output_bin, output_bin, obj_files, ld);
+				break;
+			case TP_WINDOWS:
+				systemf("gcc -fPIE -o %s %s.o %s %s", output_bin, output_bin, obj_files, ld);
+				break;
+		}
+		
+		systemf("rm %s.o", output_bin);
 	}
 
 	if (!save_asm_output) {
-		sprintf(buf, "rm %s", output_file); system(buf);
+		systemf("rm %s", output_file);
 	}
 
 	return 0;

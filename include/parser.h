@@ -202,19 +202,17 @@ Token *parser_peek(Parser *p);
 Token *parser_looknext(Parser *p);
 Token *parser_next(Parser *p);
 
-u64 parse_int(char *data);
+long int parse_int(char *data);
 Symbol *st_get(SymbolTable *st, const char *id);
-void expect_token(Token *token, TokenType type);
+void expect_token(Token *token, TokenKind type);
 Parser parser_parse(Token *tokens);
 void parser_free(Parser parser);
-void expect_token(Token *token, TokenType type);
+void expect_token(Token *token, TokenKind type);
 AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart);
 AST_Node *parse_func_call(Parser *parser);
 AST_Node *ast_alloc(AST_Node node);
 
-#define is_pointer(t) ((t).kind == TYPE_ARRAY || (t).kind == TYPE_POINTER)
-#define get_pointer_base(t) ((t).kind == TYPE_POINTER ? (t).pointer.base : (t).array.elem)
-#define unreachable do { fprintf(stderr, "%s:%d: unreachable\n", __FILE__, __LINE__); exit(1); } while(0)
+#define UNREACHABLE do { fprintf(stderr, "%s:%d: unreachable\n", __FILE__, __LINE__); exit(1); } while(0)
 #define ast_new(...) ast_alloc((AST_Node) __VA_ARGS__)
 
 #endif

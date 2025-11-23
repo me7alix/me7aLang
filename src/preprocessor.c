@@ -13,12 +13,9 @@ ImportedTable it   = {0};
 MacroTable    mt   = {0};
 StringBuilder path = {0};
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
-
 int pathcmp(const char *a, const char *b) {
 #if defined(_WIN32)
+	#include <windows.h>
 	char path1[32768], path2[32768];
 
 	DWORD r1 = GetFullPathNameA(a, sizeof(path1), path1, NULL);
@@ -28,22 +25,28 @@ int pathcmp(const char *a, const char *b) {
 		return 1;
 
 	return _stricmp(path1, path2);
-#elif defined(__linux__)
+#else
 	char ra[1024], rb[1024];
 	if (!realpath(a, ra) || !realpath(b, rb))
 		return 1;
 	return strcmp(ra, rb);
-#else // Unsupported OS
-	return strcmp(a, b);
 #endif
 }
 
 u64 ImportedTable_hashf(char *str) {
-	char ra[512];
-	u64 res;
-	realpath(str, ra);
-	strhash(&res, ra);
-	return res;
+	char real_path[512];
+	u64 res_hash;
+#if defined(_WIN32)
+	#include <windows.h>
+	DWORD len = GetFullPathNameA(str, sizeof(real_path), real_path, NULL);
+	if (len == 0 || len >= sizeof(real_path))
+		strncpy(real_path, str, sizeof(real_path)-1);
+#else
+	if (realpath(str, real_path) == NULL)
+		strncpy(real_path, str, sizeof(real_path)-1);
+#endif
+	strhash(&res_hash, real_path);
+	return res_hash;
 }
 
 int ImportedTable_compare(char *cur_str, char *str) {
