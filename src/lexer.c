@@ -182,12 +182,17 @@ Lexer lexer_lex(char *file, char *code) {
 				}
 			} break;
 
+			case '\r':
 			case '\n':
 				if (da_last(&lexer.tokens).type != TOK_SEMI &&
 					da_last(&lexer.tokens).type != TOK_CBRA &&
 					da_last(&lexer.tokens).type != TOK_OBRA &&
 					da_last(&lexer.tokens).type != TOK_COM)
 					add_token(&lexer, TOK_SEMI, ";");
+
+				if (*lexer.cur_char == '\r' && lexer.cur_char[1] == '\n')
+					lexer.cur_char++;
+
 				lexer.cur_loc.line_num++;
 				lexer.cur_loc.line_start = lexer.cur_char + 1;
 				break;

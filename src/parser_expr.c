@@ -9,7 +9,10 @@
 
 Type iptr = (Type) {.kind = TYPE_IPTR};
 
-double parse_float(char *data) { return atof(data); }
+double parse_float(char *data) {
+	return atof(data);
+}
+
 long int parse_int(char *data) {
 	char *end;
 	return strtol(data, &end, 0);

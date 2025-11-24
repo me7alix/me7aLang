@@ -14,8 +14,8 @@ SRCS := \
 	src/tac_ir_gen.c
 
 ifeq ($(OS),Windows_NT)
-	MKDIR_CMD = if not exist build mkdir build
-	RM_CMD = if exist build rmdir /s /q build
+	MKDIR_CMD = cmd /c "if not exist build mkdir build"
+	RM_CMD    = cmd /c "if exist build rmdir /s /q build"
 else
 	MKDIR_CMD = mkdir -p build
 	RM_CMD = rm -rf build

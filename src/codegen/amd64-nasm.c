@@ -53,17 +53,21 @@ uint get_type_size(Type type) {
 		case TYPE_UPTR:
 		case TYPE_IPTR:
 		case TYPE_I64:
+		case TYPE_U64:
 			return 8;
+		case TYPE_F32:
 		case TYPE_FLOAT:
 		case TYPE_UINT:
 		case TYPE_INT:
 		case TYPE_I32:
+		case TYPE_U32:
 			return 4;
 		case TYPE_U16:
 		case TYPE_I16:
 			return 2;
 		case TYPE_BOOL:
 		case TYPE_I8:
+		case TYPE_U8:
 			return 1;
 		default: UNREACHABLE;
 	}
@@ -96,19 +100,26 @@ void var_type_to_stack(TAC_Operand t, char *buf) {
 		case TYPE_ARRAY:
 		case TYPE_POINTER:
 		case TYPE_IPTR:
+		case TYPE_UPTR:
 		case TYPE_I64:
+		case TYPE_U64:
 			sprintf(buf, "qword");
 			break;
+		case TYPE_UINT:
 		case TYPE_INT:
 		case TYPE_I32:
+		case TYPE_U32:
 		case TYPE_FLOAT:
+		case TYPE_F32:
 			sprintf(buf, "dword");
 			break;
+		case TYPE_U16:
 		case TYPE_I16:
 			sprintf(buf, "word");
 			break;
 		case TYPE_BOOL:
 		case TYPE_I8:
+		case TYPE_U8:
 			sprintf(buf, "byte");
 			break;
 		default: UNREACHABLE;
@@ -167,7 +178,7 @@ char *opr_to_nasm(TAC_Operand opr) {
 					sprintf(opr_to_nasm_buf, "xmm0");
 				} break;
 				case TYPE_INT:
-					sprintf(opr_to_nasm_buf, "%d", (i32) opr.literal.lint);
+					sprintf(opr_to_nasm_buf, "%d", (int) opr.literal.lint);
 					break;
 				case TYPE_BOOL:
 				case TYPE_I8:
@@ -179,23 +190,33 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TYPE_I64:
 					sprintf(opr_to_nasm_buf, "%li", opr.literal.lint);
 					break;
-				default: printf("%d\n", opr.literal.type.kind); UNREACHABLE;
+				default: UNREACHABLE;
 			}
 		} break;
 
 		case OPR_FUNC_RET: {
 			switch (opr.func_ret.type.kind) {
+				case TYPE_I32:
+				case TYPE_U32:
+				case TYPE_UINT:
 				case TYPE_INT:
 					sprintf(opr_to_nasm_buf, "eax");
 					break;
 				case TYPE_BOOL:
 				case TYPE_I8:
+				case TYPE_U8:
 					sprintf(opr_to_nasm_buf, "al");
+					break;
+				case TYPE_I16:
+				case TYPE_U16:
+					sprintf(opr_to_nasm_buf, "ax");
 					break;
 				case TYPE_ARRAY:
 				case TYPE_POINTER:
 				case TYPE_IPTR:
+				case TYPE_UPTR:
 				case TYPE_I64:
+				case TYPE_U64:
 					sprintf(opr_to_nasm_buf, "rax");
 					break;
 				default: UNREACHABLE;
@@ -205,8 +226,10 @@ char *opr_to_nasm(TAC_Operand opr) {
 		case OPR_FUNC_INP: {
 			uint arg_id = opr.func_inp.arg_id;
 			switch (opr.func_inp.type.kind) {
+				case TYPE_U32:
 				case TYPE_I32:
 				case TYPE_INT:
+				case TYPE_UINT:
 					switch (tp) {
 						case TP_MACOS:
 						case TP_LINUX: {
@@ -218,8 +241,8 @@ char *opr_to_nasm(TAC_Operand opr) {
 							}
 						} break;
 						case TP_WINDOWS: {
-							if (arg_id >= sysv_ar_cnt) {
-								sb_appendf(&body, TAB"mov r10d, dword [rbp + %u]\n", (arg_id - sysv_ar_cnt) * 8 + 48);
+							if (arg_id >= win_ar_cnt) {
+								sb_appendf(&body, TAB"mov r10d, dword [rbp + %u]\n", (arg_id - win_ar_cnt) * 8 + 48);
 								sprintf(opr_to_nasm_buf, "r10d");
 							} else {
 								sprintf(opr_to_nasm_buf, "%s", win_ar32[arg_id]);
@@ -228,6 +251,7 @@ char *opr_to_nasm(TAC_Operand opr) {
 					} break;
 				case TYPE_BOOL:
 				case TYPE_I8:
+				case TYPE_U8:
 					switch (tp) {
 						case TP_MACOS:
 						case TP_LINUX: {
@@ -239,8 +263,8 @@ char *opr_to_nasm(TAC_Operand opr) {
 							}
 						} break;
 						case TP_WINDOWS: {
-							if (arg_id >= sysv_ar_cnt) {
-								sb_appendf(&body, TAB"mov r10b, byte [rbp + %u]\n", (arg_id - sysv_ar_cnt) * 8 + 48);
+							if (arg_id >= win_ar_cnt) {
+								sb_appendf(&body, TAB"mov r10b, byte [rbp + %u]\n", (arg_id - win_ar_cnt) * 8 + 48);
 								sprintf(opr_to_nasm_buf, "r10b");
 							} else {
 								sprintf(opr_to_nasm_buf, "%s", win_ar8[arg_id]);
@@ -250,7 +274,9 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TYPE_ARRAY:
 				case TYPE_POINTER:
 				case TYPE_IPTR:
+				case TYPE_UPTR:
 				case TYPE_I64:
+				case TYPE_U64:
 					switch (tp) {
 						case TP_MACOS:
 						case TP_LINUX: {
@@ -262,8 +288,8 @@ char *opr_to_nasm(TAC_Operand opr) {
 							}
 						} break;
 						case TP_WINDOWS: {
-							if (arg_id >= sysv_ar_cnt) {
-								sb_appendf(&body, TAB"mov r10, %s\n", win_ar64[arg_id]);
+							if (arg_id >= win_ar_cnt) {
+								sb_appendf(&body, TAB"mov r10, qword [rbp + %u]\n", (arg_id - win_ar_cnt) * 8 + 48);
 								sprintf(opr_to_nasm_buf, "r10");
 							} else {
 								sprintf(opr_to_nasm_buf, "%s", win_ar64[arg_id]);
@@ -282,23 +308,35 @@ char *opr_to_nasm(TAC_Operand opr) {
 
 void type_to_reg(TAC_Operand opr, char *arg1, char *arg2) {
 	switch (tac_ir_get_opr_type(opr).kind) {
+		case TYPE_U8:
 		case TYPE_I8:
 		case TYPE_BOOL:
 			sprintf(arg1, "al");
-			sprintf(arg2, "bl");
+			sprintf(arg2, "cl");
 			break;
+		case TYPE_F32:
 		case TYPE_FLOAT:
 			sprintf(arg1, "xmm0");
 			sprintf(arg2, "xmm1");
 			break;
+		case TYPE_I16:
+		case TYPE_U16:
+			sprintf(arg1, "ax");
+			sprintf(arg2, "cx");
+			break;
 		case TYPE_ARRAY:
 		case TYPE_POINTER:
 		case TYPE_IPTR:
+		case TYPE_UPTR:
 		case TYPE_I64:
+		case TYPE_U64:
 			sprintf(arg1, "rax");
 			sprintf(arg2, "rcx");
 			break;
+		case TYPE_I32:
+		case TYPE_U32:
 		case TYPE_INT:
+		case TYPE_UINT:
 			sprintf(arg1, "eax");
 			sprintf(arg2, "ecx");
 			break;
@@ -374,19 +412,57 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 
 				if      (ci.op == OP_ADD) sb_appendf(&body, TAB"add %s, %s\n", arg1, arg2);
 				else if (ci.op == OP_SUB) sb_appendf(&body, TAB"sub %s, %s\n", arg1, arg2);
-				else if (ci.op == OP_MUL) sb_appendf(&body, TAB"imul %s, %s\n", arg1, arg2);
+				else if (ci.op == OP_MUL) {
+					switch (ci.dst.var.type.kind) {
+						case TYPE_ARRAY:
+						case TYPE_POINTER:
+						case TYPE_UINT: case TYPE_U8:
+						case TYPE_U32: case TYPE_U16:
+						case TYPE_U64: case TYPE_UPTR:
+							sb_appendf(&body, TAB"mul %s, %s\n", arg1, arg2);
+							break;
+
+						case TYPE_IPTR:
+						case TYPE_BOOL: case TYPE_I8:
+						case TYPE_INT: case TYPE_I32:
+						case TYPE_I64: case TYPE_I16:
+							sb_appendf(&body, TAB"imul %s, %s\n", arg1, arg2);
+							break;
+
+						default: UNREACHABLE;
+					}
+				}
+
 				else if (ci.op == OP_DIV || ci.op == OP_MOD) {
 					switch (ci.dst.var.type.kind) {
-						case TYPE_INT: sb_appendf(&body, TAB"mov edx, 0\n"); break;
-						case TYPE_I64: sb_appendf(&body, TAB"mov rdx, 0\n"); break;
+						case TYPE_ARRAY:
+						case TYPE_POINTER:
+						case TYPE_UINT: case TYPE_U8:
+						case TYPE_U32: case TYPE_U16:
+						case TYPE_U64: case TYPE_UPTR:
+							sb_appendf(&body, TAB"xor rdx, rdx\n");
+							sb_appendf(&body, TAB"div %s\n", arg2);
+							break;
+
+						case TYPE_IPTR:
+						case TYPE_BOOL: case TYPE_I8:
+						case TYPE_INT: case TYPE_I32:
+						case TYPE_I64: case TYPE_I16:
+							sb_appendf(&body, TAB"cqo\n");
+							sb_appendf(&body, TAB"idiv %s\n", arg2);
+							break;
+
 						default: UNREACHABLE;
 					}
 
-					sb_appendf(&body, TAB"idiv %s\n", arg2);
 					if (ci.op == OP_MOD) {
 						switch (ci.dst.var.type.kind) {
-							case TYPE_INT: sprintf(arg1, "edx"); break;
-							case TYPE_I64: sprintf(arg1, "rdx"); break;
+							case TYPE_BOOL:
+							case TYPE_I8:   case TYPE_U8:  sprintf(arg1, "dl"); break;
+							case TYPE_I16:  case TYPE_U16: sprintf(arg1, "dx"); break;
+							case TYPE_I32:  case TYPE_U32:
+							case TYPE_UINT: case TYPE_INT: sprintf(arg1, "edx"); break;
+							case TYPE_U64:  case TYPE_I64: sprintf(arg1, "rdx"); break;
 							default: UNREACHABLE;
 						}
 					}
@@ -600,9 +676,9 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 									}
 								} break;
 								case TP_WINDOWS: {
-									if (i >= sysv_ar_cnt) {
+									if (i >= win_ar_cnt) {
 										sb_appendf(&body, TAB"mov r10, %s\n", opr_to_nasm(ci.args[i]));
-										sb_appendf(&body, TAB"mov qword [rsp + %u], r10\n", (i - sysv_ar_cnt) * 8 + 32);
+										sb_appendf(&body, TAB"mov qword [rsp + %u], r10\n", (i - win_ar_cnt) * 8 + 32);
 									} else {
 										sb_appendf(&body, TAB"mov %s, %s\n", win_ar64[i], opr_to_nasm(ci.args[i]));
 									}
@@ -610,7 +686,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 							} break;
 						case TYPE_I32:
 						case TYPE_INT:
-						switch (tp) {
+							switch (tp) {
 								case TP_MACOS:
 								case TP_LINUX: {
 									if (i >= sysv_ar_cnt) {
@@ -621,9 +697,9 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 									}
 								} break;
 								case TP_WINDOWS: {
-									if (i >= sysv_ar_cnt) {
+									if (i >= win_ar_cnt) {
 										sb_appendf(&body, TAB"mov r10d, %s\n", opr_to_nasm(ci.args[i]));
-										sb_appendf(&body, TAB"mov dword [rsp + %u], r10d\n", (i - sysv_ar_cnt) * 8 + 32);
+										sb_appendf(&body, TAB"mov dword [rsp + %u], r10d\n", (i - win_ar_cnt) * 8 + 32);
 									} else {
 										sb_appendf(&body, TAB"mov %s, %s\n", win_ar32[i], opr_to_nasm(ci.args[i]));
 									}
@@ -642,9 +718,9 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 									}
 								} break;
 								case TP_WINDOWS: {
-									if (i >= sysv_ar_cnt) {
+									if (i >= win_ar_cnt) {
 										sb_appendf(&body, TAB"mov r10b, %s\n", opr_to_nasm(ci.args[i]));
-										sb_appendf(&body, TAB"mov byte [rsp + %u], r10b\n", (i - sysv_ar_cnt) * 8 + 32);
+										sb_appendf(&body, TAB"mov byte [rsp + %u], r10b\n", (i - win_ar_cnt) * 8 + 32);
 									} else {
 										sb_appendf(&body, TAB"mov %s, %s\n", win_ar8[i], opr_to_nasm(ci.args[i]));
 									}
