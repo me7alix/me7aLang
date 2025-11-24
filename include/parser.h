@@ -202,7 +202,7 @@ Token *parser_peek(Parser *p);
 Token *parser_looknext(Parser *p);
 Token *parser_next(Parser *p);
 
-long int parse_int(char *data);
+long long parse_int(char *data);
 Symbol *st_get(SymbolTable *st, const char *id);
 void expect_token(Token *token, TokenKind type);
 Parser parser_parse(Token *tokens);

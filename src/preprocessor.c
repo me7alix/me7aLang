@@ -13,9 +13,12 @@ ImportedTable it   = {0};
 MacroTable    mt   = {0};
 StringBuilder path = {0};
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 int pathcmp(const char *a, const char *b) {
 #if defined(_WIN32)
-	#include <windows.h>
 	char path1[32768], path2[32768];
 
 	DWORD r1 = GetFullPathNameA(a, sizeof(path1), path1, NULL);

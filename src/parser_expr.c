@@ -13,9 +13,9 @@ double parse_float(char *data) {
 	return atof(data);
 }
 
-long int parse_int(char *data) {
+long long parse_int(char *data) {
 	char *end;
-	return strtol(data, &end, 0);
+	return strtoll(data, &end, 0);
 }
 
 float expr_op_precedence(AST_ExprOp op, bool l) {
