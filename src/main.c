@@ -182,13 +182,13 @@ int main(int argc, char **argv) {
 					"ld -o %s %s.o %s %s -L/usr/lib -lc "
 					"-dynamic-linker /lib64/ld-linux-x86-64.so.2 /usr/lib/crt1.o /usr/lib/crti.o /usr/lib/crtn.o",
 					output_bin, output_bin, obj_files, ld);
+				systemf("rm %s.o", output_bin);
 				break;
 			case TP_WINDOWS:
-				systemf("gcc -fPIE -o %s %s.o %s %s", output_bin, output_bin, obj_files, ld);
+				systemf("gcc -fPIE -o %s %s.obj %s %s", output_bin, output_bin, obj_files, ld);
+				systemf("rm %s.obj", output_bin);
 				break;
 		}
-		
-		systemf("rm %s.o", output_bin);
 	}
 
 	if (!save_asm_output) {
