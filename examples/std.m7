@@ -1,9 +1,7 @@
-extern print_int(val: int)
-extern print_char(val: i8)
-extern input_int(): int
 extern malloc heap_alloc(cnt: iptr): *u0
 extern free   heap_free(ptr: *u0)
 extern srand(seed: int)
 extern rand(): int
 extern time(ptr: *u0): int
-extern printf print_str(str: *i8)
+extern printf(fmt: *i8, ...)
+extern scanf(fmt: *i8, ...)

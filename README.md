@@ -23,7 +23,7 @@ make
 
 3. Compile and run an example:
 ```bash
-./build/metc -obj ./build/runtime.o -o ./build/fib ./examples/fib.met
+./build/metc -o ./build/fib ./examples/fib.m7
 ./build/fib
 ```
 

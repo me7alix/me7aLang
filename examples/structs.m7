@@ -1,4 +1,4 @@
-import "std.met"
+import "std.m7"
 
 struct Address {
 	city: *i8,
@@ -12,14 +12,8 @@ struct Person {
 }
 
 person_print(p: *Person) {
-	print_str("Name: ")
-	print_str((*p).name)
-	print_str("\nSalary: ")
-	print_int((*p).salary)
-	print_str("City: ")
-	print_str((*p).addr.city)
-	print_str("\nPost code: ")
-	print_int((*p).addr.post_code)
+	printf("Name: %s\nSalary: %d\nCity: %s\nPost code: %d\n",
+		(*p).name, (*p).salary, (*p).addr.city, (*p).addr.post_code)
 }
 
 main() {

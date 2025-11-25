@@ -1,4 +1,4 @@
-import "raylib.met"
+import "raylib.m7"
 
 #SCREEN_WIDTH  800
 #SCREEN_HEIGHT 600

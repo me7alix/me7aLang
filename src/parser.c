@@ -176,23 +176,39 @@ AST_Node *parse_func_call(Parser *p) {
 	}
 
 	size_t arg_cnt = 0;
+	bool met_any = false;
+	bool is_next_any = false;
+	AST_Node *expr;
+
 	while (parser_peek(p)->type != TOK_CPAR) {
-		if (arg_cnt + 1 > fargs.count)
-			lexer_error(fcn->loc, "error: wrong number of arguments");
+		if (fargs.items[arg_cnt]->kind == AST_FUNC_DEF_ARG_ANY)
+			met_any = true;
 
-		Type farg_type = fargs.items[arg_cnt++]->func_def_arg.type;
-		AST_Node *expr = parse_expr(p, EXPR_PARSING_FUNC_CALL, &farg_type);
-		Type expr_type = parser_get_type(p, expr);
+		if (arg_cnt < fargs.count - 1)
+			if (fargs.items[arg_cnt + 1]->kind == AST_FUNC_DEF_ARG_ANY)
+				is_next_any = true;
 
-		if (!compare_types(expr_type, farg_type))
-			lexer_error(expr->loc, "error: wrong type");
+		if (!met_any) {
+			if (arg_cnt + 1 > fargs.count)
+				lexer_error(fcn->loc, "error: wrong number of arguments");
+
+			Type farg_type = fargs.items[arg_cnt++]->func_def_arg.type;
+			expr = parse_expr(p, EXPR_PARSING_FUNC_CALL, &farg_type);
+			Type expr_type = parser_get_type(p, expr);
+
+			if (!compare_types(expr_type, farg_type))
+				lexer_error(expr->loc, "error: wrong type");
+		} else {
+			expr = parse_expr(p, EXPR_PARSING_FUNC_CALL, NULL);
+		}
 
 		da_append(&fcn->func_call.args, expr);
 		parser_next(p);
 	}
 
-	if (arg_cnt < fargs.count)
+	if (!met_any && !is_next_any && arg_cnt < fargs.count)
 		lexer_error(fcn->loc, "error: wrong number of arguments");
+
 	parser_next(p);
 	return fcn;
 }
@@ -302,7 +318,7 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 		.loc = (parser_peek(p)-1)->loc,
 	});
 
-		r->stmt_if.exp = parse_expr(p, EXPR_PARSING_STMT, NULL);
+	r->stmt_if.exp = parse_expr(p, EXPR_PARSING_STMT, NULL);
 	parser_next(p);
 	r->stmt_if.body = parse_body(p, func);
 
@@ -427,7 +443,7 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 	while (parser_peek(p)->type != TOK_CPAR) {
 		switch (parser_peek(p)->type) {
 			case TOK_COM: break;
-			case TOK_ID:
+			case TOK_ID: {
 				expect_token(parser_looknext(p), TOK_COL);
 				AST_Node *arg = ast_new({
 					.kind = AST_FUNC_DEF_ARG,
@@ -443,12 +459,16 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 					.variable.type = arg->func_def_arg.type,
 				});
 				nested_pop(p);
+			} break;
 
-				break;
+			case TOK_ANY: {
+				AST_Node *arg = ast_new({.kind = AST_FUNC_DEF_ARG_ANY});
+				da_append(fargs, arg);
+			} break;
 
-			default:
+			default: {
 				expect_token(parser_peek(p), p->cur_token->type);
-				break;
+			} break;
 		}
 
 		parser_next(p);

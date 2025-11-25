@@ -16,6 +16,8 @@ TargetPlatform tp = TP_WINDOWS;
 TargetPlatform tp = TP_LINUX;
 #elif defined(__APPLE__)
 TargetPlatform tp = TP_MACOS;
+#else
+TargetPlatform tp = TP_NULL;
 #endif
 
 char *read_file(const char *filename) {
@@ -68,7 +70,11 @@ int write_to_file(const char *filename, const char *text) {
 	return 0;
 }
 
-#define systemf(...) sprintf(buf, __VA_ARGS__); system(buf);
+#define systemf(...) \
+	do { \
+		sprintf(buf, __VA_ARGS__); \
+		system(buf); \
+	} while(0)
 
 void print_usage() {
 	printf(
@@ -83,10 +89,16 @@ void print_usage() {
 }
 
 int main(int argc, char **argv) {
+	if (tp == TP_NULL) {
+		fprintf(stderr, "Unsupported platform\n");
+		return 1;
+	}
+
 	char *input_file;
 	Imports imports = {0};
 	da_append(&imports, "");
 	da_append(&imports, ".");
+
 	char *output_bin = "a.out";
 	char *ld = "";
 	char *obj_files = "";
@@ -154,7 +166,7 @@ int main(int argc, char **argv) {
 
 	char *ep_code = read_file(input_file);
 	if (!ep_code) {
-		printf("error: no such file %s\n", input_file);
+		fprintf(stderr, "error: no such file %s\n", input_file);
 		return 1;
 	}
 
@@ -172,28 +184,34 @@ int main(int argc, char **argv) {
 	sprintf(output_file, "%s.asm", output_bin);
 	write_to_file(output_file, cg);
 
-	systemf("nasm -f %s %s", tp == TP_WINDOWS ? "win64" : "elf64", output_file);
+	systemf(
+		"nasm -f %s %s",
+		tp == TP_WINDOWS ? "win64"   :
+		tp == TP_LINUX   ? "elf64"   :
+		tp == TP_MACOS   ? "macho64" : "",
+		output_file);
 
 	if (!compile_to_obj) {
 		switch (tp) {
+			case TP_NULL: break;
 			case TP_MACOS:
-			case TP_LINUX:
+			case TP_LINUX: {
 				systemf(
-					"ld -o %s %s.o %s %s -L/usr/lib -lc "
-					"-dynamic-linker /lib64/ld-linux-x86-64.so.2 /usr/lib/crt1.o /usr/lib/crti.o /usr/lib/crtn.o",
+					"gcc -no-pie -o \"%s\" %s.o %s %s",
 					output_bin, output_bin, obj_files, ld);
 				systemf("rm %s.o", output_bin);
-				break;
-			case TP_WINDOWS:
-				systemf("gcc -fPIE -o %s %s.obj %s %s", output_bin, output_bin, obj_files, ld);
-				systemf("rm %s.obj", output_bin);
-				break;
+			} break;
+			case TP_WINDOWS: {
+				systemf(
+					"gcc -no-pie -o \"%s\" %s.obj %s %s",
+					output_bin, output_bin, obj_files, ld);
+				systemf("del /F /Q %s.obj", output_bin);
+			} break;
 		}
 	}
 
-	if (!save_asm_output) {
+	if (!save_asm_output)
 		systemf("rm %s", output_file);
-	}
 
 	return 0;
 }

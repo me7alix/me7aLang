@@ -75,15 +75,15 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 		bool is_un_op = node->kind == AST_UN_EXP && !node->expr_unary.v;
 		if (!is_bin_op && !is_un_op) {
 			bool is_lelf = false;
-			float l_cost = -999, r_cost = -999;
+			float lp = -999, rp = -999;
 
 			if (i != 0) {
 				switch (da_get(nodes, i-1)->kind) {
 					case AST_BIN_EXP:
-						l_cost = expr_op_precedence(da_get(nodes, i-1)->expr_binary.op, true);
+						lp = expr_op_precedence(da_get(nodes, i-1)->expr_binary.op, true);
 						break;
 					case AST_UN_EXP:
-						l_cost = expr_op_precedence(da_get(nodes, i-1)->expr_unary.op, true);
+						lp = expr_op_precedence(da_get(nodes, i-1)->expr_unary.op, true);
 						break;
 					default: UNREACHABLE;
 				}
@@ -92,17 +92,17 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 			if (i != nodes->count-1) {
 				switch (da_get(nodes, i+1)->kind) {
 					case AST_BIN_EXP:
-						r_cost = expr_op_precedence(da_get(nodes, i+1)->expr_binary.op, false);
+						rp = expr_op_precedence(da_get(nodes, i+1)->expr_binary.op, false);
 						break;
 					case AST_UN_EXP:
-						r_cost = expr_op_precedence(da_get(nodes, i+1)->expr_unary.op, false);
+						rp = expr_op_precedence(da_get(nodes, i+1)->expr_unary.op, false);
 						break;
 					default: UNREACHABLE;
 				}
 			}
 
-			if (l_cost > r_cost) is_lelf = true;
-			if (l_cost < -500 && r_cost < -500)
+			if (lp > rp) is_lelf = true;
+			if (lp < -500 && rp < -500)
 				lexer_error(da_get(nodes, i)->loc, "error: wrong expression");
 
 			if (is_lelf) {

@@ -1,7 +1,6 @@
 CC ?= gcc
 CFLAGS ?= -std=c99 -Wall -D_CP_RUNTIME_CHECKS -D_GNU_SOURCE
 
-RUNTIME_SRC := examples/runtime.c
 OUT_BASE := build/metc
 SRCS := \
 	src/main.c \
@@ -18,7 +17,6 @@ else
 endif
 
 OUT := $(OUT_BASE)$(EXE)
-RUNTIME_OBJ := build/runtime.o
 
 ifeq ($(OS),Windows_NT)
 	ifdef COMSPEC
@@ -41,13 +39,10 @@ build:
 	@echo "Creating build dir..."
 	@$(MKDIR_CMD)
 
-$(RUNTIME_OBJ): $(RUNTIME_SRC) | build
-	@echo "Compiling runtime..."
-	@$(CC) -c $(RUNTIME_SRC) -o $(RUNTIME_OBJ)
 
-$(OUT): $(RUNTIME_OBJ) $(SRCS) | build
+$(OUT): $(SRCS) | build
 	@echo "Compiling metc..."
-	@$(CC) $(CFLAGS) -ggdb $(SRCS) $(RUNTIME_OBJ) -o $(OUT)
+	@$(CC) $(CFLAGS) -ggdb $(SRCS) -o $(OUT)
 	@echo "Built $(OUT)"
 
 clean:

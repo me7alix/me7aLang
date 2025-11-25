@@ -1,4 +1,4 @@
-extern print_int(var: int)
+import "std.m7"
 
 bubble_sort(arr: *int, cnt: iptr) {
 	while true {
@@ -29,9 +29,9 @@ main() {
 	arr[8] = 56
 	arr[9] = 78
 
-	bubble_sort(arr: *int, 10)
+	bubble_sort(arr:*int, 10)
 
 	for i: iptr = 0; i < 10; i+=1 {
-		print_int(arr[i])
+		printf("%zi: %d\n", i, arr[i])
 	}
 }

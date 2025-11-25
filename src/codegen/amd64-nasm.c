@@ -10,6 +10,7 @@
 #define TAB "    "
 
 typedef enum : u8 {
+	TP_NULL = 0,
 	TP_LINUX,
 	TP_WINDOWS,
 	TP_MACOS,
@@ -150,10 +151,10 @@ char *opr_to_nasm(TAC_Operand opr) {
 			} else if (opr.var.kind == VAR_ADDR) {
 				if (opr.var.addr_kind == VAR_STACK) {
 					uint off = *OffTable_get(&stack_table, opr.var.addr_id);
-					sb_appendf(&body, TAB"mov rdx, qword [rbp - %u]\n", off);
+					sb_appendf(&body, TAB"mov r11, qword [rbp - %u]\n", off);
 					uint doff = 0;
 					if (opr.var.off.count != 0) doff = get_struct_alignment(opr, false);
-					sprintf(opr_to_nasm_buf, "%s [rdx + %u]", ts, doff);
+					sprintf(opr_to_nasm_buf, "%s [r11 + %u]", ts, doff);
 				} else if (opr.var.addr_kind == VAR_DATAOFF) {
 					uint off = 0;
 					if (opr.var.off.count != 0) off += get_struct_alignment(opr, true);
@@ -231,6 +232,7 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TYPE_INT:
 				case TYPE_UINT:
 					switch (tp) {
+						case TP_NULL: break;
 						case TP_MACOS:
 						case TP_LINUX: {
 							if (arg_id >= sysv_ar_cnt) {
@@ -253,6 +255,7 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TYPE_I8:
 				case TYPE_U8:
 					switch (tp) {
+						case TP_NULL: break;
 						case TP_MACOS:
 						case TP_LINUX: {
 							if (arg_id >= sysv_ar_cnt) {
@@ -278,6 +281,7 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TYPE_I64:
 				case TYPE_U64:
 					switch (tp) {
+						case TP_NULL: break;
 						case TP_MACOS:
 						case TP_LINUX: {
 							if (arg_id >= sysv_ar_cnt) {
@@ -360,11 +364,13 @@ void reg_alloc(TAC_Instruction inst, char *arg1, char *arg2) {
 	type_to_reg(inst.dst, arg1, arg2);
 }
 
-void total_offset_add(size_t off) {
+void align_up(uint *x, uint a) {
+	if (*x % a != 0) *x += a - *x % a;
+}
+
+void total_offset_add(uint off) {
 	total_offset += off;
-	if (total_offset % 8 != 0) {
-		total_offset += 8 - total_offset % 8;
-	}
+	align_up(&total_offset, 8);
 }
 
 void nasm_gen_new_stack_var(TAC_Instruction ci, char *dst, char *arg1, char *arg2) {
@@ -627,8 +633,8 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					}
 				}
 
-				sb_appendf(&body, TAB"mov rdx, %s\n", opr_to_nasm(ci.arg1));
-				sb_appendf(&body, TAB"lea rax, [rdx + %li]\n", align);
+				sb_appendf(&body, TAB"mov r11, %s\n", opr_to_nasm(ci.arg1));
+				sb_appendf(&body, TAB"lea rax, [r11 + %li]\n", align);
 				sb_appendf(&body, TAB"mov %s, rax\n", opr_to_nasm(ci.dst));
 			} break;
 
@@ -666,6 +672,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						case TYPE_IPTR:
 						case TYPE_I64:
 							switch (tp) {
+								case TP_NULL: break;
 								case TP_MACOS:
 								case TP_LINUX: {
 									if (i >= sysv_ar_cnt) {
@@ -687,6 +694,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						case TYPE_I32:
 						case TYPE_INT:
 							switch (tp) {
+								case TP_NULL: break;
 								case TP_MACOS:
 								case TP_LINUX: {
 									if (i >= sysv_ar_cnt) {
@@ -708,6 +716,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						case TYPE_I8:
 						case TYPE_BOOL:
 							switch (tp) {
+								case TP_NULL: break;
 								case TP_MACOS:
 								case TP_LINUX: {
 									if (i >= sysv_ar_cnt) {
@@ -738,11 +747,8 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		}
 	}
 
-	total_offset += 16 + 32;
-
-	if (total_offset % 16 != 0) {
-		total_offset += 16 - total_offset % 16;
-	}
+	total_offset += 48;
+	align_up(&total_offset, 16);
 
 	sb_appendf(code, TAB"sub rsp, %u\n", total_offset);
 	sb_appendf(code, "%s", body.items);
@@ -777,9 +783,11 @@ char *nasm_gen_prog(TAC_Program *prog, TargetPlatform tp) {
 				}
 				sb_appendf(&code, "\n");
 			} else sb_appendf(&code, TAB"U%u times %u db 0\n", uniq_data_off, arr_size);
+			sb_appendf(&code, TAB"align 8\n");
 			sb_appendf(&code, TAB"D%u dq U%u\n", g->index, uniq_data_off++);
 		} else sb_appendf(&code, TAB"D%u times %u db 0\n", g->index, get_type_size(g->type));
 	}
+	sb_appendf(&code, TAB"align 8\n");
 	sb_appendf(&code, "\n");
 
 	sb_appendf(&code, "section .text\n");

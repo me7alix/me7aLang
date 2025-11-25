@@ -1,5 +1,5 @@
-import "std.met"
-import "raylib.met"
+import "std.m7"
+import "raylib.m7"
 
 #MAP_W 20
 #MAP_H 20
