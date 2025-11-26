@@ -5,7 +5,7 @@
 
 #include "../include/tac_ir.h"
 
-void ir_dump_opr(TAC_Operand opr, char *buf) {
+void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 	switch (opr.kind) {
 		case OPR_NULL:     sprintf(buf, "NULL"); break;
 		case OPR_SIZEOF:   sprintf(buf, "sizeof:%d", opr.size_of.v_type.kind); break;
@@ -38,12 +38,12 @@ void ir_dump_opr(TAC_Operand opr, char *buf) {
 	}
 }
 
-void ir_dump_inst(TAC_Instruction inst, char *res) {
+void tac_ir_dump_inst(TAC_Instruction inst, char *res) {
 	char arg1[64], arg2[64], dst[64];
 
-	ir_dump_opr(inst.arg1, arg1);
-	ir_dump_opr(inst.arg2, arg2);
-	ir_dump_opr(inst.dst, dst);
+	tac_ir_dump_opr(inst.arg1, arg1);
+	tac_ir_dump_opr(inst.arg2, arg2);
+	tac_ir_dump_opr(inst.dst, dst);
 
 	switch (inst.op) {
 		case OP_ADD:    sprintf(res, "    var%s = %s %s %s", dst, arg1, "+", arg2);  break;
@@ -72,11 +72,11 @@ void ir_dump_inst(TAC_Instruction inst, char *res) {
 		case OP_FADDR:  sprintf(res, "    var%s = faddr %s %s", dst, arg1, arg2); break;
 		case OP_FUNC_CALL: {
 			char buf[128];
-			ir_dump_opr(inst.dst, dst);
+			tac_ir_dump_opr(inst.dst, dst);
 			sprintf(res, "    call %s", dst);
 
 			for (size_t i = 0; inst.args[i].kind != OPR_NULL; i++) {
-				ir_dump_opr(inst.args[i], arg1);
+				tac_ir_dump_opr(inst.args[i], arg1);
 				sprintf(buf, " %s", arg1);
 				strncat(res, buf, 128);
 			}
@@ -90,14 +90,14 @@ void ir_dump_func(TAC_Func func, FILE *fl) {
 	fprintf(fl, "%s:\n", func.name);
 	for (size_t i = 0; i < func.body.count; i++) {
 		char res[256];
-		ir_dump_inst(da_get(&func.body, i), res);
+		tac_ir_dump_inst(da_get(&func.body, i), res);
 		fprintf(fl, "%s\n", res);
 	}
 
 	fprintf(fl, "\n");
 }
 
-void ir_dump_prog(TAC_Program *prog, char *filename) {
+void tac_ir_dump_prog(TAC_Program *prog, char *filename) {
 	FILE *fl = fopen(filename, "w");
 	for (size_t i = 0; i < prog->funcs.count; i++) {
 		ir_dump_func(da_get(&prog->funcs, i), fl);

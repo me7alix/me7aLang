@@ -1,16 +1,15 @@
 import "std.m7"
 
 main() {
+	cnt: i64
+	a: i64 = 1
+	b: i64 = 2
+
 	printf("cnt: ")
+	scanf("%lli", &cnt)
 
-	cnt: int
-	scanf("%d", &cnt)
-
-	a: int = 1
-	b: int = 2
-
-	for i := 0; i < cnt; i+=1 {
-		printf("%d\n", a)
+	for i: i64 = 0; i < cnt; i+=1 {
+		printf("%lli\n", a)
 
 		l := b
 		b = b + a

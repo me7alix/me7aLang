@@ -319,8 +319,6 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 	return (TAC_Operand){0};
 }
 
-void tac_ir_dump_opr(TAC_Operand opr, char *buf);
-
 void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	IRGenExprCtx ctx = {0};
 	TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->var_def.exp);

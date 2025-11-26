@@ -2,13 +2,14 @@
 #include <string.h>
 #include <time.h>
 
+#include "../include/platform.h"
 #include "../include/preprocessor.h"
 #include "../include/lexer.h"
 #include "../include/parser.h"
 #include "../include/tac_ir.h"
 
+// codegens
 #include "./codegen/amd64-nasm.c"
-#include "tac_ir_dump.c"
 
 #if defined(_WIN32)
 TargetPlatform tp = TP_WINDOWS;
@@ -177,7 +178,7 @@ int main(int argc, char **argv) {
 	TAC_Program prog = tac_ir_gen_prog(&parser);
 	if (save_ir_output) {
 		sprintf(buf, "%s.ir", output_bin);
-		ir_dump_prog(&prog, buf);
+		tac_ir_dump_prog(&prog, buf);
 	}
 
 	char *cg = nasm_gen_prog(&prog, tp);

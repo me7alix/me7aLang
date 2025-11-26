@@ -1,7 +1,7 @@
 #include "../include/tac_ir.h"
 
 bool tac_ir_opr_calc(AST_Node *en, TAC_Operand l, TAC_Operand r, TAC_Operand *ret) {
-	int64_t res;
+	i64 res;
 
 	if (en->kind == AST_BIN_EXP) {
 		if (!(l.kind == OPR_LITERAL && r.kind == OPR_LITERAL))
@@ -11,8 +11,8 @@ bool tac_ir_opr_calc(AST_Node *en, TAC_Operand l, TAC_Operand r, TAC_Operand *re
 			return false;
 
 		int op = en->expr_binary.op;
-		int64_t lv = l.literal.lint;
-		int64_t rv = r.literal.lint;
+		i64 lv = l.literal.lint;
+		i64 rv = r.literal.lint;
 
 		switch (op) {
 			case AST_OP_ADD: res = lv + rv; break;
@@ -30,7 +30,7 @@ bool tac_ir_opr_calc(AST_Node *en, TAC_Operand l, TAC_Operand r, TAC_Operand *re
 			return false;
 
 		int op = en->expr_binary.op;
-		int64_t lv = l.literal.lint;
+		i64 lv = l.literal.lint;
 
 		switch (op) {
 			case AST_OP_NEG: res = -lv; break;

@@ -115,4 +115,10 @@ typedef struct {
 Type tac_ir_get_opr_type(TAC_Operand op);
 TAC_Program tac_ir_gen_prog(Parser *parser);
 
+// tac_ir_dump
+void tac_ir_dump_opr(TAC_Operand opr, char *buf);
+void tac_ir_dump_inst(TAC_Instruction inst, char *res);
+void tac_ir_dump_func(TAC_Func func, FILE *fl);
+void tac_ir_dump_prog(TAC_Program *prog, char *filename);
+
 #endif // IR_H

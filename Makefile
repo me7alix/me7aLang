@@ -8,6 +8,7 @@ SRCS := \
 	src/lexer.c \
 	src/parser.c \
 	src/parser_expr.c \
+	src/tac_ir_dump.c \
 	src/tac_ir_gen.c
 
 ifeq ($(OS),Windows_NT)
