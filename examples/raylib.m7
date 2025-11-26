@@ -15,6 +15,7 @@
 
 extern InitWindow         rl_init_window(width: int, height: int, title: *i8)
 extern SetTargetFPS       rl_set_target_fps(fps: int)
+extern DrawText           rl_draw_text(text: *i8, posX: int, posY: int, fontSize: int, clr: int)
 extern DrawRectangleLines rl_draw_rect_lines(x: int, y: int, w: int, h: int, clr: int)
 extern DrawRectangle      rl_draw_rect(x: int, y: int, w: int, h: int, clr: int)
 extern GetRandomValue     rl_rand(from: int, to: int): int

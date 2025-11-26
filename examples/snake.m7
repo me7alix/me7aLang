@@ -129,6 +129,9 @@ main() {
 		rl_clear_bg(rl_ColorBlack)
 
 		if new_game {
+			rl_draw_text("Game over!", 200, MAP_H/2 * TILE - 20, 40, rl_ColorWhite)
+			rl_draw_text("Press SPACE to restart", 200, MAP_H/2 * TILE + 20, 18, rl_ColorWhite)
+
 			if rl_is_key_pressed(rl_KeySpace) {
 				game_init()
 				new_game = false
@@ -155,6 +158,10 @@ main() {
 
 		draw_snake()
 		draw_apple()
+
+		text_buf: [128]i8
+		sprintf(text_buf:*i8, "Score: %lli", snake_len - 2:iptr)
+		rl_draw_text(text_buf:*i8, 20, 20, 20, rl_ColorWhite)
 
 		timer += 1
 		rl_end_drawing()
