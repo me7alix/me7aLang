@@ -34,26 +34,27 @@ float expr_op_precedence(AST_ExprOp op, bool l) {
 		case AST_OP_LESS_EQ: case AST_OP_NOT_EQ:
 			if (l) return 0.9;
 			else   return 0.8;
-		case AST_OP_AND: case AST_OP_OR:
+		case AST_OP_AND:
+		case AST_OP_OR:
 			if (l) return 0.6;
 			else   return 0.5;
 		case AST_OP_CAST:
 			if (l) return 0.0;
-			else   return 3.0;
+			else   return 5.0;
 		case AST_OP_FIELD:
 		case AST_OP_ARR:
-			if (l) return 3.1;
+			if (l) return 4.0;
 			else   return 3.0;
-		case AST_OP_NOT:
-		case AST_OP_NEG: case AST_OP_SIZEOF:
+		case AST_OP_SIZEOF:
+			if (l) return 6.0;
+			else   return 0.0;
+		case AST_OP_NOT: case AST_OP_NEG: 
 		case AST_OP_REF: case AST_OP_DEREF:
 			if (l) return 3.0;
 			else   return 0.0;
 		case AST_OP_VAR_EQ:
-		case AST_OP_ADD_EQ:
-		case AST_OP_SUB_EQ:
-		case AST_OP_DIV_EQ:
-		case AST_OP_MUL_EQ:
+		case AST_OP_ADD_EQ: case AST_OP_SUB_EQ:
+		case AST_OP_DIV_EQ: case AST_OP_MUL_EQ:
 			if (l) return -1.0;
 			else   return -1.1;
 		default:   break;
@@ -65,6 +66,15 @@ float expr_op_precedence(AST_ExprOp op, bool l) {
 AST_Node *expr_expand(AST_Nodes *nodes) {
 	size_t cur_count = nodes->count;
 	if (nodes->count == 1) {
+		bool error = false;
+		if (da_get(nodes, 0)->kind == AST_BIN_EXP) {
+			if (!da_get(nodes, 0)->expr_binary.l ||
+				!da_get(nodes, 0)->expr_binary.r) error = true;
+		} else if (da_get(nodes, 0)->kind == AST_UN_EXP) {
+			if (!da_get(nodes, 0)->expr_unary.v) error = true;
+		}
+
+		if (error) lexer_error(da_get(nodes, 0)->loc, "error: wrong expression");
 		return da_get(nodes, 0);
 	}
 
@@ -482,15 +492,14 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				if (nodes.count == 0) {
 					is_unary_op = true;
 				} else {
-					if (da_last(&nodes)->kind == AST_UN_EXP)
-						lexer_error(parser_peek(p)->loc,
-				  "error: invalid operators combination\n"
-				  "hint: try to use parenthesis");
-
-					bool is_bin_op = da_last(&nodes)->kind == AST_BIN_EXP;
-					if (is_bin_op && da_last(&nodes)->expr_binary.l &&
-						da_last(&nodes)->expr_binary.r) is_bin_op = false;
-					if (is_bin_op) is_unary_op = true;
+					if (da_last(&nodes)->kind == AST_UN_EXP) {
+						is_unary_op = false;
+					} else {
+						bool is_bin_op = da_last(&nodes)->kind == AST_BIN_EXP;
+						if (is_bin_op && da_last(&nodes)->expr_binary.l &&
+							da_last(&nodes)->expr_binary.r) is_bin_op = false;
+						if (is_bin_op) is_unary_op = true;
+					}
 				}
 
 				if (!is_unary_op) {
