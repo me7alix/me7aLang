@@ -36,6 +36,9 @@ bool is_tok(Lexer *lexer, char *tok, TokenKind type, char *str) {
 		if (tok[i] != str[i]) return false;
 	}
 
+	if (isalpha(str[strlen(tok)]) || str[strlen(tok)] == '_')
+		return false;
+
 	add_token(lexer, type, tok);
 
 	for (size_t i = 0; i < strlen(tok) - 1; i++)
@@ -286,6 +289,7 @@ Lexer lexer_lex(char *file, char *code) {
 				} else if (is_tok(&lexer, "sizeof",  TOK_SIZEOF, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "return",  TOK_RET, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "import",  TOK_IMPORT, lexer.cur_char)) {
+				} else if (is_tok(&lexer, "fn",      TOK_FUNC, lexer.cur_char)) {
 				} else if (isalpha(*lexer.cur_char)) add_token(&lexer, TOK_ID, get_word(&lexer));
 
 				else lexer_error(lexer.cur_loc, "error: unknown token");

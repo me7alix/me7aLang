@@ -26,7 +26,7 @@ typedef struct {
 	Type type;
 
 	union {
-		long int lint;
+		long long lint;
 		double lfloat;
 		u8 lbool;
 		char *str;

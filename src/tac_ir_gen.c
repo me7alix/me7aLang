@@ -16,7 +16,7 @@ HT_STR(ASTVarTable, TAC_Operand)
 ASTVarTable avt = {0};
 
 Type tac_ir_get_opr_type(TAC_Operand op) {
-	static Type tiptr = {.kind = TYPE_IPTR};
+	static Type tuptr = {.kind = TYPE_UPTR};
 
 	switch (op.kind) {
 		case OPR_VAR: {
@@ -39,7 +39,7 @@ Type tac_ir_get_opr_type(TAC_Operand op) {
 		case OPR_LITERAL:  return op.literal.type;
 		case OPR_FUNC_INP: return op.func_inp.type;
 		case OPR_FUNC_RET: return op.func_ret.type;
-		case OPR_SIZEOF:   return tiptr;
+		case OPR_SIZEOF:   return tuptr;
 		default: UNREACHABLE; return (Type) {0};
 	}
 }

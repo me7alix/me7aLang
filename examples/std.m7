@@ -1,4 +1,4 @@
-extern malloc heap_alloc(cnt: iptr): *u0
+extern malloc heap_alloc(cnt: uptr): *u0
 extern free   heap_free(ptr: *u0)
 extern srand(seed: int)
 extern rand(): int

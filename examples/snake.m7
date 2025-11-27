@@ -14,31 +14,31 @@ snake_y:   [MAX_LEN]int
 snake_dx:  int
 snake_dy:  int
 snake_da:  bool
-snake_len: iptr
+snake_len: uptr
 
-draw_snake() {
-	for i: iptr = 0; i < snake_len; i+=1 {
+fn draw_snake() {
+	for i: uptr = 0; i < snake_len; i+=1 {
 		rl_draw_rect(snake_x[i] * TILE, snake_y[i] * TILE, TILE, TILE, rl_ColorGreen)
 	}
 }
 
-draw_apple() {
+fn draw_apple() {
 	rl_draw_rect(apple_x * TILE, apple_y * TILE, TILE, TILE, rl_ColorRed)
 }
 
-snake_follow() {
-	for i: iptr = snake_len; i >= 1; i-=1 {
+fn snake_follow() {
+	for i: uptr = snake_len; i >= 1; i-=1 {
 		snake_x[i] = snake_x[i - 1]
 		snake_y[i] = snake_y[i - 1]
 	}
 }
 
-apple_set_rand_pos() {
+fn apple_set_rand_pos() {
 	apple_x = rand() % MAP_W
 	apple_y = rand() % MAP_H
 }
 
-snake_eat_apple() {
+fn snake_eat_apple() {
 	if snake_x[0] == apple_x && snake_y[0] == apple_y {
 		apple_set_rand_pos()
 		snake_x[snake_len] = snake_x[snake_len - 1]
@@ -47,8 +47,8 @@ snake_eat_apple() {
 	}
 }
 
-is_game_over(): bool {
-	for i: iptr = snake_len; i >= 1; i-=1 {
+fn is_game_over(): bool {
+	for i: uptr = snake_len; i >= 1; i-=1 {
 		if snake_x[0] == snake_x[i] && snake_y[0] == snake_y[i] {
 			return true
 		}
@@ -57,7 +57,7 @@ is_game_over(): bool {
 	return false
 }
 
-snake_set_dir() {
+fn snake_set_dir() {
 	if !snake_da {
 		return
 	}
@@ -87,7 +87,7 @@ snake_set_dir() {
 	}
 }
 
-snake_movement() {
+fn snake_movement() {
 	snake_follow()
 	snake_x[0] += snake_dx
 	snake_y[0] += snake_dy
@@ -103,7 +103,7 @@ snake_movement() {
 	}
 }
 
-game_init() {
+fn game_init() {
 	apple_set_rand_pos()
 	snake_len = 2
 	snake_x[0] = 1
@@ -114,7 +114,7 @@ game_init() {
 	snake_dy = 0
 }
 
-main() {
+fn main() {
 	srand(time(null))
 	game_init()
 
@@ -160,7 +160,7 @@ main() {
 		draw_apple()
 
 		text_buf: [128]i8
-		sprintf(text_buf:*i8, "Score: %lli", snake_len - 2:iptr)
+		sprintf(text_buf:*i8, "Score: %lli", snake_len - 2:uptr)
 		rl_draw_text(text_buf:*i8, 20, 20, 20, rl_ColorWhite)
 
 		timer += 1

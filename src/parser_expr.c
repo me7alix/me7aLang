@@ -8,6 +8,7 @@
 #include "../include/parser.h"
 
 Type iptr = (Type) {.kind = TYPE_IPTR};
+Type uptr = (Type) {.kind = TYPE_UPTR};
 
 double parse_float(char *data) {
 	return atof(data);
@@ -183,7 +184,7 @@ Type expr_calc_types(Parser *p, AST_Node *expr, Type *vart) {
 					break;
 				default:
 					if (is_pointer(lt))
-						vart = &iptr;
+						vart = &uptr;
 					break;
 			}
 
@@ -202,7 +203,9 @@ Type expr_calc_types(Parser *p, AST_Node *expr, Type *vart) {
 			expr->expr_binary.type = lt;
 
 			if ((lt.kind == TYPE_IPTR && is_pointer(rt)) ||
-				(is_pointer(lt) && rt.kind == TYPE_IPTR)) {
+				(is_pointer(lt) && rt.kind == TYPE_IPTR) ||
+				(lt.kind == TYPE_UPTR && is_pointer(rt)) ||
+				(is_pointer(lt) && rt.kind == TYPE_UPTR)) {
 				Type ptr_type = is_pointer(lt) ? lt : rt;
 				expr->expr_binary.type = (Type) {
 					.kind = TYPE_POINTER,
@@ -430,7 +433,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 						.kind = AST_UN_EXP,
 						.loc = parser_peek(p)->loc,
 						.expr_unary.op = tok_to_unary_expr_op(parser_next(p)),
-						.expr_unary.type = (Type) {.kind = TYPE_IPTR},
+						.expr_unary.type = (Type) {.kind = TYPE_UPTR},
 						.expr_unary.v = ast_new({
 							.kind = AST_LITERAL,
 							.literal.type = parse_type(p),
@@ -441,7 +444,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 						.kind = AST_UN_EXP,
 						.loc = parser_peek(p)->loc,
 						.expr_unary.op = tok_to_unary_expr_op(parser_peek(p)),
-						.expr_unary.type = (Type) {.kind = TYPE_IPTR},
+						.expr_unary.type = (Type) {.kind = TYPE_UPTR},
 						.expr_unary.v = NULL,
 					}));
 				}
@@ -465,7 +468,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 					.expr_binary.r = NULL
 				}));
 				parser_next(p);
-				da_append(&nodes, parse_expr(p, EXPR_PARSING_SQBRA, &iptr));
+				da_append(&nodes, parse_expr(p, EXPR_PARSING_SQBRA, &uptr));
 				p->cur_token--;
 				break;
 

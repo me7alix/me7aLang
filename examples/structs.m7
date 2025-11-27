@@ -6,17 +6,17 @@ struct Address {
 }
 
 struct Person {
-	name:   *i8,
+	name: *i8,
 	salary: int,
 	addr: Address,
 }
 
-person_print(p: *Person) {
+fn person_print(p: *Person) {
 	printf("Name: %s\nSalary: %d\nCity: %s\nPost code: %d\n",
 		(*p).name, (*p).salary, (*p).addr.city, (*p).addr.post_code)
 }
 
-main() {
+fn main() {
 	me: Person
 	me.name = "Michael"
 	me.salary = 777

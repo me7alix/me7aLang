@@ -212,11 +212,15 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TYPE_U16:
 					sprintf(opr_to_nasm_buf, "%hu", (u16) opr.literal.lint);
 					break;
+				case TYPE_UPTR:
+				case TYPE_U64:
+					sprintf(opr_to_nasm_buf, "%llu", opr.literal.lint);
+					break;
 				case TYPE_ARRAY:
 				case TYPE_POINTER:
 				case TYPE_IPTR:
 				case TYPE_I64:
-					sprintf(opr_to_nasm_buf, "%li", opr.literal.lint);
+					sprintf(opr_to_nasm_buf, "%lli", opr.literal.lint);
 					break;
 				default: UNREACHABLE;
 			}
@@ -508,25 +512,71 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 
 				nasm_gen_new_stack_var(ci, dst, arg1, arg2);
 
-				if (dst_type.kind == arg1_type.kind) { UNREACHABLE;
-				} else if (dst_type.kind == TYPE_I8 && arg1_type.kind == TYPE_INT) {
-					sb_appendf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
-					sb_appendf(&body, TAB"mov al, al\n");
-					sb_appendf(&body, TAB"movsx eax, al\n");
-					sb_appendf(&body, TAB"mov %s, al\n", opr_to_nasm(ci.dst));
-				} else if (dst_type.kind == TYPE_INT && arg1_type.kind == TYPE_I8) {
-					sb_appendf(&body, TAB"movsx eax, %s\n", opr_to_nasm(ci.arg1));
-					sb_appendf(&body, TAB"mov %s, eax\n", opr_to_nasm(ci.dst));
-				} else if ((dst_type.kind == TYPE_POINTER || dst_type.kind == TYPE_I64 || dst_type.kind == TYPE_IPTR) && arg1_type.kind == TYPE_INT) {
-					sb_appendf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
-					sb_appendf(&body, TAB"movsxd rax, eax\n");
-					sb_appendf(&body, TAB"mov %s, rax\n", opr_to_nasm(ci.dst));
-				} else if (dst_type.kind == TYPE_INT && (dst_type.kind == TYPE_POINTER || arg1_type.kind == TYPE_I64 || arg1_type.kind == TYPE_IPTR)) {
-					sb_appendf(&body, TAB"mov rax, %s\n", opr_to_nasm(ci.arg1));
-					sb_appendf(&body, TAB"mov eax, eax\n");
-					sb_appendf(&body, TAB"movsx rax, eax\n");
-					sb_appendf(&body, TAB"mov %s, eax\n", opr_to_nasm(ci.dst));
-				} else UNREACHABLE;
+				if (dst_type.kind == arg1_type.kind) { UNREACHABLE; }
+
+				int dst_size = 0;
+				int src_size = 0;
+				bool src_signed = false;
+
+				switch (dst_type.kind) {
+					case TYPE_I8: dst_size = 1; break;
+					case TYPE_U8: dst_size = 1; break;
+					case TYPE_I16: dst_size = 2; break;
+					case TYPE_U16: dst_size = 2; break;
+					case TYPE_INT: case TYPE_I32: dst_size = 4; break;
+					case TYPE_UINT: case TYPE_U32: dst_size = 4; break;
+					case TYPE_I64: case TYPE_IPTR: dst_size = 8; break;
+					case TYPE_U64: case TYPE_UPTR: case TYPE_POINTER: dst_size = 8; break;
+					default: UNREACHABLE;
+				}
+
+				switch (arg1_type.kind) {
+					case TYPE_I8: src_size = 1; src_signed = true; break;
+					case TYPE_U8: src_size = 1; src_signed = false; break;
+					case TYPE_I16: src_size = 2; src_signed = true; break;
+					case TYPE_U16: src_size = 2; src_signed = false; break;
+					case TYPE_INT: case TYPE_I32: src_size = 4; src_signed = true; break;
+					case TYPE_UINT: case TYPE_U32: src_size = 4; src_signed = false; break;
+					case TYPE_I64: case TYPE_IPTR: src_size = 8; src_signed = true; break;
+					case TYPE_U64: case TYPE_UPTR: case TYPE_POINTER: src_size = 8; src_signed = false; break;
+					default: UNREACHABLE;
+				}
+
+				const char* ext_inst = src_signed ? "movsx" : "movzx";
+				const char* dst_reg = NULL;
+				const char* src_reg = NULL;
+				const char* low_reg = NULL;
+
+				switch (dst_size) {
+					case 1: dst_reg = "al"; low_reg = "al"; break;
+					case 2: dst_reg = "ax"; low_reg = "ax"; break;
+					case 4: dst_reg = "eax"; low_reg = "eax"; break;
+					case 8: dst_reg = "rax"; low_reg = "eax"; break;
+					default: UNREACHABLE;
+				}
+
+				switch (src_size) {
+					case 1: src_reg = "al"; break;
+					case 2: src_reg = "ax"; break;
+					case 4: src_reg = "eax"; break;
+					case 8: src_reg = "rax"; break;
+					default: UNREACHABLE;
+				}
+
+				if (dst_size > src_size) {
+					bool is_32_to_64_signed = (src_size == 4 && dst_size == 8 && src_signed);
+					if (is_32_to_64_signed) {
+						ext_inst = "movsxd";
+					}
+					sb_appendf(&body, TAB"%s %s, %s\n", ext_inst, dst_reg, opr_to_nasm(ci.arg1));
+					sb_appendf(&body, TAB"mov %s, %s\n", opr_to_nasm(ci.dst), dst_reg);
+				} else if (dst_size < src_size) {
+					sb_appendf(&body, TAB"mov %s, %s\n", src_reg, opr_to_nasm(ci.arg1));
+					sb_appendf(&body, TAB"mov %s, %s\n", opr_to_nasm(ci.dst), low_reg);
+				} else {
+					sb_appendf(&body, TAB"mov %s, %s\n", dst_reg, opr_to_nasm(ci.arg1));
+					sb_appendf(&body, TAB"mov %s, %s\n", opr_to_nasm(ci.dst), dst_reg);
+				}
 			} break;
 
 			case OP_ASSIGN: {

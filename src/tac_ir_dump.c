@@ -30,7 +30,7 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 				case TYPE_BOOL:  sprintf(buf, "%d:%d", (i8) opr.literal.lint, opr.literal.type.kind); break;
 				case TYPE_POINTER:
 				case TYPE_IPTR:
-				case TYPE_I64:   sprintf(buf, "%li:%d", opr.literal.lint, opr.literal.type.kind); break;
+				case TYPE_I64:   sprintf(buf, "%lli:%d", opr.literal.lint, opr.literal.type.kind); break;
 				case TYPE_F32:   sprintf(buf, "%f:%d", (float) opr.literal.lfloat, opr.literal.type.kind); break;
 				default: sprintf(buf, "ERR\n"); break;
 			}
