@@ -744,6 +744,8 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 	sb_appendf(code, TAB"sub rsp, %u\n", total_offset);
 	sb_appendf(code, "%s", body.items);
 	if (da_last(&func.body).op != OP_RETURN) {
+		if (strcmp(func.name, "main") == 0)
+			sb_appendf(code, TAB"mov eax, 0\n");
 		sb_appendf(code, TAB"mov rsp, rbp\n");
 		sb_appendf(code, TAB"pop rbp\n");
 		sb_appendf(code, TAB"ret\n");
