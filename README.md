@@ -28,7 +28,13 @@ make
 ```
 
 ## Examples
+```
+import "std.m7"
 
+fn main() {
+    printf("Hello, World!\n")
+}
+```
 Check the [examples](./examples) directory to see what’s currently implemented.
 
 ## License
