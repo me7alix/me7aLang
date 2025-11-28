@@ -228,6 +228,11 @@ char *opr_to_nasm(TAC_Operand opr) {
 
 		case OPR_FUNC_RET: {
 			switch (opr.func_ret.type.kind) {
+				case TYPE_ARRAY:
+				case TYPE_STRUCT:
+					printf("error: passing arrays/structs isn't supported yet\n");
+					exit(1);
+					break;
 				case TYPE_I32:
 				case TYPE_U32:
 				case TYPE_UINT:
@@ -243,7 +248,6 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TYPE_U16:
 					sprintf(opr_to_nasm_buf, "ax");
 					break;
-				case TYPE_ARRAY:
 				case TYPE_POINTER:
 				case TYPE_IPTR:
 				case TYPE_UPTR:
@@ -663,14 +667,28 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			case OP_RETURN: {
 				if (ci.arg1.kind != OPR_NULL) {
 					switch (func.ret_type.kind) {
+						case TYPE_STRUCT:
+						case TYPE_ARRAY:
+							printf("error: returning arrays/structs isn't supported yet\n");
+							exit(1);
+							break;
+						case TYPE_UPTR:
 						case TYPE_IPTR:
 						case TYPE_POINTER:
+						case TYPE_U64:
 						case TYPE_I64:
 							sb_appendf(&body, TAB"mov rax, %s\n", opr_to_nasm(ci.arg1));
 							break;
+						case TYPE_U32:
+						case TYPE_I32:
 						case TYPE_INT:
 							sb_appendf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
 							break;
+						case TYPE_U16:
+						case TYPE_I16:
+							sb_appendf(&body, TAB"mov ax, %s\n", opr_to_nasm(ci.arg1));
+							break;
+						case TYPE_U8:
 						case TYPE_I8:
 						case TYPE_BOOL:
 							sb_appendf(&body, TAB"mov al, %s\n", opr_to_nasm(ci.arg1));

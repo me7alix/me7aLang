@@ -140,6 +140,20 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 	return expr_expand(nodes);
 }
 
+bool type_is_int(Type t) {
+	switch (t.kind) {
+		case TYPE_INT:  case TYPE_UINT:
+		case TYPE_I8:   case TYPE_U8:
+		case TYPE_I16:  case TYPE_U16:
+		case TYPE_I32:  case TYPE_U32:
+		case TYPE_I64:  case TYPE_U64:
+		case TYPE_IPTR: case TYPE_UPTR:
+			return true;
+		default:
+			return false;
+	}
+}
+
 Type expr_calc_types(Parser *p, AST_Node *expr, Type *vart) {
 	switch (expr->kind) {
 		case AST_FUNC_CALL: return expr->func_call.type;
@@ -182,10 +196,9 @@ Type expr_calc_types(Parser *p, AST_Node *expr, Type *vart) {
 				case AST_OP_DIV_EQ:
 					vart = &lt;
 					break;
-				default:
-					if (is_pointer(lt))
-						vart = &uptr;
-					break;
+				default: if(is_pointer(lt)) {
+					vart = &uptr;
+				} break;
 			}
 
 			if (expr->expr_binary.op == AST_OP_FIELD) {
@@ -212,7 +225,13 @@ Type expr_calc_types(Parser *p, AST_Node *expr, Type *vart) {
 					.pointer.base = get_pointer_base(ptr_type)
 				};
 			} else if (!compare_types(lt, rt)) {
-				lexer_error(expr->loc, "error: operation on different types");
+				AST_Node *le = expr->expr_binary.l, *re = expr->expr_binary.r;
+				if ((le->kind == AST_LITERAL || re->kind == AST_LITERAL) &&
+					(type_is_int(lt) && type_is_int(rt))) {
+					AST_Node *lit     = le->kind == AST_LITERAL ? le : re;
+					AST_Node *not_lit = le->kind != AST_LITERAL ? le : re;
+					lit->literal.type = parser_get_type(p, not_lit);
+				} else lexer_error(expr->loc, "error: operation on different types");
 			}
 
 			switch (expr->expr_binary.op) {
@@ -232,7 +251,9 @@ Type expr_calc_types(Parser *p, AST_Node *expr, Type *vart) {
 
 		case AST_UN_EXP: {
 			switch (expr->expr_unary.op) {
-				case AST_OP_SIZEOF: break;
+				case AST_OP_SIZEOF: {
+					expr_calc_types(p, expr->expr_unary.v, NULL);
+				} break;
 
 				case AST_OP_CAST: {
 					expr_calc_types(p, expr->expr_unary.v, &expr->expr_unary.type);
@@ -433,7 +454,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 						.kind = AST_UN_EXP,
 						.loc = parser_peek(p)->loc,
 						.expr_unary.op = tok_to_unary_expr_op(parser_next(p)),
-						.expr_unary.type = (Type) {.kind = TYPE_UPTR},
+						.expr_unary.type = uptr,
 						.expr_unary.v = ast_new({
 							.kind = AST_LITERAL,
 							.literal.type = parse_type(p),
@@ -444,7 +465,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 						.kind = AST_UN_EXP,
 						.loc = parser_peek(p)->loc,
 						.expr_unary.op = tok_to_unary_expr_op(parser_peek(p)),
-						.expr_unary.type = (Type) {.kind = TYPE_UPTR},
+						.expr_unary.type = uptr,
 						.expr_unary.v = NULL,
 					}));
 				}

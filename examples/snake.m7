@@ -16,14 +16,16 @@ snake_dy:  int
 snake_da:  bool
 snake_len: uptr
 
-fn draw_snake() {
+fn draw_game() {
 	for i: uptr = 0; i < snake_len; i+=1 {
 		rl_draw_rect(snake_x[i] * TILE, snake_y[i] * TILE, TILE, TILE, rl_ColorGreen)
 	}
-}
 
-fn draw_apple() {
 	rl_draw_rect(apple_x * TILE, apple_y * TILE, TILE, TILE, rl_ColorRed)
+
+	score_buf: [64]i8
+	sprintf(score_buf:*i8, "Score: %zu", snake_len - 2)
+	rl_draw_text(score_buf:*i8, 20, 20, 20, rl_ColorWhite)
 }
 
 fn snake_follow() {
@@ -156,12 +158,7 @@ fn main() {
 			}
 		}
 
-		draw_snake()
-		draw_apple()
-
-		text_buf: [128]i8
-		sprintf(text_buf:*i8, "Score: %lli", snake_len - 2:uptr)
-		rl_draw_text(text_buf:*i8, 20, 20, 20, rl_ColorWhite)
+		draw_game()
 
 		timer += 1
 		rl_end_drawing()

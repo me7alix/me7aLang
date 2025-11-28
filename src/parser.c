@@ -140,7 +140,7 @@ Type parse_type(Parser *p) {
 }
 
 AST_Node *ast_alloc(AST_Node node) {
-	AST_Node *new = malloc(sizeof(AST_Node)); 
+	AST_Node *new = malloc(sizeof(AST_Node));
 	memcpy(new, &node, sizeof(node));
 	return new;
 }
