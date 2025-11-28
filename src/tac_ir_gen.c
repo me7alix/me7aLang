@@ -483,6 +483,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 			case AST_FUNC_CALL: tac_ir_gen_func_call(prog, func, cn);     break;
 			case AST_VAR_MUT:   tac_ir_gen_var_mut(prog, func, cn);       break;
 			case AST_IF_STMT:   tac_ir_gen_if_chain(ctx, prog, func, cn); break;
+			case AST_BODY:      tac_ir_gen_body(ctx, prog, func, cn);     break;
 
 			case AST_FUNC_RET: {
 				if (cn->func_ret.type.kind == TYPE_NULL) {

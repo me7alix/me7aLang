@@ -383,20 +383,15 @@ AST_Node *parse_body(Parser *p, AST_Node *func) {
 	nested_push(p);
 
 	AST_Node *body = ast_new({.kind = AST_BODY});
-	int br_cnt = 0;
-
 	expect_token(parser_peek(p), TOK_OBRA);
+	parser_next(p);
+
 	while (true) {
 		switch (parser_peek(p)->type) {
-			case TOK_OBRA: {
-				br_cnt++;
-			} break;
-
-			case TOK_CBRA: {
-				br_cnt--;
-				if (br_cnt == 0)
-					goto ex;
-			} break;
+			case TOK_CBRA: goto ex;
+			case TOK_OBRA:
+				da_append(&body->body.stmts, parse_body(p, func));
+				break;
 
 			case TOK_ID: {
 				if ((parser_looknext(p))->type == TOK_COL)
@@ -424,11 +419,11 @@ AST_Node *parse_body(Parser *p, AST_Node *func) {
 				expect_token(parser_peek(p), TOK_SEMI);
 				break;
 
-			case TOK_IF_SYM:    da_append(&body->body.stmts, parse_if_stmt(p, func));             break;
-			case TOK_WHILE_SYM: da_append(&body->body.stmts, parse_while_stmt(p, func));          break;
-			case TOK_FOR_SYM:   da_append(&body->body.stmts, parse_for_stmt(p, func));            break;
-			case TOK_RET:       da_append(&body->body.stmts, parse_func_return(p, func));         break;
-			default:            da_append(&body->body.stmts, parse_var_mut(p, EXPR_PARSING_VAR)); break;
+			case TOK_IF_SYM:    da_append(&body->body.stmts, parse_if_stmt(p, func));     break;
+			case TOK_WHILE_SYM: da_append(&body->body.stmts, parse_while_stmt(p, func));  break;
+			case TOK_FOR_SYM:   da_append(&body->body.stmts, parse_for_stmt(p, func));    break;
+			case TOK_RET:       da_append(&body->body.stmts, parse_func_return(p, func)); break;
+			default: da_append(&body->body.stmts, parse_var_mut(p, EXPR_PARSING_VAR));    break;
 		}
 
 		parser_next(p);
@@ -543,9 +538,8 @@ void parse_extern(Parser *p) {
 	Location loc = parser_peek(p)->loc;
 	char *extern_smb = parser_peek(p)->data;
 
-	if (parser_peek(p)[1].type == TOK_ID) {
+	if (parser_peek(p)[1].type == TOK_ID)
 		parser_next(p);
-	}
 
 	expect_token(parser_peek(p), TOK_ID);
 
@@ -566,9 +560,8 @@ void parse_extern(Parser *p) {
 
 	Symbol *smbl_f = parser_symbol_table_get(p, SBL_FUNC_DEF, id);
 	Symbol *smbl_e = parser_symbol_table_get(p, SBL_FUNC_EXTERN, id);
-	if (smbl_f || smbl_e) {
+	if (smbl_f || smbl_e)
 		lexer_error(loc, "error: the symbol is already in use used");
-	}
 
 	parser_symbol_table_add(p, SBL_FUNC_EXTERN, id, fes);
 	expect_token(parser_peek(p), TOK_SEMI);
