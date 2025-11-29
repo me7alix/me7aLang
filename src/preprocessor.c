@@ -98,10 +98,10 @@ void preprocessor(Imports *imports, Lexer *entry) {
 	ImportedTable_add(&it, entry->cur_loc.file, true);
 
 	for (size_t i = 0; i < entry->tokens.count; i++) {
-		switch (da_get(&entry->tokens, i).type) {
+		switch (da_get(&entry->tokens, i).kind) {
 			case TOK_IMPORT: {
 				i++;
-				if (da_get(&entry->tokens, i).type != TOK_STRING)
+				if (da_get(&entry->tokens, i).kind != TOK_STRING)
 					lexer_error(da_get(&entry->tokens, i).loc, "error: filepath expected");
 
 				bool is_imported;
@@ -110,7 +110,7 @@ void preprocessor(Imports *imports, Lexer *entry) {
 					lexer_error(da_get(&entry->tokens, i).loc, "error: no such file");
 
 				i++;
-				if (da_get(&entry->tokens, i).type != TOK_SEMI)
+				if (da_get(&entry->tokens, i).kind != TOK_SEMI)
 					lexer_error(da_get(&entry->tokens, i).loc, "error: semicolon expected");
 
 				i++;
@@ -127,13 +127,13 @@ void preprocessor(Imports *imports, Lexer *entry) {
 
 			case TOK_MACRO: {
 				i++;
-				if (da_get(&entry->tokens, i).type != TOK_ID)
+				if (da_get(&entry->tokens, i).kind != TOK_ID)
 					lexer_error(da_get(&entry->tokens, i).loc, "error: identifier expected");
 				char *macro_id = da_get(&entry->tokens, i).data;
 				Macro macro = {0};
 
 				i++;
-				for (size_t j = 0; da_get(&entry->tokens, i).type != TOK_SEMI; j++) {
+				for (size_t j = 0; da_get(&entry->tokens, i).kind != TOK_SEMI; j++) {
 					da_append(&macro, da_get(&entry->tokens, i));
 					i++;
 				}

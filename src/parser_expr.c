@@ -311,7 +311,7 @@ AST_ExprOp tok_to_binary_expr_op(TokenKind tok) {
 }
 
 AST_ExprOp tok_to_unary_expr_op(Token *tok) {
-	switch (tok->type) {
+	switch (tok->kind) {
 		case TOK_SIZEOF: return AST_OP_SIZEOF;
 		case TOK_COL:    return AST_OP_CAST;
 		case TOK_STAR:   return AST_OP_DEREF;
@@ -328,41 +328,41 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 	AST_Nodes nodes = {0};
 
 	while (true) {
-		if (parser_peek(p)->type == TOK_OPAR) {
+		if (parser_peek(p)->kind == TOK_OPAR) {
 			parser_next(p);
 			da_append(&nodes, parse_expr(p, EXPR_PARSING_PAR, vart));
 		}
 
 		if (type == EXPR_PARSING_FUNC_CALL) {
-			if (parser_peek(p)->type == TOK_COM) break;
-			else if (parser_peek(p)->type == TOK_CPAR) {
+			if (parser_peek(p)->kind == TOK_COM) break;
+			else if (parser_peek(p)->kind == TOK_CPAR) {
 				p->cur_token--;
 				break;
 			}
 		} else if (type == EXPR_PARSING_VAR) {
-			if (parser_peek(p)->type == TOK_SEMI) {
+			if (parser_peek(p)->kind == TOK_SEMI) {
 				break;
 			}
 		} else if (type == EXPR_PARSING_SQBRA) {
-			if (parser_peek(p)->type == TOK_CSQBRA) {
+			if (parser_peek(p)->kind == TOK_CSQBRA) {
 				parser_next(p);
 				break;
 			}
 		} else if (type == EXPR_PARSING_PAR) {
-			if (parser_peek(p)->type == TOK_CPAR) {
+			if (parser_peek(p)->kind == TOK_CPAR) {
 				parser_next(p);
 				break;
 			}
 		} else if (type == EXPR_PARSING_STMT) {
-			if (parser_peek(p)->type == TOK_OBRA) {
+			if (parser_peek(p)->kind == TOK_OBRA) {
 				p->cur_token--;
 				break;
 			}
 		}
 
-		switch (parser_peek(p)->type) {
+		switch (parser_peek(p)->kind) {
 			case TOK_ID:
-				if (parser_looknext(p)->type == TOK_OPAR) {
+				if (parser_looknext(p)->kind == TOK_OPAR) {
 					da_append(&nodes, parse_func_call(p));
 					p->cur_token--;
 				} else {
@@ -449,7 +449,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			} break;
 
 			case TOK_SIZEOF:
-				if (parser_looknext(p)->type == TOK_COL) {
+				if (parser_looknext(p)->kind == TOK_COL) {
 					da_append(&nodes, ast_new({
 						.kind = AST_UN_EXP,
 						.loc = parser_peek(p)->loc,
@@ -484,7 +484,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				da_append(&nodes, ast_new({
 					.kind = AST_BIN_EXP,
 					.loc = parser_peek(p)->loc,
-					.expr_binary.op = tok_to_binary_expr_op(parser_peek(p)->type),
+					.expr_binary.op = tok_to_binary_expr_op(parser_peek(p)->kind),
 					.expr_binary.l = NULL,
 					.expr_binary.r = NULL
 				}));
@@ -505,7 +505,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				da_append(&nodes, ast_new({
 					.kind = AST_BIN_EXP,
 					.loc = parser_peek(p)->loc,
-					.expr_binary.op = tok_to_binary_expr_op(parser_peek(p)->type),
+					.expr_binary.op = tok_to_binary_expr_op(parser_peek(p)->kind),
 					.expr_binary.l = NULL,
 					.expr_binary.r = NULL
 				}));
@@ -530,7 +530,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 					da_append(&nodes, ast_new({
 						.kind = AST_BIN_EXP,
 						.loc = parser_peek(p)->loc,
-						.expr_binary.op = tok_to_binary_expr_op(parser_peek(p)->type),
+						.expr_binary.op = tok_to_binary_expr_op(parser_peek(p)->kind),
 						.expr_binary.l = NULL,
 						.expr_binary.r = NULL
 					}));

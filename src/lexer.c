@@ -25,7 +25,7 @@ char *get_word(Lexer *lexer) {
 
 void add_token(Lexer *lexer, TokenKind type, char *data) {
 	da_append(&lexer->tokens, ((Token) {
-		.type = type,
+		.kind = type,
 		.data = data,
 		.loc = lexer->cur_loc,
 	}));
@@ -187,10 +187,10 @@ Lexer lexer_lex(char *file, char *code) {
 
 			case '\r':
 			case '\n':
-				if (da_last(&lexer.tokens).type != TOK_SEMI &&
-					da_last(&lexer.tokens).type != TOK_CBRA &&
-					da_last(&lexer.tokens).type != TOK_OBRA &&
-					da_last(&lexer.tokens).type != TOK_COM)
+				if (da_last(&lexer.tokens).kind != TOK_SEMI &&
+					da_last(&lexer.tokens).kind != TOK_CBRA &&
+					da_last(&lexer.tokens).kind != TOK_OBRA &&
+					da_last(&lexer.tokens).kind != TOK_COM)
 					add_token(&lexer, TOK_SEMI, ";");
 
 				if (*lexer.cur_char == '\r' && lexer.cur_char[1] == '\n')

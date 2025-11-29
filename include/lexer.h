@@ -26,7 +26,7 @@ typedef struct {
 } Location;
 
 typedef struct {
-	TokenKind type;
+	TokenKind kind;
 	Location loc;
 	char *data;
 } Token;

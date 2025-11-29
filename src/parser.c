@@ -85,10 +85,10 @@ Type parse_type(Parser *p) {
 	bool is_arr = false;
 	size_t arr_len;
 
-	if (parser_peek(p)->type == TOK_STAR) {
+	if (parser_peek(p)->kind == TOK_STAR) {
 		is_ptr = true;
 		parser_next(p);
-	} else if (parser_peek(p)->type == TOK_OSQBRA) {
+	} else if (parser_peek(p)->kind == TOK_OSQBRA) {
 		is_arr = true;
 		parser_next(p);
 		expect_token(parser_peek(p), TOK_INT);
@@ -146,7 +146,7 @@ AST_Node *ast_alloc(AST_Node node) {
 }
 
 void expect_token(Token *token, TokenKind type) {
-	if (token->type == type) return;
+	if (token->kind == type) return;
 
 	char err[256];
 	sprintf(err, "error: unexpected token");
@@ -180,7 +180,7 @@ AST_Node *parse_func_call(Parser *p) {
 	bool is_next_any = false;
 	AST_Node *expr;
 
-	while (parser_peek(p)->type != TOK_CPAR) {
+	while (parser_peek(p)->kind != TOK_CPAR) {
 		if (fargs.items[arg_cnt]->kind == AST_FUNC_DEF_ARG_ANY)
 			met_any = true;
 
@@ -227,7 +227,7 @@ AST_Node *parse_var_def(Parser *p) {
 		.var_def.exp = NULL,
 	});
 
-	if (parser_peek(p)->type == TOK_EQ) {
+	if (parser_peek(p)->kind == TOK_EQ) {
 		parser_next(p);
 		vdn->var_def.exp = parse_expr(p, EXPR_PARSING_VAR, &type);
 	}
@@ -296,7 +296,7 @@ AST_Node *parse_func_return(Parser *p, AST_Node *func) {
 	});
 
 	parser_next(p);
-	if (parser_peek(p)->type == TOK_SEMI) {
+	if (parser_peek(p)->kind == TOK_SEMI) {
 		if (ret->func_ret.type.kind != TYPE_NULL)
 			lexer_error(ret->loc, "error: you must return something");
 		ret->func_ret.type = (Type) {.kind = TYPE_NULL};
@@ -322,9 +322,9 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 	parser_next(p);
 	r->stmt_if.body = parse_body(p, func);
 
-	if (parser_looknext(p)->type == TOK_ELSE_SYM) {
+	if (parser_looknext(p)->kind == TOK_ELSE_SYM) {
 		parser_next(p);
-		if (parser_looknext(p)->type == TOK_IF_SYM) {
+		if (parser_looknext(p)->kind == TOK_IF_SYM) {
 			parser_next(p);
 			r->stmt_if.next = parse_if_stmt(p, func);
 		} else {
@@ -360,11 +360,11 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 
 	nested_push_next(p);
 
-	if ((parser_looknext(p))->type == TOK_COL)
+	if ((parser_looknext(p))->kind == TOK_COL)
 		r->stmt_for.var = parse_var_def(p);
-	else if ((parser_looknext(p))->type == TOK_EQ)
+	else if ((parser_looknext(p))->kind == TOK_EQ)
 		r->stmt_for.var = parse_var_mut(p, EXPR_PARSING_VAR);
-	else if ((parser_looknext(p))->type == TOK_ASSIGN)
+	else if ((parser_looknext(p))->kind == TOK_ASSIGN)
 		r->stmt_for.var = parse_var_assign(p);
 	parser_next(p);
 
@@ -387,18 +387,18 @@ AST_Node *parse_body(Parser *p, AST_Node *func) {
 	parser_next(p);
 
 	while (true) {
-		switch (parser_peek(p)->type) {
+		switch (parser_peek(p)->kind) {
 			case TOK_CBRA: goto ex;
 			case TOK_OBRA:
 				da_append(&body->body.stmts, parse_body(p, func));
 				break;
 
 			case TOK_ID: {
-				if ((parser_looknext(p))->type == TOK_COL)
+				if ((parser_looknext(p))->kind == TOK_COL)
 					da_append(&body->body.stmts, parse_var_def(p));
-				else if ((parser_looknext(p))->type == TOK_ASSIGN)
+				else if ((parser_looknext(p))->kind == TOK_ASSIGN)
 					da_append(&body->body.stmts, parse_var_assign(p));
-				else if ((parser_looknext(p))->type == TOK_OPAR)
+				else if ((parser_looknext(p))->kind == TOK_OPAR)
 					da_append(&body->body.stmts, parse_func_call(p));
 				else da_append(&body->body.stmts, parse_var_mut(p, EXPR_PARSING_VAR));
 			} break;
@@ -435,8 +435,8 @@ ex:
 }
 
 void parse_func_args(Parser *p, AST_Nodes *fargs) {
-	while (parser_peek(p)->type != TOK_CPAR) {
-		switch (parser_peek(p)->type) {
+	while (parser_peek(p)->kind != TOK_CPAR) {
+		switch (parser_peek(p)->kind) {
 			case TOK_COM: break;
 			case TOK_ID: {
 				expect_token(parser_looknext(p), TOK_COL);
@@ -462,7 +462,7 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 			} break;
 
 			default: {
-				expect_token(parser_peek(p), p->cur_token->type);
+				expect_token(parser_peek(p), p->cur_token->kind);
 			} break;
 		}
 
@@ -485,7 +485,7 @@ AST_Node *parse_function(Parser *p) {
 
 	parse_func_args(p, &fdn->func_def.args);
 
-	if (parser_peek(p)->type == TOK_COL) {
+	if (parser_peek(p)->kind == TOK_COL) {
 		fdn->func_def.type = parse_type(p);
 		parser_next(p);
 	} else {
@@ -519,7 +519,7 @@ AST_Node *parse_function(Parser *p) {
 
 		fdsc_f->func_def.is_def = true;
 	} else {
-		if (parser_peek(p)->type == TOK_SEMI) {
+		if (parser_peek(p)->kind == TOK_SEMI) {
 			fds.func_def.is_def = false;
 			parser_symbol_table_add(p, SBL_FUNC_DEF, fdn->func_def.id, fds);
 			return NULL;
@@ -538,7 +538,7 @@ void parse_extern(Parser *p) {
 	Location loc = parser_peek(p)->loc;
 	char *extern_smb = parser_peek(p)->data;
 
-	if (parser_peek(p)[1].type == TOK_ID)
+	if (parser_peek(p)[1].kind == TOK_ID)
 		parser_next(p);
 
 	expect_token(parser_peek(p), TOK_ID);
@@ -551,7 +551,7 @@ void parse_extern(Parser *p) {
 
 	parse_func_args(p, &fes.func_extern.args);
 
-	if (parser_peek(p)->type == TOK_COL) {
+	if (parser_peek(p)->kind == TOK_COL) {
 		fes.func_extern.type = parse_type(p);
 		parser_next(p);
 	} else {
@@ -575,13 +575,13 @@ void parse_struct(Parser *p) {
 	char *struct_id = parser_next(p)->data;
 
 	expect_token(parser_next(p), TOK_OBRA);
-	while (parser_peek(p)->type != TOK_CBRA) {
+	while (parser_peek(p)->kind != TOK_CBRA) {
 		expect_token(parser_peek(p), TOK_ID);
 		char *id = parser_next(p)->data;
 		Type type = parse_type(p);
 		da_append(&st.ustruct.fields, ((Field){type, id}));
 		parser_next(p);
-		if (parser_peek(p)->type == TOK_COM)
+		if (parser_peek(p)->kind == TOK_COM)
 			parser_next(p);
 	}
 
@@ -594,8 +594,8 @@ Parser parser_parse(Token *tokens) {
 	p.program = prog;
 	p.cur_token = tokens;
 
-	while (parser_peek(&p)->type != TOK_EOF) {
-		switch (parser_peek(&p)->type) {
+	while (parser_peek(&p)->kind != TOK_EOF) {
+		switch (parser_peek(&p)->kind) {
 			case TOK_STRUCT:
 				parse_struct(&p);
 				break;
@@ -610,7 +610,7 @@ Parser parser_parse(Token *tokens) {
 				break;
 
 			case TOK_MACRO:
-				while (parser_peek(&p)->type != TOK_SEMI)
+				while (parser_peek(&p)->kind != TOK_SEMI)
 					parser_next(&p);
 				break;
 
@@ -620,9 +620,9 @@ Parser parser_parse(Token *tokens) {
 			} break;
 
 			case TOK_ID:
-				if ((parser_looknext(&p))->type == TOK_COL) {
+				if ((parser_looknext(&p))->kind == TOK_COL) {
 					parse_var_def(&p);
-				} else if ((parser_looknext(&p))->type == TOK_ASSIGN) {
+				} else if ((parser_looknext(&p))->kind == TOK_ASSIGN) {
 					parse_var_assign(&p);
 				} else lexer_error(parser_peek(&p)->loc, "error: unexpected top level declaration");
 				break;
