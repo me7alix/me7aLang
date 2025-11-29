@@ -445,11 +445,17 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					if (ci.op == OP_MOD) {
 						switch (ci.dst.var.type.kind) {
 							case TYPE_BOOL:
-							case TYPE_I8:   case TYPE_U8:  sprintf(arg1, "dl"); break;
-							case TYPE_I16:  case TYPE_U16: sprintf(arg1, "dx"); break;
+							case TYPE_I8:   case TYPE_U8:
+								sprintf(arg1, "dl"); break;
+							case TYPE_I16:  case TYPE_U16:
+								sprintf(arg1, "dx"); break;
 							case TYPE_I32:  case TYPE_U32:
-							case TYPE_UINT: case TYPE_INT: sprintf(arg1, "edx"); break;
-							case TYPE_U64:  case TYPE_I64: sprintf(arg1, "rdx"); break;
+							case TYPE_UINT: case TYPE_INT:
+								sprintf(arg1, "edx"); break;
+							case TYPE_POINTER:
+							case TYPE_UPTR: case TYPE_IPTR:
+							case TYPE_U64:  case TYPE_I64:
+								sprintf(arg1, "rdx"); break;
 							default: UNREACHABLE;
 						}
 					}
