@@ -1,9 +1,9 @@
 import "std.m7"
 import "raylib.m7"
 
-#MAP_W 20
-#MAP_H 20
-#TILE  30
+#MAP_W   20
+#MAP_H   20
+#TILE    30
 #MAX_LEN 1024
 
 apple_x: int
