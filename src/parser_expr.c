@@ -7,8 +7,7 @@
 
 #include "../include/parser.h"
 
-Type iptr = (Type) {.kind = TYPE_IPTR};
-Type uptr = (Type) {.kind = TYPE_UPTR};
+Type tuptr = (Type) {.kind = TYPE_UPTR};
 
 double parse_float(char *data) {
 	return atof(data);
@@ -197,7 +196,7 @@ Type expr_calc_types(Parser *p, AST_Node *expr, Type *vart) {
 					vart = &lt;
 					break;
 				default: if(is_pointer(lt)) {
-					vart = &uptr;
+					vart = &tuptr;
 				} break;
 			}
 
@@ -454,7 +453,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 						.kind = AST_UN_EXP,
 						.loc = parser_peek(p)->loc,
 						.expr_unary.op = tok_to_unary_expr_op(parser_next(p)),
-						.expr_unary.type = uptr,
+						.expr_unary.type = tuptr,
 						.expr_unary.v = ast_new({
 							.kind = AST_LITERAL,
 							.literal.type = parse_type(p),
@@ -465,7 +464,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 						.kind = AST_UN_EXP,
 						.loc = parser_peek(p)->loc,
 						.expr_unary.op = tok_to_unary_expr_op(parser_peek(p)),
-						.expr_unary.type = uptr,
+						.expr_unary.type = tuptr,
 						.expr_unary.v = NULL,
 					}));
 				}
@@ -489,7 +488,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 					.expr_binary.r = NULL
 				}));
 				parser_next(p);
-				da_append(&nodes, parse_expr(p, EXPR_PARSING_SQBRA, &uptr));
+				da_append(&nodes, parse_expr(p, EXPR_PARSING_SQBRA, &tuptr));
 				p->cur_token--;
 				break;
 

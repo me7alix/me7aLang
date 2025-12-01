@@ -8,8 +8,6 @@
 #include "../../include/platform.h"
 #include "../../include/tac_ir.h"
 
-#define TAB "    "
-
 const int sysv_regs_cnt = 6;
 const char *sysv_regs[][6] = {
 	{ "dil",  "sil",  "dl",   "cl",   "r8b",  "r9b" },
@@ -164,14 +162,14 @@ char *opr_to_nasm(TAC_Operand opr) {
 			} else if (opr.var.kind == VAR_ADDR) {
 				if (opr.var.addr_kind == VAR_STACK) {
 					uint off = *OffTable_get(&stack_table, opr.var.addr_id);
-					sb_appendf(&body, TAB"mov r11, qword [rbp - %u]\n", off);
+					sb_appendf(&body, "    mov r11, qword [rbp - %u]\n", off);
 					uint doff = 0;
 					if (opr.var.off.count != 0) doff = get_struct_alignment(opr, false);
 					sprintf(opr_to_nasm_buf, "%s [r11 + %u]", ts, doff);
 				} else if (opr.var.addr_kind == VAR_DATAOFF) {
 					uint off = 0;
 					if (opr.var.off.count != 0) off += get_struct_alignment(opr, true);
-					sb_appendf(&body, TAB"lea rax, [rel D%u + %lu]\n", opr.var.addr_id, off);
+					sb_appendf(&body, "    lea rax, [rel D%u + %lu]\n", opr.var.addr_id, off);
 					sprintf(opr_to_nasm_buf, "%s [rax]", ts);
 				} else UNREACHABLE;
 			} else if (opr.var.kind == VAR_DATAOFF) {
@@ -188,8 +186,8 @@ char *opr_to_nasm(TAC_Operand opr) {
 					float x = (float)opr.literal.lfloat;
 					uint32_t bits;
 					memcpy(&bits, &x, 4);
-					sb_appendf(&body, TAB"mov r10d, 0x%08X\n", bits);
-					sb_appendf(&body, TAB"movd xmm0, r10d\n", bits);
+					sb_appendf(&body, "    mov r10d, 0x%08X\n", bits);
+					sb_appendf(&body, "    movd xmm0, r10d\n", bits);
 					sprintf(opr_to_nasm_buf, "xmm0");
 				} break;
 				case TYPE_I32:
@@ -268,7 +266,7 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TP_MACOS:
 				case TP_LINUX: {
 					if (arg_id >= sysv_regs_cnt) {
-						sb_appendf(&body, TAB"mov r10d, dword [rbp + %u]\n", (arg_id - sysv_regs_cnt) * 8 + 48);
+						sb_appendf(&body, "    mov r10d, dword [rbp + %u]\n", (arg_id - sysv_regs_cnt) * 8 + 48);
 						sprintf(opr_to_nasm_buf, "r10d");
 					} else {
 						sprintf(opr_to_nasm_buf, "%s", sysv_regs[arg_row][arg_id]);
@@ -276,7 +274,7 @@ char *opr_to_nasm(TAC_Operand opr) {
 				} break;
 				case TP_WINDOWS: {
 					if (arg_id >= win_regs_cnt) {
-						sb_appendf(&body, TAB"mov r10d, dword [rbp + %u]\n", (arg_id - win_regs_cnt) * 8 + 48);
+						sb_appendf(&body, "    mov r10d, dword [rbp + %u]\n", (arg_id - win_regs_cnt) * 8 + 48);
 						sprintf(opr_to_nasm_buf, "r10d");
 					} else {
 						sprintf(opr_to_nasm_buf, "%s", win_regs[arg_row][arg_id]);
@@ -366,8 +364,8 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 	sb_appendf(code, "global %s\n", func.name);
 	sb_appendf(code, "%s%s:\n", (tp == TP_MACOS ? "_" : ""), func.name);
 
-	sb_appendf(code, TAB"push rbp\n");
-	sb_appendf(code, TAB"mov rbp, rsp\n");
+	sb_appendf(code, "    push rbp\n");
+	sb_appendf(code, "    mov rbp, rsp\n");
 
 	sb_reset(&body);
 
@@ -394,11 +392,11 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			case OP_GREAT_EQ: {
 				nasm_gen_new_stack_var(ci, dst, arg1, arg2);
 
-				sb_appendf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
-				sb_appendf(&body, TAB"mov %s, %s\n", arg2, opr_to_nasm(ci.arg2));
+				sb_appendf(&body, "    mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
+				sb_appendf(&body, "    mov %s, %s\n", arg2, opr_to_nasm(ci.arg2));
 
-				if      (ci.op == OP_ADD) sb_appendf(&body, TAB"add %s, %s\n", arg1, arg2);
-				else if (ci.op == OP_SUB) sb_appendf(&body, TAB"sub %s, %s\n", arg1, arg2);
+				if      (ci.op == OP_ADD) sb_appendf(&body, "    add %s, %s\n", arg1, arg2);
+				else if (ci.op == OP_SUB) sb_appendf(&body, "    sub %s, %s\n", arg1, arg2);
 				else if (ci.op == OP_MUL) {
 					switch (ci.dst.var.type.kind) {
 						case TYPE_ARRAY:
@@ -406,14 +404,14 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						case TYPE_UINT: case TYPE_U8:
 						case TYPE_U32: case TYPE_U16:
 						case TYPE_U64: case TYPE_UPTR:
-							sb_appendf(&body, TAB"mul %s, %s\n", arg1, arg2);
+							sb_appendf(&body, "    mul %s, %s\n", arg1, arg2);
 							break;
 
 						case TYPE_IPTR:
 						case TYPE_BOOL: case TYPE_I8:
 						case TYPE_INT: case TYPE_I32:
 						case TYPE_I64: case TYPE_I16:
-							sb_appendf(&body, TAB"imul %s, %s\n", arg1, arg2);
+							sb_appendf(&body, "    imul %s, %s\n", arg1, arg2);
 							break;
 
 						default: UNREACHABLE;
@@ -427,16 +425,16 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						case TYPE_UINT: case TYPE_U8:
 						case TYPE_U32: case TYPE_U16:
 						case TYPE_U64: case TYPE_UPTR:
-							sb_appendf(&body, TAB"xor rdx, rdx\n");
-							sb_appendf(&body, TAB"div %s\n", arg2);
+							sb_appendf(&body, "    xor rdx, rdx\n");
+							sb_appendf(&body, "    div %s\n", arg2);
 							break;
 
 						case TYPE_IPTR:
 						case TYPE_BOOL: case TYPE_I8:
 						case TYPE_INT: case TYPE_I32:
 						case TYPE_I64: case TYPE_I16:
-							sb_appendf(&body, TAB"cqo\n");
-							sb_appendf(&body, TAB"idiv %s\n", arg2);
+							sb_appendf(&body, "    cqo\n");
+							sb_appendf(&body, "    idiv %s\n", arg2);
 							break;
 
 						default: UNREACHABLE;
@@ -462,53 +460,53 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				}
 
 				else if (ci.op == OP_EQ) {
-					sb_appendf(&body, TAB"cmp %s, %s\n", arg1, arg2);
-					sb_appendf(&body, TAB"sete al\n");
+					sb_appendf(&body, "    cmp %s, %s\n", arg1, arg2);
+					sb_appendf(&body, "    sete al\n");
 					sprintf(arg1, "al");
 				} else if (ci.op == OP_NOT_EQ) {
-					sb_appendf(&body, TAB"cmp %s, %s\n", arg1, arg2);
-					sb_appendf(&body, TAB"setne al\n");
+					sb_appendf(&body, "    cmp %s, %s\n", arg1, arg2);
+					sb_appendf(&body, "    setne al\n");
 					sprintf(arg1, "al");
 				} else if (ci.op == OP_AND) {
-					sb_appendf(&body, TAB"and %s, %s\n", arg1, arg2);
+					sb_appendf(&body, "    and %s, %s\n", arg1, arg2);
 					sprintf(arg1, "al");
 				} else if (ci.op == OP_OR) {
-					sb_appendf(&body, TAB"or %s, %s\n", arg1, arg2);
+					sb_appendf(&body, "    or %s, %s\n", arg1, arg2);
 					sprintf(arg1, "al");
 				} else if (ci.op == OP_GREAT) {
-					sb_appendf(&body, TAB"cmp %s, %s\n", arg1, arg2);
-					sb_appendf(&body, TAB"setg al\n");
+					sb_appendf(&body, "    cmp %s, %s\n", arg1, arg2);
+					sb_appendf(&body, "    setg al\n");
 					sprintf(arg1, "al");
 				} else if (ci.op == OP_LESS) {
-					sb_appendf(&body, TAB"cmp %s, %s\n", arg1, arg2);
-					sb_appendf(&body, TAB"setl al\n");
+					sb_appendf(&body, "    cmp %s, %s\n", arg1, arg2);
+					sb_appendf(&body, "    setl al\n");
 					sprintf(arg1, "al");
 				} else if (ci.op == OP_GREAT_EQ) {
-					sb_appendf(&body, TAB"cmp %s, %s\n", arg1, arg2);
-					sb_appendf(&body, TAB"setge al\n");
+					sb_appendf(&body, "    cmp %s, %s\n", arg1, arg2);
+					sb_appendf(&body, "    setge al\n");
 					sprintf(arg1, "al");
 				} else if (ci.op == OP_LESS_EQ) {
-					sb_appendf(&body, TAB"cmp %s, %s\n", arg1, arg2);
-					sb_appendf(&body, TAB"setle al\n");
+					sb_appendf(&body, "    cmp %s, %s\n", arg1, arg2);
+					sb_appendf(&body, "    setle al\n");
 					sprintf(arg1, "al");
 				}
 
-				sb_appendf(&body, TAB"mov %s, %s\n", dst, arg1);
+				sb_appendf(&body, "    mov %s, %s\n", dst, arg1);
 			} break;
 
 			case OP_NOT: case OP_NEG: {
 				nasm_gen_new_stack_var(ci, dst, arg1, arg2);
 
-				sb_appendf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
+				sb_appendf(&body, "    mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
 
-				if      (ci.op == OP_NEG) sb_appendf(&body, TAB"neg %s\n", arg1);
+				if      (ci.op == OP_NEG) sb_appendf(&body, "    neg %s\n", arg1);
 				else if (ci.op == OP_NOT) {
-					sb_appendf(&body, TAB"test %s, %s\n", arg1, arg1);
-					sb_appendf(&body, TAB"setz al\n");
+					sb_appendf(&body, "    test %s, %s\n", arg1, arg1);
+					sb_appendf(&body, "    setz al\n");
 					sprintf(arg1, "al");
 				}
 
-				sb_appendf(&body, TAB"mov %s, %s\n", dst, arg1);
+				sb_appendf(&body, "    mov %s, %s\n", dst, arg1);
 			} break;
 
 			case OP_CAST: {
@@ -578,14 +576,14 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					if (is_32_to_64_signed) {
 						ext_inst = "movsxd";
 					}
-					sb_appendf(&body, TAB"%s %s, %s\n", ext_inst, dst_reg, opr_to_nasm(ci.arg1));
-					sb_appendf(&body, TAB"mov %s, %s\n", opr_to_nasm(ci.dst), dst_reg);
+					sb_appendf(&body, "    %s %s, %s\n", ext_inst, dst_reg, opr_to_nasm(ci.arg1));
+					sb_appendf(&body, "    mov %s, %s\n", opr_to_nasm(ci.dst), dst_reg);
 				} else if (dst_size < src_size) {
-					sb_appendf(&body, TAB"mov %s, %s\n", src_reg, opr_to_nasm(ci.arg1));
-					sb_appendf(&body, TAB"mov %s, %s\n", opr_to_nasm(ci.dst), low_reg);
+					sb_appendf(&body, "    mov %s, %s\n", src_reg, opr_to_nasm(ci.arg1));
+					sb_appendf(&body, "    mov %s, %s\n", opr_to_nasm(ci.dst), low_reg);
 				} else {
-					sb_appendf(&body, TAB"mov %s, %s\n", dst_reg, opr_to_nasm(ci.arg1));
-					sb_appendf(&body, TAB"mov %s, %s\n", opr_to_nasm(ci.dst), dst_reg);
+					sb_appendf(&body, "    mov %s, %s\n", dst_reg, opr_to_nasm(ci.arg1));
+					sb_appendf(&body, "    mov %s, %s\n", opr_to_nasm(ci.dst), dst_reg);
 				}
 			} break;
 
@@ -604,16 +602,16 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				if (ci.dst.var.type.kind == TYPE_ARRAY && is_first_assign) {
 					reg_alloc(ci, arg1, arg2);
 					total_offset_add(get_type_size(*ci.dst.var.type.array.elem) * ci.dst.var.type.array.length);
-					sb_appendf(&body, TAB"lea %s, [rbp - %u]\n", arg1, total_offset);
-					sb_appendf(&body, TAB"mov %s, %s\n", opr_to_nasm(ci.dst), arg1);
+					sb_appendf(&body, "    lea %s, [rbp - %u]\n", arg1, total_offset);
+					sb_appendf(&body, "    mov %s, %s\n", opr_to_nasm(ci.dst), arg1);
 				}
 
 				if (ci.arg1.kind != OPR_NULL) {
 					reg_alloc(ci, arg1, arg2);
 					sprintf(dst, "%s", opr_to_nasm(ci.dst));
 
-					sb_appendf(&body, TAB"mov %s, %s\n", arg2, opr_to_nasm(ci.arg1));
-					sb_appendf(&body, TAB"mov %s, %s\n", dst, arg2);
+					sb_appendf(&body, "    mov %s, %s\n", arg2, opr_to_nasm(ci.arg1));
+					sb_appendf(&body, "    mov %s, %s\n", dst, arg2);
 				}
 			} break;
 
@@ -625,26 +623,26 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				if (ci.arg1.var.kind == VAR_ADDR) {
 					if (ci.arg1.var.addr_kind == VAR_STACK) {
 						size_t off = *OffTable_get(&stack_table, ci.arg1.var.addr_id);
-						sb_appendf(&body, TAB"mov rax, [rbp - %u]\n", off);
+						sb_appendf(&body, "    mov rax, [rbp - %u]\n", off);
 					} else if (ci.arg1.var.addr_kind == VAR_DATAOFF) {
-						sb_appendf(&body, TAB"lea rax, [rel D%u]\n", ci.arg1.var.addr_id);
+						sb_appendf(&body, "    lea rax, [rel D%u]\n", ci.arg1.var.addr_id);
 					}
 				} else if (ci.arg1.var.kind == VAR_STACK) {
 					size_t off = *OffTable_get(&stack_table, ci.arg1.var.addr_id);
-					sb_appendf(&body, TAB"lea rax, [rbp - %u]\n", off);
+					sb_appendf(&body, "    lea rax, [rbp - %u]\n", off);
 				} else if (ci.arg1.var.kind == VAR_DATAOFF) {
-					sb_appendf(&body, TAB"lea rax, [rel D%u]\n", ci.arg1.var.addr_id);
+					sb_appendf(&body, "    lea rax, [rel D%u]\n", ci.arg1.var.addr_id);
 				}
 
 				sprintf(dst, "%s", opr_to_nasm(ci.dst));
-				sb_appendf(&body, TAB"mov %s, rax\n", dst);
+				sb_appendf(&body, "    mov %s, rax\n", dst);
 			} break;
 
 			case OP_JUMP_IF_NOT: {
 				reg_alloc(ci, arg1, arg2);
-				sb_appendf(&body, TAB"mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
-				sb_appendf(&body, TAB"cmp %s, 0\n", arg1);
-				sb_appendf(&body, TAB"je %s\n", opr_to_nasm(ci.dst));
+				sb_appendf(&body, "    mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
+				sb_appendf(&body, "    cmp %s, 0\n", arg1);
+				sb_appendf(&body, "    je %s\n", opr_to_nasm(ci.dst));
 			} break;
 
 			case OP_LABEL: {
@@ -652,7 +650,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			} break;
 
 			case OP_JUMP: {
-				sb_appendf(&body, TAB"jmp %s\n", opr_to_nasm(ci.dst));
+				sb_appendf(&body, "    jmp %s\n", opr_to_nasm(ci.dst));
 			} break;
 
 			case OP_FADDR: {
@@ -665,9 +663,9 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					}
 				}
 
-				sb_appendf(&body, TAB"mov r11, %s\n", opr_to_nasm(ci.arg1));
-				sb_appendf(&body, TAB"lea rax, [r11 + %li]\n", align);
-				sb_appendf(&body, TAB"mov %s, rax\n", opr_to_nasm(ci.dst));
+				sb_appendf(&body, "    mov r11, %s\n", opr_to_nasm(ci.arg1));
+				sb_appendf(&body, "    lea rax, [r11 + %li]\n", align);
+				sb_appendf(&body, "    mov %s, rax\n", opr_to_nasm(ci.dst));
 			} break;
 
 			case OP_RETURN: {
@@ -683,33 +681,33 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						case TYPE_POINTER:
 						case TYPE_U64:
 						case TYPE_I64:
-							sb_appendf(&body, TAB"mov rax, %s\n", opr_to_nasm(ci.arg1));
+							sb_appendf(&body, "    mov rax, %s\n", opr_to_nasm(ci.arg1));
 							break;
 						case TYPE_U32:
 						case TYPE_I32:
 						case TYPE_INT:
-							sb_appendf(&body, TAB"mov eax, %s\n", opr_to_nasm(ci.arg1));
+							sb_appendf(&body, "    mov eax, %s\n", opr_to_nasm(ci.arg1));
 							break;
 						case TYPE_U16:
 						case TYPE_I16:
-							sb_appendf(&body, TAB"mov ax, %s\n", opr_to_nasm(ci.arg1));
+							sb_appendf(&body, "    mov ax, %s\n", opr_to_nasm(ci.arg1));
 							break;
 						case TYPE_U8:
 						case TYPE_I8:
 						case TYPE_BOOL:
-							sb_appendf(&body, TAB"mov al, %s\n", opr_to_nasm(ci.arg1));
+							sb_appendf(&body, "    mov al, %s\n", opr_to_nasm(ci.arg1));
 							break;
 						default: UNREACHABLE;
 					}
 				}
 
-				sb_appendf(&body, TAB"mov rsp, rbp\n");
-				sb_appendf(&body, TAB"pop rbp\n");
-				sb_appendf(&body, TAB"ret\n");
+				sb_appendf(&body, "    mov rsp, rbp\n");
+				sb_appendf(&body, "    pop rbp\n");
+				sb_appendf(&body, "    ret\n");
 			} break;
 
 			case OP_FUNC_CALL: {
-				sb_appendf(&body, TAB"sub rsp, 32\n");
+				sb_appendf(&body, "    sub rsp, 32\n");
 
 				for (size_t i = 0; ci.args[i].kind != OPR_NULL; i++) {
 					size_t arg_row = get_reg_row(tac_ir_get_opr_type(ci.args[i]));
@@ -719,25 +717,25 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						case TP_MACOS:
 						case TP_LINUX: {
 							if (i >= sysv_regs_cnt) {
-								sb_appendf(&body, TAB"mov r10, %s\n", opr_to_nasm(ci.args[i]));
-								sb_appendf(&body, TAB"mov qword [rsp + %u], r10\n", (i - sysv_regs_cnt) * 8 + 32);
+								sb_appendf(&body, "    mov r10, %s\n", opr_to_nasm(ci.args[i]));
+								sb_appendf(&body, "    mov qword [rsp + %u], r10\n", (i - sysv_regs_cnt) * 8 + 32);
 							} else {
-								sb_appendf(&body, TAB"mov %s, %s\n", sysv_regs[arg_row][i], opr_to_nasm(ci.args[i]));
+								sb_appendf(&body, "    mov %s, %s\n", sysv_regs[arg_row][i], opr_to_nasm(ci.args[i]));
 							}
 						} break;
 						case TP_WINDOWS: {
 							if (i >= sysv_regs_cnt) {
-								sb_appendf(&body, TAB"mov r10, %s\n", opr_to_nasm(ci.args[i]));
-								sb_appendf(&body, TAB"mov qword [rsp + %u], r10\n", (i - win_regs_cnt) * 8 + 32);
+								sb_appendf(&body, "    mov r10, %s\n", opr_to_nasm(ci.args[i]));
+								sb_appendf(&body, "    mov qword [rsp + %u], r10\n", (i - win_regs_cnt) * 8 + 32);
 							} else {
-								sb_appendf(&body, TAB"mov %s, %s\n", win_regs[i], opr_to_nasm(ci.args[i]));
+								sb_appendf(&body, "    mov %s, %s\n", win_regs[i], opr_to_nasm(ci.args[i]));
 							}
 						} break;
 					}
 				}
 
-				sb_appendf(&body, TAB"call %s%s\n", (tp == TP_MACOS ? "_" : ""), ci.dst.name);
-				sb_appendf(&body, TAB"add rsp, 32\n");
+				sb_appendf(&body, "    call %s%s\n", (tp == TP_MACOS ? "_" : ""), ci.dst.name);
+				sb_appendf(&body, "    add rsp, 32\n");
 			} break;
 
 			default: UNREACHABLE;
@@ -747,14 +745,14 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 	total_offset += 48;
 	align_up(&total_offset, 16);
 
-	sb_appendf(code, TAB"sub rsp, %u\n", total_offset);
+	sb_appendf(code, "    sub rsp, %u\n", total_offset);
 	sb_appendf(code, "%s", body.items);
 	if (da_last(&func.body).op != OP_RETURN) {
 		if (strcmp(func.name, "main") == 0)
-			sb_appendf(code, TAB"mov eax, 0\n");
-		sb_appendf(code, TAB"mov rsp, rbp\n");
-		sb_appendf(code, TAB"pop rbp\n");
-		sb_appendf(code, TAB"ret\n");
+			sb_appendf(code, "    mov eax, 0\n");
+		sb_appendf(code, "    mov rsp, rbp\n");
+		sb_appendf(code, "    pop rbp\n");
+		sb_appendf(code, "    ret\n");
 	}
 
 	sb_appendf(code, "\n");
@@ -775,18 +773,18 @@ char *nasm_gen_prog(TAC_Program *prog, TargetPlatform tp) {
 		if (g->type.kind == TYPE_ARRAY) {
 			uint arr_size = get_type_size(*g->type.array.elem) * g->type.array.length;
 			if (g->data) {
-				sb_appendf(&code, TAB"U%u db ", uniq_data_off);
+				sb_appendf(&code, "    U%u db ", uniq_data_off);
 				for (size_t i = 0; i < g->type.array.length; i++) {
 					sb_appendf(&code, "%#x", g->data[i]);
 					if (i != g->type.array.length - 1) sb_appendf(&code, ", ");
 				}
 				sb_appendf(&code, "\n");
-			} else sb_appendf(&code, TAB"U%u times %u db 0\n", uniq_data_off, arr_size);
-			sb_appendf(&code, TAB"align 8\n");
-			sb_appendf(&code, TAB"D%u dq U%u\n", g->index, uniq_data_off++);
-		} else sb_appendf(&code, TAB"D%u times %u db 0\n", g->index, get_type_size(g->type));
+			} else sb_appendf(&code, "    U%u times %u db 0\n", uniq_data_off, arr_size);
+			sb_appendf(&code, "    align 8\n");
+			sb_appendf(&code, "    D%u dq U%u\n", g->index, uniq_data_off++);
+		} else sb_appendf(&code, "    D%u times %u db 0\n", g->index, get_type_size(g->type));
 	}
-	sb_appendf(&code, TAB"align 8\n");
+	sb_appendf(&code, "    align 8\n");
 	sb_appendf(&code, "\n");
 
 	sb_appendf(&code, "section .text\n");

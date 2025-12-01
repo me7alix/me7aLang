@@ -46,9 +46,9 @@ Type tac_ir_get_opr_type(TAC_Operand op) {
 
 typedef struct {
 	bool is_right_of_eq;
-	uint  last_var;
 	bool is_field_gen;
 	bool is_field_op;
+	uint last_var;
 } IRGenExprCtx;
 
 void tac_ir_gen_func_call(TAC_Program *prog, TAC_Func *func, AST_Node *cn);

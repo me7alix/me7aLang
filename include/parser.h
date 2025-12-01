@@ -159,6 +159,7 @@ struct AST_Node {
 typedef enum {
 	SBL_FUNC_DEF, SBL_VAR,
 	SBL_FUNC_EXTERN,
+	SBL_FUNC_EX_USED,
 } SymbolType;
 
 typedef struct {

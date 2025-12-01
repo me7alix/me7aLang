@@ -500,24 +500,26 @@ AST_Node *parse_function(Parser *p) {
 	for (size_t i = 0; i < fdn->func_def.args.count; i++)
 		da_append(&fds.func_def.args, da_get(&fdn->func_def.args, i));
 
-	Symbol *fdsc_e = parser_symbol_table_get(p, SBL_FUNC_EXTERN, fdn->func_def.id);
-	Symbol *fdsc_f = parser_symbol_table_get(p, SBL_FUNC_DEF, fdn->func_def.id);
-	if (fdsc_e) lexer_error(fdn->loc, "error: the symbol is already in use");
-	else if (fdsc_f) {
-		if (fdsc_f->func_def.is_def)
+	Symbol *seu = parser_symbol_table_get(p, SBL_FUNC_EX_USED, fdn->func_def.id);
+	Symbol *se  = parser_symbol_table_get(p, SBL_FUNC_EXTERN, fdn->func_def.id);
+	Symbol *sf  = parser_symbol_table_get(p, SBL_FUNC_DEF, fdn->func_def.id);
+
+	if (se || seu) lexer_error(fdn->loc, "error: the symbol is already in use");
+	else if (sf) {
+		if (sf->func_def.is_def)
 			lexer_error(fdn->loc, "error: function redefinition");
-		if (!compare_types(fdsc_f->func_def.type, fds.func_def.type))
+		if (!compare_types(sf->func_def.type, fds.func_def.type))
 			lexer_error(fdn->loc, "error: wrong function return type in the function declaration");
-		if (fdsc_f->func_def.args.count != fds.func_def.args.count)
+		if (sf->func_def.args.count != fds.func_def.args.count)
 			lexer_error(fdn->loc, "error: wrong number of arguments in the function declaration");
 		for (size_t i = 0; i < fds.func_def.args.count; i++) {
 			Type l = fds.func_def.args.items[i]->func_def_arg.type;
-			Type r = fdsc_f->func_def.args.items[i]->func_def_arg.type;
+			Type r = sf->func_def.args.items[i]->func_def_arg.type;
 			if (!compare_types(l, r))
 				lexer_error(fdn->loc, "error: wrong type in the function declaration");
 		}
 
-		fdsc_f->func_def.is_def = true;
+		sf->func_def.is_def = true;
 	} else {
 		if (parser_peek(p)->kind == TOK_SEMI) {
 			fds.func_def.is_def = false;
@@ -535,7 +537,6 @@ void parse_extern(Parser *p) {
 	parser_next(p);
 
 	expect_token(parser_peek(p), TOK_ID);
-	Location loc = parser_peek(p)->loc;
 	char *extern_smb = parser_peek(p)->data;
 
 	if (parser_peek(p)[1].kind == TOK_ID)
@@ -545,6 +546,7 @@ void parse_extern(Parser *p) {
 
 	char *id = parser_peek(p)->data;
 	Symbol fes = { .func_extern.extern_smb = extern_smb };
+	Location loc = parser_peek(p)->loc;
 
 	parser_next(p);
 	expect_token(parser_next(p), TOK_OPAR);
@@ -558,12 +560,15 @@ void parse_extern(Parser *p) {
 		fes.func_extern.type = (Type) {.kind = TYPE_NULL};
 	}
 
-	Symbol *smbl_f = parser_symbol_table_get(p, SBL_FUNC_DEF, id);
-	Symbol *smbl_e = parser_symbol_table_get(p, SBL_FUNC_EXTERN, id);
-	if (smbl_f || smbl_e)
+	Symbol *sf  = parser_symbol_table_get(p, SBL_FUNC_DEF, id);
+	Symbol *se  = parser_symbol_table_get(p, SBL_FUNC_EXTERN, id);
+	Symbol *seu = parser_symbol_table_get(p, SBL_FUNC_EX_USED, id);
+
+	if (sf || se || seu)
 		lexer_error(loc, "error: the symbol is already in use used");
 
 	parser_symbol_table_add(p, SBL_FUNC_EXTERN, id, fes);
+	parser_symbol_table_add(p, SBL_FUNC_EX_USED, extern_smb, (Symbol){0});
 	expect_token(parser_peek(p), TOK_SEMI);
 	nested_uniq++;
 }

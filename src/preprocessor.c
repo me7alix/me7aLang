@@ -9,6 +9,7 @@
 typedef DA(Token) Macro;
 HT(ImportedTable, char*, bool)
 HT_STR(MacroTable, Macro)
+
 ImportedTable it   = {0};
 MacroTable    mt   = {0};
 StringBuilder path = {0};
