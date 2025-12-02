@@ -9,6 +9,10 @@
 
 #include "../include/parser.h"
 
+Token *parser_peek(Parser *p)     { return p->cur_token;   }
+Token *parser_looknext(Parser *p) { return p->cur_token+1; }
+Token *parser_next(Parser *p)     { return p->cur_token++; }
+
 uint nested_uniq = 1;
 #define nested_push_next(p) (p)->nested[(p)->nptr++] = nested_uniq
 #define nested_push(p) (p)->nested[(p)->nptr++] = nested_uniq++
@@ -71,9 +75,38 @@ bool compare_types(Type a, Type b) {
 	return true;
 }
 
-Token *parser_peek(Parser *p) { return p->cur_token; }
-Token *parser_looknext(Parser *p) { return p->cur_token+1; }
-Token *parser_next(Parser *p) { return p->cur_token++; }
+long long calc_arr_len(AST_Node *e) {
+	switch (e->kind) {
+		case AST_LITERAL: {
+			if (e->literal.kind != LIT_INT)
+				lexer_error(e->loc, "error: expected integer literal");
+			return e->literal.lint;
+		} break;
+
+		case AST_UN_EXP: {
+			switch (e->expr_unary.op) {
+				case AST_OP_NEG: return -calc_arr_len(e->expr_unary.v);
+				default: lexer_error(e->loc, "error: invalid unary operator in array size");
+			}
+		} break;
+
+		case AST_BIN_EXP: {
+			size_t le = calc_arr_len(e->expr_binary.l);
+			size_t re = calc_arr_len(e->expr_binary.r);
+			switch (e->expr_binary.op) {
+				case AST_OP_ADD: return le + re;
+				case AST_OP_SUB: return le - re;
+				case AST_OP_MUL: return le * re;
+				case AST_OP_DIV: return le / re;
+				default: lexer_error(e->loc, "error: invalid binary operator in array size");
+			}
+		} break;
+
+		default: lexer_error(e->loc, "error: wrong expression");
+	}
+
+	return 0;
+}
 
 Type parse_type(Parser *p) {
 	expect_token(parser_peek(p), TOK_COL);
@@ -81,20 +114,24 @@ Type parse_type(Parser *p) {
 	Type type = {0};
 	parser_next(p);
 
-	bool is_ptr = false;
-	bool is_arr = false;
-	size_t arr_len;
+	bool isPtr = false;
+	bool isArr = false;
+	size_t arrLen;
 
 	if (parser_peek(p)->kind == TOK_STAR) {
-		is_ptr = true;
+		isPtr = true;
 		parser_next(p);
 	} else if (parser_peek(p)->kind == TOK_OSQBRA) {
-		is_arr = true;
+		isArr = true;
 		parser_next(p);
-		expect_token(parser_peek(p), TOK_INT);
-		arr_len = (size_t) parse_int(parser_peek(p)->data);
-		parser_next(p);
-		expect_token(parser_next(p), TOK_CSQBRA);
+
+		static Type tuptr = (Type) {.kind = TYPE_UPTR};
+		AST_Node *arrLenExpr = parse_expr(p, EXPR_PARSING_SQBRA, &tuptr);
+		long long calculatedArrLen = calc_arr_len(arrLenExpr);
+
+		if (calculatedArrLen <= 0)
+			lexer_error(arrLenExpr->loc, "error: array size must be greater than zero");
+		arrLen = calculatedArrLen;
 	}
 
 	char *tn = parser_peek(p)->data;
@@ -119,20 +156,20 @@ Type parse_type(Parser *p) {
 		} else lexer_error(loc, "error: no such type");
 	}
 
-	if (is_ptr) {
+	if (isPtr) {
 		Type *base = malloc(sizeof(Type));
 		*base = type;
 		type = (Type) {
 			.kind = TYPE_POINTER,
 			.pointer.base = base
 		};
-	} else if (is_arr) {
+	} else if (isArr) {
 		Type *base = malloc(sizeof(Type));
 		*base = type;
 		type = (Type) {
 			.kind = TYPE_ARRAY,
 			.array.elem = base,
-			.array.length = arr_len
+			.array.length = arrLen
 		};
 	}
 

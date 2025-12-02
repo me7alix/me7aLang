@@ -38,43 +38,29 @@ bool tac_ir_opr_calc(AST_Node *en, TAC_Operand l, TAC_Operand r, TAC_Operand *re
 		}
 	} else return false;
 
+#define CAST_TO_OPR(tk, t) \
+	case tk: \
+		*ret = (TAC_Operand){ \
+			.kind = OPR_LITERAL, \
+			.literal = { \
+				.kind = LIT_INT, \
+				.lint = (t)res, \
+				.type = l.literal.type, \
+			}, \
+		}; \
+		return true
+
 	switch (l.literal.type.kind) {
-		case TYPE_I8:
-			*ret = (TAC_Operand){
-				.kind = OPR_LITERAL,
-				.literal = {
-					.kind = LIT_INT,
-					.lint = (int8_t)res,
-					.type = l.literal.type,
-				},
-			};
-			return true;
-
-		case TYPE_INT:
-		case TYPE_I32:
-			*ret = (TAC_Operand){
-				.kind = OPR_LITERAL,
-				.literal = {
-					.kind = LIT_INT,
-					.lint = (int32_t)res,
-					.type = l.literal.type,
-				},
-			};
-			return true;
-
-		case TYPE_I64:
-			*ret = (TAC_Operand){
-				.kind = OPR_LITERAL,
-				.literal = {
-					.kind = LIT_INT,
-					.lint = (int64_t)res,
-					.type = l.literal.type,
-				},
-			};
-			return true;
-
-		default:
-			return false;
+		CAST_TO_OPR(TYPE_INT, i32);
+		CAST_TO_OPR(TYPE_I8,  i8);
+		CAST_TO_OPR(TYPE_I16, i16);
+		CAST_TO_OPR(TYPE_I32, i32);
+		CAST_TO_OPR(TYPE_I64, i32);
+		CAST_TO_OPR(TYPE_U8,  u8);
+		CAST_TO_OPR(TYPE_U16, u16);
+		CAST_TO_OPR(TYPE_U32, u32);
+		CAST_TO_OPR(TYPE_U64, u32);
+		default: return false;
 	}
 
 	return false;

@@ -92,65 +92,72 @@ void get_folder(char *dst, const char *file) {
 	}
 }
 
+bool insert_macro(Lexer *entry, size_t *cur_tok) {
+	Macro *macro = MacroTable_get(&mt, da_get(&entry->tokens, *cur_tok).data);
+	if (!macro) return false;
+	da_remove_ordered(&entry->tokens, *cur_tok);
+
+	for (size_t j = 0; j < macro->count; j++) {
+		da_insert(&entry->tokens, *cur_tok, da_get(macro, j));
+		if (!insert_macro(entry, cur_tok))
+			(*cur_tok)++;
+	}
+
+	return true;
+}
+
 void preprocessor(Imports *imports, Lexer *entry) {
 	char *cur_folder = malloc(256);
 	get_folder(cur_folder, entry->cur_loc.file);
 	da_get(imports, 0) = cur_folder;
 	ImportedTable_add(&it, entry->cur_loc.file, true);
 
-	for (size_t i = 0; i < entry->tokens.count; i++) {
-		switch (da_get(&entry->tokens, i).kind) {
+	for (size_t cur_tok = 0; cur_tok < entry->tokens.count; cur_tok++) {
+		switch (da_get(&entry->tokens, cur_tok).kind) {
 			case TOK_IMPORT: {
-				i++;
-				if (da_get(&entry->tokens, i).kind != TOK_STRING)
-					lexer_error(da_get(&entry->tokens, i).loc, "error: filepath expected");
+				cur_tok++;
+				if (da_get(&entry->tokens, cur_tok).kind != TOK_STRING)
+					lexer_error(da_get(&entry->tokens, cur_tok).loc, "error: filepath expected");
 
 				bool is_imported;
-				Lexer *imp = get_lexer(imports, da_get(&entry->tokens, i).data, &is_imported);
+				Lexer *imp = get_lexer(imports, da_get(&entry->tokens, cur_tok).data, &is_imported);
 				if (!imp && !is_imported)
-					lexer_error(da_get(&entry->tokens, i).loc, "error: no such file");
+					lexer_error(da_get(&entry->tokens, cur_tok).loc, "error: no such file");
 
-				i++;
-				if (da_get(&entry->tokens, i).kind != TOK_SEMI)
-					lexer_error(da_get(&entry->tokens, i).loc, "error: semicolon expected");
+				cur_tok++;
+				if (da_get(&entry->tokens, cur_tok).kind != TOK_SEMI)
+					lexer_error(da_get(&entry->tokens, cur_tok).loc, "error: semicolon expected");
 
-				i++;
+				cur_tok++;
 				if (!is_imported) {
 					preprocessor(imports, imp);
 
 					for (size_t j = 0; j < imp->tokens.count - 1; j++) {
-						da_insert(&entry->tokens, i, da_get(&imp->tokens, j));
-						i++;
+						da_insert(&entry->tokens, cur_tok, da_get(&imp->tokens, j));
+						cur_tok++;
 					}
 				}
-				i--;
+				cur_tok--;
 			} break;
 
 			case TOK_MACRO: {
-				i++;
-				if (da_get(&entry->tokens, i).kind != TOK_ID)
-					lexer_error(da_get(&entry->tokens, i).loc, "error: identifier expected");
-				char *macro_id = da_get(&entry->tokens, i).data;
+				cur_tok++;
+				if (da_get(&entry->tokens, cur_tok).kind != TOK_ID)
+					lexer_error(da_get(&entry->tokens, cur_tok).loc, "error: identifier expected");
+				char *mid = da_get(&entry->tokens, cur_tok).data;
 				Macro macro = {0};
 
-				i++;
-				for (size_t j = 0; da_get(&entry->tokens, i).kind != TOK_SEMI; j++) {
-					da_append(&macro, da_get(&entry->tokens, i));
-					i++;
+				cur_tok++;
+				for (size_t j = 0; da_get(&entry->tokens, cur_tok).kind != TOK_SEMI; j++) {
+					da_append(&macro, da_get(&entry->tokens, cur_tok));
+					cur_tok++;
 				}
 
-				MacroTable_add(&mt, macro_id, macro);
+				MacroTable_add(&mt, mid, macro);
 			} break;
 
 			case TOK_ID: {
-				Macro *macro = MacroTable_get(&mt, da_get(&entry->tokens, i).data);
-				if (!macro) break;
-				da_remove_ordered(&entry->tokens, i);
-
-				for (size_t j = 0; j < macro->count; j++) {
-					da_insert(&entry->tokens, i, da_get(macro, j));
-					i++;
-				}
+				insert_macro(entry, &cur_tok);
 			} break;
 
 			default:;

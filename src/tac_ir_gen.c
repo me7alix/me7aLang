@@ -8,22 +8,21 @@
 #include "../include/parser.h"
 #include "tac_ir_gen_calc.c"
 
-uint dataoff_id = 1;
-uint var_id     = 1;
-uint label_id   = 1;
+uint data_id  = 1;
+uint var_id   = 1;
+uint label_id = 1;
 
 HT_STR(ASTVarTable, TAC_Operand)
 ASTVarTable avt = {0};
 
 Type tac_ir_get_opr_type(TAC_Operand op) {
 	static Type tuptr = {.kind = TYPE_UPTR};
-
 	switch (op.kind) {
 		case OPR_VAR: {
 			if (op.var.type.kind == TYPE_STRUCT) {
 				Type res = op.var.type;
-				for (size_t i = 0; i < op.var.off.count; i++) {
-					char *off = da_get(&op.var.off, i);
+				for (size_t i = 0; i < op.var.fields.count; i++) {
+					char *off = da_get(&op.var.fields, i);
 					da_foreach (Field, field, &op.var.type.user->ustruct.fields) {
 						if (strcmp(field->id, off) == 0) {
 							op.var.type = field->type;
@@ -86,7 +85,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		return (TAC_Operand) {.kind = OPR_NULL};
 	}
 
-	static Type ti8 = {.kind = TYPE_I8};
+	static Type TI8 = {.kind = TYPE_I8};
 	switch (en->kind) {
 		case AST_LITERAL: {
 			ctx->last_var = 0;
@@ -94,19 +93,19 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 				da_append(&prog->globals, ((TAC_GlobalVar){
 					.type = (Type) {
 						.kind = TYPE_ARRAY,
-						.array.elem = &ti8,
+						.array.elem = &TI8,
 						.array.length = strlen(en->literal.str) + 1
 					},
-					.index = dataoff_id,
+					.index = data_id,
 					.data = (u8*) en->literal.str,
 				}));
 
 				return (TAC_Operand) {
 					.kind = OPR_VAR,
 					.var.kind = VAR_ADDR,
-					.var.type = (Type) {.kind = TYPE_POINTER, .pointer.base = &ti8},
-					.var.addr_id = dataoff_id++,
-					.var.addr_kind = VAR_DATAOFF,
+					.var.type = (Type) {.kind = TYPE_POINTER, .pointer.base = &TI8},
+					.var.addr_id = data_id++,
+					.var.addr_kind = VAR_DATA,
 				};
 			}
 
@@ -124,9 +123,8 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 					.field_id = en->vid,
 				};
 			} else {
-				TAC_Operand *var = ASTVarTable_get(&avt, en->vid);
 				ctx->last_var = 0;
-				return *var;
+				return *ASTVarTable_get(&avt, en->vid);
 			}
 		} break;
 
@@ -162,7 +160,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 
 			if (is_op_field) {
 				ctx->is_field_gen = false;
-				da_append(&l.var.off, r.field_id);
+				da_append(&l.var.fields, r.field_id);
 				return l;
 			}
 
@@ -170,6 +168,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 				return ret;
 			}
 
+			//printf("%d\n", en->expr_binary.type.kind);
 			Type exp_type;
 			switch (en->expr_binary.op) {
 				case AST_OP_FIELD:
@@ -692,13 +691,13 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 		} else if (n->key.type == SBL_VAR && n->key.nested[0] == 0) {
 			da_append(&prog.globals, ((TAC_GlobalVar){
 				.type = n->val.variable.type,
-				.index = dataoff_id,
+				.index = data_id,
 			}));
 			ASTVarTable_add(&avt, n->key.id, (TAC_Operand){
 				.kind = OPR_VAR,
-				.var.kind = VAR_DATAOFF,
+				.var.kind = VAR_DATA,
 				.var.type = n->val.variable.type,
-				.var.addr_id = dataoff_id++,
+				.var.addr_id = data_id++,
 			});
 		}
 	}

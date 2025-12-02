@@ -37,7 +37,7 @@ typedef enum {
 typedef enum {
 	VAR_STACK,
 	VAR_ADDR,
-	VAR_DATAOFF,
+	VAR_DATA,
 } TAC_VarKind;
 
 typedef struct {
@@ -64,7 +64,7 @@ typedef struct {
 			Type type;
 			TAC_VarKind addr_kind;
 			uint addr_id;
-			DA(char*) off;
+			DA(char*) fields;
 		} var;
 	};
 } TAC_Operand;
