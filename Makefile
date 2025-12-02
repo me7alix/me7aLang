@@ -1,51 +1,77 @@
 CC ?= gcc
-CFLAGS ?= -std=c99 -Wall -D_CP_RUNTIME_CHECKS -D_GNU_SOURCE
-
-OUT_BASE := build/metc
+CFLAGS ?= -std=c99 -D_GNU_SOURCE
 SRCS := \
-	src/main.c \
-	src/preprocessor.c \
-	src/lexer.c \
-	src/parser.c \
-	src/parser_expr.c \
-	src/tac_ir_dump.c \
-	src/tac_ir_gen.c
+src/main.c \
+src/preprocessor.c \
+src/lexer.c \
+src/parser.c \
+src/parser_expr.c \
+src/tac_ir_dump.c \
+src/tac_ir_gen.c
 
 ifeq ($(OS),Windows_NT)
-	EXE := .exe
+EXE := .exe
 else
-	EXE :=
+EXE :=
 endif
 
-OUT := $(OUT_BASE)$(EXE)
+DEBUG_DIR := build/debug
+RELEASE_DIR := build/release
+OUT_DEBUG := $(DEBUG_DIR)/metc$(EXE)
+OUT_RELEASE := $(RELEASE_DIR)/metc$(EXE)
 
 ifeq ($(OS),Windows_NT)
-	ifdef COMSPEC
-	MKDIR_CMD = if not exist build mkdir build
-	RM_CMD    = if exist build rmdir /s /q build
+ifdef COMSPEC
+# For Windows cmd.exe
+define MKDIR
+@if not exist $(1) mkdir $(1)
+endef
+define RM
+@if exist $(1) rmdir /s /q $(1)
+endef
 else
-	MKDIR_CMD = mkdir -p build
-	RM_CMD    = rm -rf build
+# For Unix-like shell on Windows (e.g., Git Bash)
+define MKDIR
+@mkdir -p $(1)
+endef
+define RM
+@rm -rf $(1)
+endef
 endif
 else
-	MKDIR_CMD = mkdir -p build
-	RM_CMD    = rm -rf build
+# For Unix-like systems
+define MKDIR
+@mkdir -p $(1)
+endef
+define RM
+@rm -rf $(1)
+endef
 endif
 
-.PHONY: all build clean
+.PHONY: all debug release clean
 
-all: $(OUT)
+all: debug
 
-build:
-	@echo "Creating build dir..."
-	@$(MKDIR_CMD)
+debug: $(OUT_DEBUG)
 
+$(OUT_DEBUG): $(SRCS) | $(DEBUG_DIR)
+	@echo "Compiling metc (debug)..."
+	@$(CC) $(CFLAGS) -ggdb -O0 -D_CP_RUNTIME_CHECKS $(SRCS) -o $@
+	@echo "Built $@"
 
-$(OUT): $(SRCS) | build
-	@echo "Compiling metc..."
-	@$(CC) $(CFLAGS) -ggdb $(SRCS) -o $(OUT)
-	@echo "Built $(OUT)"
+release: $(OUT_RELEASE)
+
+$(OUT_RELEASE): $(SRCS) | $(RELEASE_DIR)
+	@echo "Compiling metc (release)..."
+	@$(CC) $(CFLAGS) -O3 -DNDEBUG $(SRCS) -o $@
+	@echo "Built $@"
+
+$(DEBUG_DIR):
+	$(call MKDIR,$@)
+
+$(RELEASE_DIR):
+	$(call MKDIR,$@)
 
 clean:
 	@echo "Removing build dir..."
-	@$(RM_CMD)
+	$(call RM,build)

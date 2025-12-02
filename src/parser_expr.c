@@ -204,7 +204,6 @@ Type expr_calc_types(Parser *p, AST_Node *expr, Type *vart) {
 				da_foreach (Field, field, &lt.user->ustruct.fields) {
 					if (strcmp(expr->expr_binary.r->vid, field->id) == 0) {
 						expr->expr_binary.type = field->type;
-						printf("%d\n", expr->expr_binary.type.kind);
 						return field->type;
 					}
 				}

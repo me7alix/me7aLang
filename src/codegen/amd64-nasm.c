@@ -380,12 +380,12 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		char arg1[64], arg2[64], dst[64];
 		TAC_Instruction ci = da_get(&func.body, i);
 
-		{ // debug information
-			char res[256];
-			tac_ir_dump_inst(ci, res);
-			printf("%s\n", res);
-			sb_appendf(&body, ";%s\n", res);
-		}
+#ifdef CP_RUNTIME_CHECKS
+		char res[256];
+		tac_ir_dump_inst(ci, res);
+		printf("%s\n", res);
+		sb_appendf(&body, ";%s\n", res);
+#endif
 
 		switch (ci.op) {
 			case OP_ADD:   case OP_SUB:

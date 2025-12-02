@@ -168,7 +168,6 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 				return ret;
 			}
 
-			//printf("%d\n", en->expr_binary.type.kind);
 			Type exp_type;
 			switch (en->expr_binary.op) {
 				case AST_OP_FIELD:
