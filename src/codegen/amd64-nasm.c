@@ -85,7 +85,7 @@ uint get_type_size(Type type) {
 	}
 }
 
-uint get_struct_alignment(TAC_Operand var, bool is_data) {
+uint get_struct_alignment(TAC_Operand var) {
 	if (var.var.fields.count == 0)
 		return 0;
 
@@ -105,9 +105,7 @@ uint get_struct_alignment(TAC_Operand var, bool is_data) {
 		}
 	}
 
-	total += get_type_size(lt);
-	if (is_data) return total;
-	return get_type_size(vt) - total;
+	return total;
 }
 
 void var_type_to_stack(TAC_Operand t, char *buf) {
@@ -160,24 +158,23 @@ char *opr_to_nasm(TAC_Operand opr) {
 
 		case OPR_VAR: {
 			char ts[32]; var_type_to_stack(opr, ts);
-
 			if (opr.var.kind == VAR_STACK) {
 				uint off = *OffTable_get(&stack_table, opr.var.addr_id);
-				if (opr.var.fields.count != 0) off -= get_struct_alignment(opr, false);
+				off -= get_struct_alignment(opr);
 				sprintf(rbuf, "%s [rbp - %u]", ts, off);
 			} else if (opr.var.kind == VAR_ADDR) {
 				if (opr.var.addr_kind == VAR_STACK) {
 					uint off = *OffTable_get(&stack_table, opr.var.addr_id);
 					sb_appendf(&body, "    mov r11, qword [rbp - %u]\n", off);
-					uint field_off = get_struct_alignment(opr, false);
+					uint field_off = get_struct_alignment(opr);
 					sprintf(rbuf, "%s [r11 + %u]", ts, field_off);
 				} else if (opr.var.addr_kind == VAR_DATA) {
-					uint field_off = get_struct_alignment(opr, true);
+					uint field_off = get_struct_alignment(opr);
 					sb_appendf(&body, "    lea rax, [rel D%u + %lu]\n", opr.var.addr_id, field_off);
 					sprintf(rbuf, "%s [rax]", ts);
 				} else UNREACHABLE;
 			} else if (opr.var.kind == VAR_DATA) {
-				uint field_off = get_struct_alignment(opr, false);
+				uint field_off = get_struct_alignment(opr);
 				sprintf(rbuf, "%s [rel D%u + %u]", ts, opr.var.addr_id, field_off);
 			}
 		} break;
