@@ -132,9 +132,6 @@ fn main() {
 				new_game = false
 			}
 		} else {
-			if timer % 12 == 0 {
-			}
-
 			snake_set_dir()
 
 			if timer % 12 == 0 {
