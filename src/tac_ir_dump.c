@@ -107,7 +107,6 @@ void tac_ir_dump_inst(TAC_Instruction inst, char *res) {
 		case OP_MOD:         sprintf(res, "    var%s = %s %s %s", dst, arg1, "%", arg2);   break;
 		case OP_ASSIGN:      sprintf(res, "    var%s = %s", dst, arg1);                    break;
 		case OP_RETURN:      sprintf(res, "    return %s", arg1);                          break;
-		case OP_FADDR:       sprintf(res, "    var%s = faddr %s %s", dst, arg1, arg2);     break;
 		case OP_FUNC_CALL: {
 			char buf[128];
 			tac_ir_dump_opr(inst.dst, dst);

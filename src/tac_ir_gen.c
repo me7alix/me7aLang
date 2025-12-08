@@ -207,7 +207,6 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 				case AST_OP_NOT_EQ:   inst.op = OP_NOT_EQ;   break;
 				case AST_OP_AND:      inst.op = OP_AND;      break;
 				case AST_OP_OR:       inst.op = OP_OR;       break;
-				case AST_OP_FIELD:    inst.op = OP_FADDR;    break;
 				case AST_OP_ARR:                             break;
 				default: UNREACHABLE;
 			}

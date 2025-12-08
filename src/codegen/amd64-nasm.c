@@ -24,6 +24,11 @@ const char *win_regs[][4] = {
 	{ "rcx",  "rdx",  "r8",   "r9"  },
 };
 
+const char *R10[] = {"r10b", "r10w", "r10d", "r10"};
+const char *R11[] = {"r11b", "r11w", "r11d", "r11"};
+const char *RAX[] = {"al",   "ax",   "eax",  "rax"};
+const char *RDX[] = {"dl",   "dx",   "edx",  "rdx"};
+
 HT_DECL(OffTable, uint, uint)
 HT_IMPL_NUM(OffTable, uint, uint)
 
@@ -37,16 +42,23 @@ uint total_offset;
 size_t get_reg_row(Type t) {
 	switch (t.kind) {
 		case TYPE_BOOL:
-		case TYPE_I8:    case TYPE_U8:
+		case TYPE_I8:
+		case TYPE_U8:
 			return 0;
-		case TYPE_I16:   case TYPE_U16:
+		case TYPE_I16:
+		case TYPE_U16:
 			return 1;
-		case TYPE_U32:   case TYPE_I32:
-		case TYPE_INT:   case TYPE_UINT:
+		case TYPE_U32:
+		case TYPE_I32:
+		case TYPE_INT:
+		case TYPE_UINT:
 			return 2;
-		case TYPE_ARRAY: case TYPE_POINTER:
-		case TYPE_IPTR:  case TYPE_UPTR:
-		case TYPE_I64:   case TYPE_U64:
+		case TYPE_ARRAY:
+		case TYPE_POINTER:
+		case TYPE_IPTR:
+		case TYPE_UPTR:
+		case TYPE_I64:
+		case TYPE_U64:
 			return 3;
 		default: UNREACHABLE;
 	}
@@ -54,34 +66,13 @@ size_t get_reg_row(Type t) {
 
 uint get_type_size(Type type) {
 	switch (type.kind) {
+		default: return 1 << get_reg_row(type);
 		case TYPE_STRUCT: {
 			uint total = 0;
 			da_foreach (Field, field, &type.user->ustruct.fields)
 				total += get_type_size(field->type);
 			return total;
 		} break;
-		case TYPE_ARRAY:
-		case TYPE_POINTER:
-		case TYPE_UPTR:
-		case TYPE_IPTR:
-		case TYPE_I64:
-		case TYPE_U64:
-			return 8;
-		case TYPE_F32:
-		case TYPE_FLOAT:
-		case TYPE_UINT:
-		case TYPE_INT:
-		case TYPE_I32:
-		case TYPE_U32:
-			return 4;
-		case TYPE_U16:
-		case TYPE_I16:
-			return 2;
-		case TYPE_BOOL:
-		case TYPE_I8:
-		case TYPE_U8:
-			return 1;
-		default: UNREACHABLE;
 	}
 }
 
@@ -104,37 +95,15 @@ uint get_struct_alignment(TAC_Operand var) {
 	return total;
 }
 
-void var_type_to_stack(TAC_Operand t, char *buf) {
+void opr_type_to_stack(TAC_Operand t, char *buf) {
 	switch (tac_ir_get_opr_type(t).kind) {
-		case TYPE_ARRAY:
-		case TYPE_POINTER:
-		case TYPE_IPTR:
-		case TYPE_UPTR:
-		case TYPE_I64:
-		case TYPE_U64:
-			sprintf(buf, "qword");
-			break;
-		case TYPE_UINT:
-		case TYPE_INT:
-		case TYPE_I32:
-		case TYPE_U32:
-		case TYPE_FLOAT:
-		case TYPE_F32:
-			sprintf(buf, "dword");
-			break;
-		case TYPE_U16:
-		case TYPE_I16:
-			sprintf(buf, "word");
-			break;
-		case TYPE_BOOL:
-		case TYPE_I8:
-		case TYPE_U8:
-			sprintf(buf, "byte");
-			break;
 		case TYPE_STRUCT:
 			sprintf(buf, " ");
 			break;
-		default: UNREACHABLE;
+		default: {
+			uint reg_row = get_reg_row(tac_ir_get_opr_type(t));
+			sprintf(buf, "%s", (char*[]){"byte", "word", "dword", "qword"}[reg_row]);
+		}
 	}
 }
 
@@ -153,15 +122,15 @@ char *opr_to_nasm(TAC_Operand opr) {
 		} break;
 
 		case OPR_VAR: {
-			char ts[32]; var_type_to_stack(opr, ts);
+			char ts[32]; opr_type_to_stack(opr, ts);
 			if (opr.var.kind == VAR_STACK) {
 				uint off = *OffTable_get(&stack_table, opr.var.addr_id);
 				sprintf(rbuf, "%s [rbp - %u]", ts, off - get_struct_alignment(opr));
 			} else if (opr.var.kind == VAR_ADDR) {
 				if (opr.var.addr_kind == VAR_STACK) {
 					uint off = *OffTable_get(&stack_table, opr.var.addr_id);
-					sb_appendf(&body, "    mov r11, qword [rbp - %u]\n", off);
-					sprintf(rbuf, "%s [r11 + %u]", ts, get_struct_alignment(opr));
+					sb_appendf(&body, "    mov rax, qword [rbp - %u]\n", off);
+					sprintf(rbuf, "%s [rax + %u]", ts, get_struct_alignment(opr));
 				} else if (opr.var.addr_kind == VAR_DATA) {
 					uint field_off = get_struct_alignment(opr);
 					sb_appendf(&body, "    lea rax, [rel D%u + %lu]\n", opr.var.addr_id, field_off);
@@ -222,36 +191,16 @@ char *opr_to_nasm(TAC_Operand opr) {
 			switch (opr.func_ret.type.kind) {
 				case TYPE_ARRAY:
 				case TYPE_STRUCT:
-					printf("error: passing arrays/structs isn't supported yet\n");
-					exit(1);
-					break;
-				case TYPE_I32:
-				case TYPE_U32:
-				case TYPE_UINT:
-				case TYPE_INT:
-					sprintf(rbuf, "eax");
-					break;
-				case TYPE_BOOL:
-				case TYPE_I8:
-				case TYPE_U8:
-					sprintf(rbuf, "al");
-					break;
-				case TYPE_I16:
-				case TYPE_U16:
-					sprintf(rbuf, "ax");
-					break;
-				case TYPE_POINTER:
-				case TYPE_IPTR:
-				case TYPE_UPTR:
-				case TYPE_I64:
-				case TYPE_U64:
-					sprintf(rbuf, "rax");
-					break;
-				default: UNREACHABLE;
+					assert(!"error: passing arrays/structs isn't supported yet\n");
+				default: {
+					uint reg_row = get_reg_row(opr.func_ret.type);
+					sprintf(rbuf, "%s", RAX[reg_row]);
+				}
 			}
 		} break;
 
 		case OPR_FUNC_INP: {
+			char ts[32]; opr_type_to_stack(opr, ts);
 			uint arg_id = opr.func_inp.arg_id;
 			size_t arg_row = get_reg_row(opr.func_inp.type);
 
@@ -261,8 +210,8 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TP_LINUX: {
 					if (arg_id >= sysv_regs_cnt) {
 						uint shadow_space = (arg_id - sysv_regs_cnt) * 8 + 48;
-						sb_appendf(&body, "    mov r10d, dword [rbp + %u]\n", shadow_space);
-						sprintf(rbuf, "r10d");
+						sb_appendf(&body, "    mov %s, %s [rbp + %u]\n", R10[arg_row], ts, shadow_space);
+						sprintf(rbuf, "%s", R10[arg_row]);
 					} else {
 						sprintf(rbuf, "%s", sysv_regs[arg_row][arg_id]);
 					}
@@ -270,8 +219,8 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TP_WINDOWS: {
 					if (arg_id >= win_regs_cnt) {
 						uint shadow_space = (arg_id - win_regs_cnt) * 8 + 48;
-						sb_appendf(&body, "    mov r10d, dword [rbp + %u]\n", shadow_space);
-						sprintf(rbuf, "r10d");
+						sb_appendf(&body, "    mov %s, %s [rbp + %u]\n", R10[arg_row], ts, shadow_space);
+						sprintf(rbuf, "%s", R10[arg_row]);
 					} else {
 						sprintf(rbuf, "%s", win_regs[arg_row][arg_id]);
 					}
@@ -286,40 +235,18 @@ char *opr_to_nasm(TAC_Operand opr) {
 }
 
 void type_to_reg(TAC_Operand opr, char *arg1, char *arg2) {
-	switch (tac_ir_get_opr_type(opr).kind) {
-		case TYPE_U8:
-		case TYPE_I8:
-		case TYPE_BOOL:
-			sprintf(arg1, "al");
-			sprintf(arg2, "cl");
-			break;
+	Type opr_type = tac_ir_get_opr_type(opr);
+
+	switch (opr_type.kind) {
 		case TYPE_F32:
 		case TYPE_FLOAT:
 			sprintf(arg1, "xmm0");
 			sprintf(arg2, "xmm1");
 			break;
-		case TYPE_I16:
-		case TYPE_U16:
-			sprintf(arg1, "ax");
-			sprintf(arg2, "cx");
-			break;
-		case TYPE_ARRAY:
-		case TYPE_POINTER:
-		case TYPE_IPTR:
-		case TYPE_UPTR:
-		case TYPE_I64:
-		case TYPE_U64:
-			sprintf(arg1, "rax");
-			sprintf(arg2, "rcx");
-			break;
-		case TYPE_I32:
-		case TYPE_U32:
-		case TYPE_INT:
-		case TYPE_UINT:
-			sprintf(arg1, "eax");
-			sprintf(arg2, "ecx");
-			break;
-		default: UNREACHABLE;
+		default: {
+			sprintf(arg1, "%s", R10[get_reg_row(opr_type)]);
+			sprintf(arg2, "%s", R11[get_reg_row(opr_type)]);
+		}
 	}
 }
 
@@ -349,7 +276,7 @@ void total_offset_add(uint off) {
 }
 
 void nasm_gen_new_stack_var(TAC_Instruction ci, char *dst, char *arg1, char *arg2) {
-	char ts[32]; var_type_to_stack(ci.dst, ts);
+	char ts[32]; opr_type_to_stack(ci.dst, ts);
 	total_offset_add(get_type_size(ci.dst.var.type));
 	OffTable_add(&stack_table, ci.dst.var.addr_id, total_offset);
 	sprintf(dst, "%s [rbp - %u]", ts, total_offset);
@@ -417,6 +344,10 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				}
 
 				else if (ci.op == OP_DIV || ci.op == OP_MOD) {
+					char *SEI[] = {"cbw", "cwd", "cdq", "cqo"};
+					uint reg_row = get_reg_row(ci.dst.var.type);
+					sb_appendf(&body, "    mov %s, %s\n", RAX[reg_row], arg1);
+
 					switch (ci.dst.var.type.kind) {
 						case TYPE_ARRAY:
 						case TYPE_POINTER:
@@ -431,35 +362,20 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						case TYPE_BOOL: case TYPE_I8:
 						case TYPE_INT: case TYPE_I32:
 						case TYPE_I64: case TYPE_I16:
-							sb_appendf(&body, "    cqo\n");
+							sb_appendf(&body, "    %s\n", SEI[reg_row]);
 							sb_appendf(&body, "    idiv %s\n", arg2);
 							break;
 
 						default: UNREACHABLE;
 					}
 
-					if (ci.op == OP_MOD) {
-						switch (ci.dst.var.type.kind) {
-							case TYPE_BOOL:
-							case TYPE_I8:   case TYPE_U8:
-								sprintf(arg1, "dl"); break;
-							case TYPE_I16:  case TYPE_U16:
-								sprintf(arg1, "dx"); break;
-							case TYPE_I32:  case TYPE_U32:
-							case TYPE_UINT: case TYPE_INT:
-								sprintf(arg1, "edx"); break;
-							case TYPE_POINTER:
-							case TYPE_UPTR: case TYPE_IPTR:
-							case TYPE_U64:  case TYPE_I64:
-								sprintf(arg1, "rdx"); break;
-							default: UNREACHABLE;
-						}
-					}
+					if (ci.op == OP_DIV) sprintf(arg1, "%s", RAX[reg_row]);
+					else                 sprintf(arg1, "%s", RDX[reg_row]);
 				}
 
 				else if (ci.op == OP_EQ) {
 					sb_appendf(&body, "    cmp %s, %s\n", arg1, arg2);
-					sb_appendf(&body, "    sete al\n");
+					sb_appendf(&body, "    sete al\n", arg1);
 					sprintf(arg1, "al");
 				} else if (ci.op == OP_NOT_EQ) {
 					sb_appendf(&body, "    cmp %s, %s\n", arg1, arg2);
@@ -467,10 +383,8 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					sprintf(arg1, "al");
 				} else if (ci.op == OP_AND) {
 					sb_appendf(&body, "    and %s, %s\n", arg1, arg2);
-					sprintf(arg1, "al");
 				} else if (ci.op == OP_OR) {
 					sb_appendf(&body, "    or %s, %s\n", arg1, arg2);
-					sprintf(arg1, "al");
 				} else if (ci.op == OP_GREAT) {
 					sb_appendf(&body, "    cmp %s, %s\n", arg1, arg2);
 					sb_appendf(&body, "    setg al\n");
@@ -494,7 +408,6 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 
 			case OP_NOT: case OP_NEG: {
 				nasm_gen_new_stack_var(ci, dst, arg1, arg2);
-
 				sb_appendf(&body, "    mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
 
 				if      (ci.op == OP_NEG) sb_appendf(&body, "    neg %s\n", arg1);
@@ -622,7 +535,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			} break;
 
 			case OP_REF: {
-				char ts[32]; var_type_to_stack(ci.dst, ts);
+				char ts[32]; opr_type_to_stack(ci.dst, ts);
 				total_offset_add(get_type_size(ci.dst.var.type));
 				OffTable_add(&stack_table, ci.dst.var.addr_id, total_offset);
 
@@ -659,51 +572,16 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "    jmp %s\n", opr_to_nasm(ci.dst));
 			} break;
 
-			case OP_FADDR: {
-				nasm_gen_new_stack_var(ci, dst, arg1, arg2);
-
-				uint align = 0;
-				da_foreach(Field, field, &ci.arg1.var.type.user->ustruct.fields) {
-					if (strcmp(field->id, ci.arg2.field_id) == 0) {
-						align += get_type_size(field->type);
-					}
-				}
-
-				sb_appendf(&body, "    mov r11, %s\n", opr_to_nasm(ci.arg1));
-				sb_appendf(&body, "    lea rax, [r11 + %li]\n", align);
-				sb_appendf(&body, "    mov %s, rax\n", opr_to_nasm(ci.dst));
-			} break;
-
 			case OP_RETURN: {
 				if (ci.arg1.kind != OPR_NULL) {
 					switch (func.ret_type.kind) {
 						case TYPE_STRUCT:
 						case TYPE_ARRAY:
-							printf("error: returning arrays/structs isn't supported yet\n");
-							exit(1);
-							break;
-						case TYPE_UPTR:
-						case TYPE_IPTR:
-						case TYPE_POINTER:
-						case TYPE_U64:
-						case TYPE_I64:
-							sb_appendf(&body, "    mov rax, %s\n", opr_to_nasm(ci.arg1));
-							break;
-						case TYPE_U32:
-						case TYPE_I32:
-						case TYPE_INT:
-							sb_appendf(&body, "    mov eax, %s\n", opr_to_nasm(ci.arg1));
-							break;
-						case TYPE_U16:
-						case TYPE_I16:
-							sb_appendf(&body, "    mov ax, %s\n", opr_to_nasm(ci.arg1));
-							break;
-						case TYPE_U8:
-						case TYPE_I8:
-						case TYPE_BOOL:
-							sb_appendf(&body, "    mov al, %s\n", opr_to_nasm(ci.arg1));
-							break;
-						default: UNREACHABLE;
+							assert(!"error: returning arrays/structs isn't supported yet\n");
+						default: {
+							uint reg_row = get_reg_row(func.ret_type);
+							sb_appendf(&body, "    mov %s, %s\n", RAX[reg_row], opr_to_nasm(ci.arg1));
+						}
 					}
 				}
 
@@ -716,6 +594,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "    sub rsp, 32\n");
 
 				for (size_t i = 0; ci.args[i].kind != OPR_NULL; i++) {
+					char ts[32]; opr_type_to_stack(ci.args[i], ts);
 					size_t arg_row = get_reg_row(tac_ir_get_opr_type(ci.args[i]));
 
 					switch (tp) {
@@ -723,18 +602,18 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						case TP_MACOS:
 						case TP_LINUX: {
 							if (i >= sysv_regs_cnt) {
-								sb_appendf(&body, "    mov r10, %s\n", opr_to_nasm(ci.args[i]));
+								sb_appendf(&body, "    mov %s, %s\n", R10[arg_row], opr_to_nasm(ci.args[i]));
 								uint shadow_space = (i - sysv_regs_cnt) * 8 + 32;
-								sb_appendf(&body, "    mov qword [rsp + %u], r10\n", shadow_space);
+								sb_appendf(&body, "    mov %s [rsp + %u], %s\n", ts, shadow_space, R10[arg_row]);
 							} else {
 								sb_appendf(&body, "    mov %s, %s\n", sysv_regs[arg_row][i], opr_to_nasm(ci.args[i]));
 							}
 						} break;
 						case TP_WINDOWS: {
 							if (i >= sysv_regs_cnt) {
-								sb_appendf(&body, "    mov r10, %s\n", opr_to_nasm(ci.args[i]));
+								sb_appendf(&body, "    mov %s, %s\n", R10[arg_row], opr_to_nasm(ci.args[i]));
 								uint shadow_space = (i - win_regs_cnt) * 8 + 32;
-								sb_appendf(&body, "    mov qword [rsp + %u], r10\n", shadow_space);
+								sb_appendf(&body, "    mov %s [rsp + %u], %s\n", ts, shadow_space, R10[arg_row]);
 							} else {
 								sb_appendf(&body, "    mov %s, %s\n", win_regs[arg_row][i], opr_to_nasm(ci.args[i]));
 							}
