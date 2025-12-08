@@ -86,10 +86,7 @@ uint get_type_size(Type type) {
 }
 
 uint get_struct_alignment(TAC_Operand var) {
-	if (var.var.fields.count == 0)
-		return 0;
-
-	Type vt = var.var.type, lt;
+	if (var.var.fields.count == 0) return 0;
 	uint total = 0;
 
 	for (size_t i = 0; i < var.var.fields.count; i++) {
@@ -98,7 +95,6 @@ uint get_struct_alignment(TAC_Operand var) {
 			total += get_type_size(field->type);
 			if (strcmp(field->id, off) == 0) {
 				var.var.type = field->type;
-				lt = field->type;
 				total -= get_type_size(field->type);
 				break;
 			}
@@ -146,9 +142,9 @@ char *opr_to_nasm(TAC_Operand opr) {
 	static char rbuf[64];
 	switch (opr.kind) {
 		case OPR_SIZEOF: {
-			uint size = get_type_size(opr.size_of.v_type);
-			if (opr.size_of.v_type.kind == TYPE_ARRAY)
-				size = get_type_size(*opr.size_of.v_type.array.elem) * opr.size_of.v_type.array.length;
+			uint size = get_type_size(opr.size_of.vtype);
+			if (opr.size_of.vtype.kind == TYPE_ARRAY)
+				size = get_type_size(*opr.size_of.vtype.array.elem) * opr.size_of.vtype.array.length;
 			sprintf(rbuf, "%u", size);
 		} break;
 
@@ -160,14 +156,12 @@ char *opr_to_nasm(TAC_Operand opr) {
 			char ts[32]; var_type_to_stack(opr, ts);
 			if (opr.var.kind == VAR_STACK) {
 				uint off = *OffTable_get(&stack_table, opr.var.addr_id);
-				off -= get_struct_alignment(opr);
-				sprintf(rbuf, "%s [rbp - %u]", ts, off);
+				sprintf(rbuf, "%s [rbp - %u]", ts, off - get_struct_alignment(opr));
 			} else if (opr.var.kind == VAR_ADDR) {
 				if (opr.var.addr_kind == VAR_STACK) {
 					uint off = *OffTable_get(&stack_table, opr.var.addr_id);
 					sb_appendf(&body, "    mov r11, qword [rbp - %u]\n", off);
-					uint field_off = get_struct_alignment(opr);
-					sprintf(rbuf, "%s [r11 + %u]", ts, field_off);
+					sprintf(rbuf, "%s [r11 + %u]", ts, get_struct_alignment(opr));
 				} else if (opr.var.addr_kind == VAR_DATA) {
 					uint field_off = get_struct_alignment(opr);
 					sb_appendf(&body, "    lea rax, [rel D%u + %lu]\n", opr.var.addr_id, field_off);
@@ -266,7 +260,8 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TP_MACOS:
 				case TP_LINUX: {
 					if (arg_id >= sysv_regs_cnt) {
-						sb_appendf(&body, "    mov r10d, dword [rbp + %u]\n", (arg_id - sysv_regs_cnt) * 8 + 48);
+						uint shadow_space = (arg_id - sysv_regs_cnt) * 8 + 48;
+						sb_appendf(&body, "    mov r10d, dword [rbp + %u]\n", shadow_space);
 						sprintf(rbuf, "r10d");
 					} else {
 						sprintf(rbuf, "%s", sysv_regs[arg_row][arg_id]);
@@ -274,7 +269,8 @@ char *opr_to_nasm(TAC_Operand opr) {
 				} break;
 				case TP_WINDOWS: {
 					if (arg_id >= win_regs_cnt) {
-						sb_appendf(&body, "    mov r10d, dword [rbp + %u]\n", (arg_id - win_regs_cnt) * 8 + 48);
+						uint shadow_space = (arg_id - win_regs_cnt) * 8 + 48;
+						sb_appendf(&body, "    mov r10d, dword [rbp + %u]\n", shadow_space);
 						sprintf(rbuf, "r10d");
 					} else {
 						sprintf(rbuf, "%s", win_regs[arg_row][arg_id]);
@@ -632,13 +628,13 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 
 				if (ci.arg1.var.kind == VAR_ADDR) {
 					if (ci.arg1.var.addr_kind == VAR_STACK) {
-						size_t off = *OffTable_get(&stack_table, ci.arg1.var.addr_id);
+						uint off = *OffTable_get(&stack_table, ci.arg1.var.addr_id);
 						sb_appendf(&body, "    mov rax, [rbp - %u]\n", off);
 					} else if (ci.arg1.var.addr_kind == VAR_DATA) {
 						sb_appendf(&body, "    lea rax, [rel D%u]\n", ci.arg1.var.addr_id);
 					}
 				} else if (ci.arg1.var.kind == VAR_STACK) {
-					size_t off = *OffTable_get(&stack_table, ci.arg1.var.addr_id);
+					uint off = *OffTable_get(&stack_table, ci.arg1.var.addr_id);
 					sb_appendf(&body, "    lea rax, [rbp - %u]\n", off);
 				} else if (ci.arg1.var.kind == VAR_DATA) {
 					sb_appendf(&body, "    lea rax, [rel D%u]\n", ci.arg1.var.addr_id);
@@ -728,7 +724,8 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						case TP_LINUX: {
 							if (i >= sysv_regs_cnt) {
 								sb_appendf(&body, "    mov r10, %s\n", opr_to_nasm(ci.args[i]));
-								sb_appendf(&body, "    mov qword [rsp + %u], r10\n", (i - sysv_regs_cnt) * 8 + 32);
+								uint shadow_space = (i - sysv_regs_cnt) * 8 + 32;
+								sb_appendf(&body, "    mov qword [rsp + %u], r10\n", shadow_space);
 							} else {
 								sb_appendf(&body, "    mov %s, %s\n", sysv_regs[arg_row][i], opr_to_nasm(ci.args[i]));
 							}
@@ -736,9 +733,10 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						case TP_WINDOWS: {
 							if (i >= sysv_regs_cnt) {
 								sb_appendf(&body, "    mov r10, %s\n", opr_to_nasm(ci.args[i]));
-								sb_appendf(&body, "    mov qword [rsp + %u], r10\n", (i - win_regs_cnt) * 8 + 32);
+								uint shadow_space = (i - win_regs_cnt) * 8 + 32;
+								sb_appendf(&body, "    mov qword [rsp + %u], r10\n", shadow_space);
 							} else {
-								sb_appendf(&body, "    mov %s, %s\n", win_regs[i], opr_to_nasm(ci.args[i]));
+								sb_appendf(&body, "    mov %s, %s\n", win_regs[arg_row][i], opr_to_nasm(ci.args[i]));
 							}
 						} break;
 					}

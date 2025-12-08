@@ -106,15 +106,15 @@ struct AST_Node {
 		struct {
 			char *id;
 			Type type;
-			AST_Node *exp;
+			AST_Node *expr;
 		} var_def;
 		struct {
 			char *id;
 			Type type;
-			AST_Node *exp;
+			AST_Node *expr;
 		} var_mut;
 		struct {
-			AST_Node *exp;
+			AST_Node *expr;
 			AST_Node *body;
 			AST_Node *next;
 		} stmt_if;
@@ -122,7 +122,7 @@ struct AST_Node {
 			AST_Node *body;
 		} stmt_else;
 		struct {
-			AST_Node *exp;
+			AST_Node *expr;
 			AST_Node *body;
 		} stmt_while;
 		struct {
@@ -149,9 +149,9 @@ struct AST_Node {
 			AST_Node *expr;
 			Type type;
 		} func_ret;
+		AST_Node *func_ret_exp;
 		Literal literal;
 		Type vtype;
-		AST_Node *func_ret_exp;
 		char *vid;
 	};
 };

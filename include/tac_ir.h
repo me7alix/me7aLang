@@ -16,10 +16,9 @@ typedef enum {
 	OP_GREAT_EQ, OP_CAST, OP_NOT,
 	OP_REF, OP_DEREF, OP_FADDR,
 
-	OP_LABEL,
+	OP_LABEL, OP_FUNC_CALL,
 	OP_JUMP, OP_JUMP_IF_NOT,
 	OP_ASSIGN, OP_RETURN,
-	OP_FUNC_CALL,
 } TAC_OpCode;
 
 typedef enum {
@@ -50,7 +49,7 @@ typedef struct {
 		char *name;
 		struct {
 			Type type;
-			Type v_type;
+			Type vtype;
 		} size_of;
 		struct {
 			Type type;

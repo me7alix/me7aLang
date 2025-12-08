@@ -242,7 +242,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 						.arg2 = (TAC_Operand) {
 							.kind = OPR_SIZEOF,
 							.size_of.type = (Type) {.kind = TYPE_IPTR},
-							.size_of.v_type = ptr_base,
+							.size_of.vtype = ptr_base,
 						},
 						.dst = dst,
 					};
@@ -270,7 +270,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 				return (TAC_Operand) {
 					.kind = OPR_SIZEOF,
 					.size_of.type = en->expr_unary.type,
-					.size_of.v_type = tac_ir_get_opr_type(arg),
+					.size_of.vtype = tac_ir_get_opr_type(arg),
 				};
 			} else if (en->expr_unary.op == AST_OP_DEREF) {
 				TAC_Operand arg = tac_ir_gen_expr(ctx, prog, func, en->expr_unary.v);
@@ -319,7 +319,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 
 void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	IRGenExprCtx ctx = {0};
-	TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->var_def.exp);
+	TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->var_def.expr);
 
 	if (ctx.last_var == 0) {
 		da_append(&func->body, ((TAC_Instruction){
@@ -351,13 +351,13 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 void tac_ir_gen_var_mut(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	IRGenExprCtx ctx = {0};
 	ctx.is_right_of_eq = false;
-	TAC_Operand dst = tac_ir_gen_expr(&ctx, prog, func, cn->var_mut.exp->expr_binary.l);
+	TAC_Operand dst = tac_ir_gen_expr(&ctx, prog, func, cn->var_mut.expr->expr_binary.l);
 	ctx.is_right_of_eq = true;
-	TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->var_mut.exp->expr_binary.r);
+	TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->var_mut.expr->expr_binary.r);
 
 	TAC_OpCode op_eq;
 	bool is_op_eq;
-	switch (cn->var_mut.exp->expr_binary.op) {
+	switch (cn->var_mut.expr->expr_binary.op) {
 		case AST_OP_ADD_EQ: op_eq = OP_ADD; is_op_eq = true; break;
 		case AST_OP_SUB_EQ: op_eq = OP_SUB; is_op_eq = true; break;
 		case AST_OP_MUL_EQ: op_eq = OP_MUL; is_op_eq = true; break;
@@ -423,7 +423,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 
 void tac_ir_gen_if_chain(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	IRGenExprCtx ectx = {0};
-	TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->stmt_if.exp);
+	TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->stmt_if.expr);
 	uint label_start = label_id++;
 	uint label_end = label_id++;
 
@@ -553,7 +553,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 				}));
 
 				IRGenExprCtx ectx = {0};
-				TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->stmt_while.exp);
+				TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->stmt_while.expr);
 				ctx->label_end = label_id++;
 
 				da_append(&func->body, ((TAC_Instruction){

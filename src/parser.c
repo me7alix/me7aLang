@@ -261,12 +261,12 @@ AST_Node *parse_var_def(Parser *p) {
 		.loc = loc,
 		.var_def.id = id,
 		.var_def.type = type,
-		.var_def.exp = NULL,
+		.var_def.expr = NULL,
 	});
 
 	if (parser_peek(p)->kind == TOK_EQ) {
 		parser_next(p);
-		vdn->var_def.exp = parse_expr(p, EXPR_PARSING_VAR, &type);
+		vdn->var_def.expr = parse_expr(p, EXPR_PARSING_VAR, &type);
 	}
 
 	if (parser_symbol_table_get(p, SBL_VAR, vdn->var_def.id))
@@ -285,21 +285,21 @@ AST_Node *parse_var_assign(Parser *p) {
 	parser_next(p);
 	parser_next(p);
 
-	AST_Node *exp = parse_expr(p, EXPR_PARSING_VAR, NULL);
+	AST_Node *expr = parse_expr(p, EXPR_PARSING_VAR, NULL);
 
 	AST_Node *vdn = ast_new({
 		.kind = AST_VAR_DEF,
 		.loc = loc,
 		.var_def.id = id,
-		.var_def.exp = exp,
+		.var_def.expr = expr,
 	});
 
-	switch (exp->kind) {
-		case AST_BIN_EXP:   vdn->var_def.type = exp->expr_binary.type; break;
-		case AST_UN_EXP:    vdn->var_def.type = exp->expr_unary.type;  break;
-		case AST_LITERAL:   vdn->var_def.type = exp->literal.type;    break;
-		case AST_FUNC_CALL: vdn->var_def.type = exp->func_call.type;  break;
-		case AST_VID:       vdn->var_def.type = parser_symbol_table_get(p, SBL_VAR, exp->vid)->variable.type; break;
+	switch (expr->kind) {
+		case AST_BIN_EXP:   vdn->var_def.type = expr->expr_binary.type; break;
+		case AST_UN_EXP:    vdn->var_def.type = expr->expr_unary.type;  break;
+		case AST_LITERAL:   vdn->var_def.type = expr->literal.type;    break;
+		case AST_FUNC_CALL: vdn->var_def.type = expr->func_call.type;  break;
+		case AST_VID:       vdn->var_def.type = parser_symbol_table_get(p, SBL_VAR, expr->vid)->variable.type; break;
 		default: UNREACHABLE;
 	}
 
@@ -319,7 +319,7 @@ AST_Node *parse_var_mut(Parser *p, ExprParsingType pt) {
 		.kind = AST_VAR_MUT,
 		.loc = exp->loc,
 		.var_mut.type = exp->expr_binary.type,
-		.var_mut.exp = exp,
+		.var_mut.expr = exp,
 	});
 
 	return vmn;
@@ -355,7 +355,7 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 		.loc = (parser_peek(p)-1)->loc,
 	});
 
-	r->stmt_if.exp = parse_expr(p, EXPR_PARSING_STMT, NULL);
+	r->stmt_if.expr = parse_expr(p, EXPR_PARSING_STMT, NULL);
 	parser_next(p);
 	r->stmt_if.body = parse_body(p, func);
 
@@ -380,7 +380,7 @@ AST_Node *parse_while_stmt(Parser *p, AST_Node *func) {
 	parser_next(p);
 	AST_Node *r = ast_new({.kind = AST_WHILE_STMT});
 
-	r->stmt_while.exp = parse_expr(p, EXPR_PARSING_STMT, NULL);
+	r->stmt_while.expr = parse_expr(p, EXPR_PARSING_STMT, NULL);
 	parser_next(p);
 	r->stmt_while.body = parse_body(p, func);
 

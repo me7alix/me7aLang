@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <ctype.h>
+
 #include "../include/lexer.h"
 
 char *get_word(Lexer *lexer) {
@@ -136,16 +137,16 @@ Lexer lexer_lex(char *file, char *code) {
 					add_token(&lexer, TOK_NOT_EQ, "!=");
 					lexer.cur_char++;
 				} else {
-					add_token(&lexer, TOK_EXC, "!"); 
+					add_token(&lexer, TOK_EXC, "!");
 				}
 			} break;
 
 			case '&': {
 				if (lexer.cur_char[1] == '&') {
-					add_token(&lexer, TOK_AND, "&&"); 
+					add_token(&lexer, TOK_AND, "&&");
 					lexer.cur_char++;
 				} else {
-					add_token(&lexer, TOK_AMP, "&"); 
+					add_token(&lexer, TOK_AMP, "&");
 				}
 			} break;
 
@@ -186,19 +187,19 @@ Lexer lexer_lex(char *file, char *code) {
 			} break;
 
 			case '\r':
-			case '\n':
-				if (da_last(&lexer.tokens).kind != TOK_SEMI &&
-					da_last(&lexer.tokens).kind != TOK_CBRA &&
-					da_last(&lexer.tokens).kind != TOK_OBRA &&
-					da_last(&lexer.tokens).kind != TOK_COM)
-					add_token(&lexer, TOK_SEMI, ";");
+			case '\n': {
+				switch (da_last(&lexer.tokens).kind) {
+					case TOK_SEMI: case TOK_CBRA:
+					case TOK_OBRA: case TOK_COM: break;
+					default: add_token(&lexer, TOK_SEMI, ";");
+				}
 
-				if (*lexer.cur_char == '\r' && lexer.cur_char[1] == '\n')
+				if (lexer.cur_char[0] == '\r' && lexer.cur_char[1] == '\n')
 					lexer.cur_char++;
 
 				lexer.cur_loc.line_num++;
 				lexer.cur_loc.line_start = lexer.cur_char + 1;
-				break;
+			} break;
 
 			case ':': {
 				if (lexer.cur_char[1] == '=') {

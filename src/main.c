@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
 	da_append(&imports, ".");
 
 	char *output_bin = "a.out";
-	char *ld = "";
+	char *link_dynamically = "";
 	char *obj_files = "";
 	bool compile_to_obj = false;
 	bool save_asm_output = false;
@@ -133,7 +133,7 @@ int main(int argc, char **argv) {
 				return 1;
 			}
 
-			ld = argv[++i];
+			link_dynamically = argv[++i];
 		} else if (strcmp(argv[i], "-I") == 0) {
 			if (i >= argc) {
 				fprintf(stderr, "invalid -I argument\n");
@@ -199,13 +199,13 @@ int main(int argc, char **argv) {
 			case TP_LINUX: {
 				systemf(
 					"gcc -no-pie -o \"%s\" %s.o %s %s",
-					output_bin, output_bin, obj_files, ld);
+					output_bin, output_bin, obj_files, link_dynamically);
 				systemf("rm %s.o", output_bin);
 			} break;
 			case TP_WINDOWS: {
 				systemf(
 					"gcc -no-pie -o \"%s\" %s.obj %s %s",
-					output_bin, output_bin, obj_files, ld);
+					output_bin, output_bin, obj_files, link_dynamically);
 				systemf("del /F /Q %s.obj", output_bin);
 			} break;
 		}
