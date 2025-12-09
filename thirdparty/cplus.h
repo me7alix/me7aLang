@@ -8,6 +8,10 @@
 #define CP_DA_INIT_CAP 256
 #endif
 
+#ifndef CP_HT_INIT_CAP
+#define CP_HT_INIT_CAP 128
+#endif
+
 #ifndef CP_REALLOC
 #include <stdlib.h>
 #define CP_REALLOC realloc
@@ -175,46 +179,43 @@
 
 /* Hashtable templates */
 
-#define HT_DECL(hashtable_type, key_type, value_type) \
-    typedef struct hashtable_type##_node { \
+#define HT_DECL(ht_type, key_type, value_type) \
+    typedef struct ht_type##_node { \
         key_type key; \
         value_type val; \
-        struct hashtable_type##_node *next; \
-    } hashtable_type##_node; \
+        struct ht_type##_node *next; \
+    } ht_type##_node; \
     typedef struct { \
-        hashtable_type##_node **arr; \
+        ht_type##_node **arr; \
         size_t count; \
         size_t capacity; \
-    } hashtable_type; \
-    u64 hashtable_type##_hashf(key_type key); \
-    int hashtable_type##_compare(key_type a, key_type b); \
-    void hashtable_type##_add(hashtable_type *ht, key_type key, value_type val); \
-    value_type *hashtable_type##_get(hashtable_type *ht, key_type key); \
-    void hashtable_type##_remove(hashtable_type *ht, key_type key); \
-    void hashtable_type##_free(hashtable_type *ht);
+    } ht_type; \
+    u64 ht_type##_hashf(key_type key); \
+    int ht_type##_compare(key_type a, key_type b); \
+    void ht_type##_add(ht_type *ht, key_type key, value_type val); \
+    value_type *ht_type##_get(ht_type *ht, key_type key); \
+    void ht_type##_remove(ht_type *ht, key_type key); \
+    void ht_type##_free(ht_type *ht);
 
-#define HT_IMPL(hashtable_type, key_type, value_type) \
-extern u64 hashtable_type##_hashf(key_type key); \
-extern int hashtable_type##_compare(key_type a, key_type b); \
+#define HT_IMPL(ht_type, key_type, value_type) \
+extern u64 ht_type##_hashf(key_type key); \
+extern int ht_type##_compare(key_type a, key_type b); \
 \
-static void hashtable_type##_ensure_capacity(hashtable_type *ht) { \
-    if (ht->capacity != 0) return; \
-    ht->capacity = 128; \
-    ht->arr = (hashtable_type##_node**) CP_CALLOC(ht->capacity, sizeof(hashtable_type##_node*)); \
-} \
-\
-void hashtable_type##_add(hashtable_type *ht, key_type key, value_type val) { \
-    if (ht->capacity == 0) hashtable_type##_ensure_capacity(ht); \
-    size_t idx = (size_t)(hashtable_type##_hashf(key) % ht->capacity); \
-    hashtable_type##_node *cur = ht->arr[idx]; \
+void ht_type##_add(ht_type *ht, key_type key, value_type val) { \
+    if (ht->capacity == 0) { \
+        ht->capacity = CP_HT_INIT_CAP; \
+        ht->arr = (ht_type##_node**) CP_CALLOC(ht->capacity, sizeof(ht_type##_node*)); \
+    } \
+    size_t idx = (size_t)(ht_type##_hashf(key) % ht->capacity); \
+    ht_type##_node *cur = ht->arr[idx]; \
     while (cur) { \
-        if (hashtable_type##_compare(cur->key, key) == 0) { \
+        if (ht_type##_compare(cur->key, key) == 0) { \
             cur->val = val; \
             return; \
         } \
         cur = cur->next; \
     } \
-    hashtable_type##_node *n = (hashtable_type##_node*) CP_CALLOC(1, sizeof(hashtable_type##_node)); \
+    ht_type##_node *n = (ht_type##_node*) CP_CALLOC(1, sizeof(ht_type##_node)); \
     n->key = key; \
     n->val = val; \
     n->next = ht->arr[idx]; \
@@ -223,12 +224,12 @@ void hashtable_type##_add(hashtable_type *ht, key_type key, value_type val) { \
     if (ht->count > ht->capacity * 2) { \
         size_t old_cap = ht->capacity; \
         size_t new_cap = old_cap * 3; \
-        hashtable_type##_node **new_arr = (hashtable_type##_node**) CP_CALLOC(new_cap, sizeof(hashtable_type##_node*)); \
+        ht_type##_node **new_arr = (ht_type##_node**) CP_CALLOC(new_cap, sizeof(ht_type##_node*)); \
         for (size_t i = 0; i < old_cap; ++i) { \
-            hashtable_type##_node *it = ht->arr[i]; \
+            ht_type##_node *it = ht->arr[i]; \
             while (it) { \
-                hashtable_type##_node *next = it->next; \
-                size_t j = (size_t)(hashtable_type##_hashf(it->key) % new_cap); \
+                ht_type##_node *next = it->next; \
+                size_t j = (size_t)(ht_type##_hashf(it->key) % new_cap); \
                 it->next = new_arr[j]; \
                 new_arr[j] = it; \
                 it = next; \
@@ -240,24 +241,24 @@ void hashtable_type##_add(hashtable_type *ht, key_type key, value_type val) { \
     } \
 } \
 \
-value_type *hashtable_type##_get(hashtable_type *ht, key_type key) { \
+value_type *ht_type##_get(ht_type *ht, key_type key) { \
     if (ht->capacity == 0) return NULL; \
-    size_t idx = (size_t)(hashtable_type##_hashf(key) % ht->capacity); \
-    hashtable_type##_node *cur = ht->arr[idx]; \
+    size_t idx = (size_t)(ht_type##_hashf(key) % ht->capacity); \
+    ht_type##_node *cur = ht->arr[idx]; \
     while (cur) { \
-        if (hashtable_type##_compare(cur->key, key) == 0) return &cur->val; \
+        if (ht_type##_compare(cur->key, key) == 0) return &cur->val; \
         cur = cur->next; \
     } \
     return NULL; \
 } \
 \
-void hashtable_type##_remove(hashtable_type *ht, key_type key) { \
+void ht_type##_remove(ht_type *ht, key_type key) { \
     if (ht->capacity == 0) return; \
-    size_t idx = (size_t)(hashtable_type##_hashf(key) % ht->capacity); \
-    hashtable_type##_node *cur = ht->arr[idx]; \
-    hashtable_type##_node *prev = NULL; \
+    size_t idx = (size_t)(ht_type##_hashf(key) % ht->capacity); \
+    ht_type##_node *cur = ht->arr[idx]; \
+    ht_type##_node *prev = NULL; \
     while (cur) { \
-        if (hashtable_type##_compare(cur->key, key) == 0) { \
+        if (ht_type##_compare(cur->key, key) == 0) { \
             if (prev) prev->next = cur->next; else ht->arr[idx] = cur->next; \
             CP_FREE(cur); \
             ht->count--; \
@@ -268,12 +269,12 @@ void hashtable_type##_remove(hashtable_type *ht, key_type key) { \
     } \
 } \
 \
-void hashtable_type##_free(hashtable_type *ht) { \
+void ht_type##_free(ht_type *ht) { \
     if (ht->capacity == 0) return; \
     for (size_t i = 0; i < ht->capacity; ++i) { \
-        hashtable_type##_node *cur = ht->arr[i]; \
+        ht_type##_node *cur = ht->arr[i]; \
         while (cur) { \
-            hashtable_type##_node *next = cur->next; \
+            ht_type##_node *next = cur->next; \
             CP_FREE(cur); \
             cur = next; \
         } \
@@ -284,24 +285,23 @@ void hashtable_type##_free(hashtable_type *ht) { \
     ht->count = 0; \
 }
 
-#define HT(hashtable_type, key_type, value_type) \
-    HT_DECL(hashtable_type, key_type, value_type) \
-    HT_IMPL(hashtable_type, key_type, value_type)
+#define HT(ht_type, key_type, value_type) \
+    HT_DECL(ht_type, key_type, value_type) \
+    HT_IMPL(ht_type, key_type, value_type)
 
-#define ht_foreach_node(hashtable_type, ht, nodevar) \
+#define ht_foreach_node(ht_type, ht, nodevar) \
     for (size_t _ht_idx = 0; (ht)->capacity && _ht_idx < (ht)->capacity; ++_ht_idx) \
-        for (hashtable_type##_node *nodevar = (ht)->arr[_ht_idx]; nodevar; nodevar = nodevar->next)
+        for (ht_type##_node *nodevar = (ht)->arr[_ht_idx]; nodevar; nodevar = nodevar->next)
 
-#define strhash(dst, str) \
-    do { \
-        u64 h = 14695981039346656037ULL; \
-        u8 *p = (u8*)(str); \
-        while (*p) { \
-            h ^= (u64)(*p++); \
-            h *= 1099511628211ULL; \
-        } \
-        *(dst) = h; \
-    } while(0)
+static inline u64 strhash(char *str) {
+    u64 h = 14695981039346656037ULL;
+    u8 *p = (u8*)(str);
+    while (*p) {
+        h ^= (u64)(*p++);
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
 
 #define numhash(num) \
     ((u64)((u64)6364136223846793005ULL * (u64)(num) + 1442695040888963407ULL))
@@ -309,34 +309,32 @@ void hashtable_type##_free(hashtable_type *ht) { \
 #define hash_combine(h1, h2) \
     h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2))
 
-#define HT_DECL_STR(hashtable_type, value_type) \
-    HT_DECL(hashtable_type, char*, value_type)
+#define HT_DECL_STR(ht_type, value_type) \
+    HT_DECL(ht_type, char*, value_type)
 
-#define HT_IMPL_STR(hashtable_type, value_type) \
-HT_IMPL(hashtable_type, char*, value_type) \
+#define HT_IMPL_STR(ht_type, value_type) \
+HT_IMPL(ht_type, char*, value_type) \
 \
-u64 hashtable_type##_hashf(char* s) { \
-    u64 res; \
-    strhash(&res, s); \
-    return res; \
+u64 ht_type##_hashf(char* s) { \
+    return strhash(s); \
 } \
 \
-int hashtable_type##_compare(char* a, char* b) { \
+int ht_type##_compare(char* a, char* b) { \
     return strcmp(a, b); \
 }
 
-#define HT_STR(hashtable_type, value_type) \
-    HT_DECL_STR(hashtable_type, value_type) \
-    HT_IMPL_STR(hashtable_type, value_type)
+#define HT_STR(ht_type, value_type) \
+    HT_DECL_STR(ht_type, value_type) \
+    HT_IMPL_STR(ht_type, value_type)
 
-#define HT_IMPL_NUM(hashtable_type, key_type, value_type) \
-HT_IMPL(hashtable_type, key_type, value_type) \
+#define HT_IMPL_NUM(ht_type, key_type, value_type) \
+HT_IMPL(ht_type, key_type, value_type) \
 \
-u64 hashtable_type##_hashf(key_type num) { \
+u64 ht_type##_hashf(key_type num) { \
     return numhash(num); \
 } \
 \
-int hashtable_type##_compare(key_type a, key_type b) { \
+int ht_type##_compare(key_type a, key_type b) { \
     return !(a == b); \
 }
 

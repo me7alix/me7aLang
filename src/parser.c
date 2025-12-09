@@ -34,8 +34,7 @@ HT_IMPL_STR(UserTypes, UserType)
 HT_IMPL(SymbolTable, SymbolKey, Symbol)
 
 u64 SymbolTable_hashf(SymbolKey key) {
-	u64 res; strhash(&res, key.id);
-	return hash_combine(res, numhash(key.type));
+	return hash_combine(strhash(key.id), numhash(key.type));
 }
 
 int SymbolTable_compare(SymbolKey cur_key, SymbolKey key) {

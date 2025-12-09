@@ -39,7 +39,6 @@ int pathcmp(const char *a, const char *b) {
 
 u64 ImportedTable_hashf(char *str) {
 	char real_path[512];
-	u64 res_hash;
 #if defined(_WIN32)
 	#include <windows.h>
 	DWORD len = GetFullPathNameA(str, sizeof(real_path), real_path, NULL);
@@ -49,8 +48,7 @@ u64 ImportedTable_hashf(char *str) {
 	if (realpath(str, real_path) == NULL)
 		strncpy(real_path, str, sizeof(real_path)-1);
 #endif
-	strhash(&res_hash, real_path);
-	return res_hash;
+	return strhash(real_path);;
 }
 
 int ImportedTable_compare(char *cur_str, char *str) {
