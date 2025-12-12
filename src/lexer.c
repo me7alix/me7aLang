@@ -93,13 +93,15 @@ Lexer lexer_lex(char *file, char *code) {
 			case ']': add_token(&lexer, TOK_CSQBRA,"]"); break;
 			case '%': add_token(&lexer, TOK_PS,    "%"); break;
 			case '#': add_token(&lexer, TOK_MACRO, "#"); break;
+			case '^': add_token(&lexer, TOK_XOR,   "^"); break;
+			case '~': add_token(&lexer, TOK_TILDA, "~"); break;
 
-			case '.':
+			case '.': {
 				if (lexer.cur_char[1] == '.' && lexer.cur_char[2] == '.') {
 					add_token(&lexer, TOK_ANY,   "...");
 					lexer.cur_char += 2;
 				} else add_token(&lexer, TOK_DOT,   ".");
-				break;
+			} break;
 
 			case '+': {
 				if (lexer.cur_char[1] == '=') {
@@ -124,8 +126,8 @@ Lexer lexer_lex(char *file, char *code) {
 
 			case '/': {
 				if (lexer.cur_char[1] == '/') {
-					while (*lexer.cur_char != '\n')
-						lexer.cur_char += 1;
+					while (lexer.cur_char[1] != '\n')
+						lexer.cur_char++;
 				} else if (lexer.cur_char[1] == '=') {
 					add_token(&lexer, TOK_SLASH_EQ, "/=");
 					lexer.cur_char++;
@@ -163,6 +165,9 @@ Lexer lexer_lex(char *file, char *code) {
 				if (lexer.cur_char[1] == '=') {
 					add_token(&lexer, TOK_GREAT_EQ, ">=");
 					lexer.cur_char++;
+				} else if (lexer.cur_char[1] == '>') {
+					add_token(&lexer, TOK_RIGHT_SHIFT, ">>");
+					lexer.cur_char++;
 				} else {
 					add_token(&lexer, TOK_GREAT, ">");
 				}
@@ -171,6 +176,9 @@ Lexer lexer_lex(char *file, char *code) {
 			case '<': {
 				if (lexer.cur_char[1] == '=') {
 					add_token(&lexer, TOK_LESS_EQ, "<=");
+					lexer.cur_char++;
+				} else if (lexer.cur_char[1] == '<') {
+					add_token(&lexer, TOK_LEFT_SHIFT, "<<");
 					lexer.cur_char++;
 				} else {
 					add_token(&lexer, TOK_LESS, "<");

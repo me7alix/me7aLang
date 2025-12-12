@@ -28,6 +28,7 @@ const char *R10[] = {"r10b", "r10w", "r10d", "r10"};
 const char *R11[] = {"r11b", "r11w", "r11d", "r11"};
 const char *RAX[] = {"al",   "ax",   "eax",  "rax"};
 const char *RDX[] = {"dl",   "dx",   "edx",  "rdx"};
+const char *RCX[] = {"cl",   "cx",   "ecx",  "rcx"};
 
 HT_DECL(OffTable, uint, uint)
 HT_IMPL_NUM(OffTable, uint, uint)
@@ -308,20 +309,32 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 #endif
 
 		switch (ci.op) {
-			case OP_ADD:   case OP_SUB:
-			case OP_MUL:   case OP_DIV:
-			case OP_EQ:    case OP_NOT_EQ:
-			case OP_AND:   case OP_OR:
-			case OP_GREAT: case OP_LESS:
-			case OP_MOD:   case OP_LESS_EQ:
-			case OP_GREAT_EQ: {
+			case OP_ADD:    case OP_SUB:
+			case OP_MUL:    case OP_DIV:
+			case OP_EQ:     case OP_NOT_EQ:
+			case OP_AND:    case OP_OR:
+			case OP_GREAT:  case OP_LESS:
+			case OP_MOD:    case OP_LESS_EQ:
+			case OP_BW_AND: case OP_BW_OR:
+			case OP_BW_LS:  case OP_BW_RS:
+			case OP_BW_XOR: case OP_GREAT_EQ: {
 				nasm_gen_new_stack_var(ci, dst, arg1, arg2);
 
 				sb_appendf(&body, "    mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
 				sb_appendf(&body, "    mov %s, %s\n", arg2, opr_to_nasm(ci.arg2));
 
-				if      (ci.op == OP_ADD) sb_appendf(&body, "    add %s, %s\n", arg1, arg2);
-				else if (ci.op == OP_SUB) sb_appendf(&body, "    sub %s, %s\n", arg1, arg2);
+				if      (ci.op == OP_ADD)    sb_appendf(&body, "    add %s, %s\n", arg1, arg2);
+				else if (ci.op == OP_SUB)    sb_appendf(&body, "    sub %s, %s\n", arg1, arg2);
+				else if (ci.op == OP_BW_AND) sb_appendf(&body, "    and %s, %s\n", arg1, arg2);
+				else if (ci.op == OP_BW_OR)  sb_appendf(&body, "    or  %s, %s\n", arg1, arg2);
+				else if (ci.op == OP_BW_XOR) sb_appendf(&body, "    xor %s, %s\n", arg1, arg2);
+
+				else if (ci.op == OP_BW_LS || ci.op == OP_BW_RS) {
+					const char *rcx = RCX[get_reg_row(ci.dst.var.type)];
+					sb_appendf(&body, "    mov %s, %s\n", rcx, arg2);
+					sb_appendf(&body, "    %s %s, cl\n", ci.op == OP_BW_LS ? "shl" : "shr", arg1);
+				}
+
 				else if (ci.op == OP_MUL) {
 					switch (ci.dst.var.type.kind) {
 						case TYPE_ARRAY:
@@ -406,11 +419,13 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "    mov %s, %s\n", dst, arg1);
 			} break;
 
+			case OP_BW_NOT:
 			case OP_NOT: case OP_NEG: {
 				nasm_gen_new_stack_var(ci, dst, arg1, arg2);
 				sb_appendf(&body, "    mov %s, %s\n", arg1, opr_to_nasm(ci.arg1));
 
-				if      (ci.op == OP_NEG) sb_appendf(&body, "    neg %s\n", arg1);
+				if      (ci.op == OP_NEG)    sb_appendf(&body, "    neg %s\n", arg1);
+				else if (ci.op == OP_BW_NOT) sb_appendf(&body, "    not %s\n", arg1);
 				else if (ci.op == OP_NOT) {
 					sb_appendf(&body, "    test %s, %s\n", arg1, arg1);
 					sb_appendf(&body, "    setz al\n");

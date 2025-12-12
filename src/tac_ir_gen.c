@@ -207,6 +207,11 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 				case AST_OP_NOT_EQ:   inst.op = OP_NOT_EQ;   break;
 				case AST_OP_AND:      inst.op = OP_AND;      break;
 				case AST_OP_OR:       inst.op = OP_OR;       break;
+				case AST_OP_BW_AND:   inst.op = OP_BW_AND;   break;
+				case AST_OP_BW_OR:    inst.op = OP_BW_OR;    break;
+				case AST_OP_BW_LS:    inst.op = OP_BW_LS;    break;
+				case AST_OP_BW_RS:    inst.op = OP_BW_RS;    break;
+				case AST_OP_BW_XOR:   inst.op = OP_BW_XOR;   break;
 				case AST_OP_ARR:                             break;
 				default: UNREACHABLE;
 			}
@@ -291,10 +296,11 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			};
 
 			switch (en->expr_unary.op) {
-				case AST_OP_CAST: inst.op = OP_CAST; break;
-				case AST_OP_NOT:  inst.op = OP_NOT;  break;
-				case AST_OP_NEG:  inst.op = OP_NEG;  break;
-				case AST_OP_REF:  inst.op = OP_REF;  break;
+				case AST_OP_CAST:   inst.op = OP_CAST;   break;
+				case AST_OP_NOT:    inst.op = OP_NOT;    break;
+				case AST_OP_NEG:    inst.op = OP_NEG;    break;
+				case AST_OP_REF:    inst.op = OP_REF;    break;
+				case AST_OP_BW_NOT: inst.op = OP_BW_NOT; break;
 				default: UNREACHABLE;
 			}
 

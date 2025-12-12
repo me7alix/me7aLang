@@ -9,11 +9,13 @@
 #include "../include/parser.h"
 
 typedef enum {
-	// Binops
 	OP_ADD, OP_SUB, OP_NEG, OP_MUL, OP_DIV,
 	OP_MOD, OP_OR, OP_AND, OP_EQ, OP_NOT_EQ,
 	OP_LESS, OP_GREAT, OP_LESS_EQ, OP_GREAT_EQ,
 	OP_CAST, OP_NOT, OP_REF, OP_DEREF,
+
+	OP_BW_AND, OP_BW_OR, OP_BW_LS, OP_BW_RS,
+	OP_BW_XOR, OP_BW_NOT,
 
 	OP_LABEL, OP_FUNC_CALL,
 	OP_JUMP, OP_JUMP_IF_NOT,

@@ -1,0 +1,27 @@
+import "std.m7"
+
+fn main() {
+	a := 6
+	b := 9
+
+	printf("XOR swap\n")
+	printf("%d %d\n", a, b)
+	a = a ^ b
+	b = b ^ a
+	a = a ^ b
+	printf("%d %d\n", a, b)
+
+	printf("\nBit shifts\n")
+	printf("%02d << %02d = %02d\n", a, 1, a << 1)
+	printf("%02d >> %02d = %02d\n", a, 1, a >> 1)
+
+	printf("\nBitwise and/or\n")
+	//6 0110
+	//9 1001
+	printf("%02d & %02d = %02d\n", a, b, a & b)
+	printf("%02d | %02d = %02d\n", a, b, a | b)
+
+	printf("\nBitwise not\n")
+	printf("~%d = %d\n", a, ~a)
+	printf("~%d = %d\n", b, ~b)
+}

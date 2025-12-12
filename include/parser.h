@@ -57,6 +57,14 @@ typedef enum {
 	AST_OP_OR,
 	AST_OP_NOT,
 
+	//bitops
+	AST_OP_BW_AND,
+	AST_OP_BW_OR,
+	AST_OP_BW_XOR,
+	AST_OP_BW_LS,
+	AST_OP_BW_RS,
+	AST_OP_BW_NOT,
+
 	// other
 	AST_OP_SIZEOF,
 	AST_OP_CAST,

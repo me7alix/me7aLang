@@ -29,6 +29,13 @@ float expr_op_precedence(AST_ExprOp op, bool l) {
 		case AST_OP_DIV:
 			if (l) return 2.1;
 			else   return 2.0;
+		case AST_OP_BW_NOT:
+			if (l) return 2.8;
+			else   return 0;
+		case AST_OP_BW_AND:  case AST_OP_BW_OR:
+		case AST_OP_BW_LS:   case AST_OP_BW_RS:
+			if (l) return 2.6;
+			else   return 2.5;
 		case AST_OP_EQ:      case AST_OP_GREAT:
 		case AST_OP_LESS:    case AST_OP_GREAT_EQ:
 		case AST_OP_LESS_EQ: case AST_OP_NOT_EQ:
@@ -292,18 +299,23 @@ AST_ExprOp tok_to_binary_expr_op(TokenKind tok) {
 		case TOK_EQ_EQ:    return AST_OP_EQ;
 		case TOK_EQ:       return AST_OP_VAR_EQ;
 		case TOK_GREAT:    return AST_OP_GREAT;
-		case TOK_LESS:     return AST_OP_LESS;
-		case TOK_GREAT_EQ: return AST_OP_GREAT_EQ;
-		case TOK_LESS_EQ:  return AST_OP_LESS_EQ;
-		case TOK_AND:      return AST_OP_AND;
-		case TOK_OR:       return AST_OP_OR;
-		case TOK_PLUS:     return AST_OP_ADD;
-		case TOK_MINUS:    return AST_OP_SUB;
-		case TOK_STAR:     return AST_OP_MUL;
-		case TOK_SLASH:    return AST_OP_DIV;
-		case TOK_PS:       return AST_OP_MOD;
-		case TOK_OSQBRA:   return AST_OP_ARR;
-		case TOK_DOT:      return AST_OP_FIELD;
+		case TOK_LESS:        return AST_OP_LESS;
+		case TOK_GREAT_EQ:    return AST_OP_GREAT_EQ;
+		case TOK_LESS_EQ:     return AST_OP_LESS_EQ;
+		case TOK_AND:         return AST_OP_AND;
+		case TOK_OR:          return AST_OP_OR;
+		case TOK_PLUS:        return AST_OP_ADD;
+		case TOK_MINUS:       return AST_OP_SUB;
+		case TOK_STAR:        return AST_OP_MUL;
+		case TOK_SLASH:       return AST_OP_DIV;
+		case TOK_PS:          return AST_OP_MOD;
+		case TOK_OSQBRA:      return AST_OP_ARR;
+		case TOK_DOT:         return AST_OP_FIELD;
+		case TOK_AMP:         return AST_OP_BW_AND;
+		case TOK_PIPE:        return AST_OP_BW_OR;
+		case TOK_XOR:         return AST_OP_BW_XOR;
+		case TOK_LEFT_SHIFT:  return AST_OP_BW_LS;
+		case TOK_RIGHT_SHIFT: return AST_OP_BW_RS;
 		default: UNREACHABLE;
 	}
 }
@@ -316,6 +328,7 @@ AST_ExprOp tok_to_unary_expr_op(Token *tok) {
 		case TOK_AMP:    return AST_OP_REF;
 		case TOK_EXC:    return AST_OP_NOT;
 		case TOK_MINUS:  return AST_OP_NEG;
+		case TOK_TILDA:  return AST_OP_BW_NOT;
 		default:
 			lexer_error(tok->loc, "error: wrong operation");
 			return 0;
@@ -469,7 +482,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				}
 				break;
 
-			case TOK_EXC: case TOK_AMP:
+			case TOK_EXC: case TOK_TILDA:
 				da_append(&nodes, ast_new({
 					.kind = AST_UN_EXP,
 					.loc = parser_peek(p)->loc,
@@ -491,6 +504,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				p->cur_token--;
 				break;
 
+			case TOK_LEFT_SHIFT:
+			case TOK_RIGHT_SHIFT:
 			case TOK_PLUS_EQ: case TOK_MINUS_EQ:
 			case TOK_STAR_EQ: case TOK_SLASH_EQ:
 			case TOK_NOT_EQ:  case TOK_OR:
@@ -499,7 +514,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			case TOK_EQ_EQ:   case TOK_AND:
 			case TOK_PLUS:    case TOK_SLASH:
 			case TOK_EQ:      case TOK_PS:
-			case TOK_DOT: {
+			case TOK_DOT:     case TOK_PIPE:
+			case TOK_XOR: {
 				da_append(&nodes, ast_new({
 					.kind = AST_BIN_EXP,
 					.loc = parser_peek(p)->loc,
@@ -509,6 +525,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				}));
 			} break;
 
+			case TOK_AMP:
 			case TOK_STAR: case TOK_MINUS: {
 				bool is_unary_op = false;
 				if (nodes.count == 0) {
