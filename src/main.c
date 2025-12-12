@@ -201,18 +201,17 @@ int main(int argc, char **argv) {
 					"gcc -no-pie -o \"%s\" %s.o %s %s",
 					output_bin, output_bin, obj_files, link_dynamically);
 				systemf("rm %s.o", output_bin);
+				if (!save_asm_output) systemf("rm %s", output_file);
 			} break;
 			case TP_WINDOWS: {
 				systemf(
 					"gcc -no-pie -o \"%s\" %s.obj %s %s",
 					output_bin, output_bin, obj_files, link_dynamically);
 				systemf("del /F /Q %s.obj", output_bin);
+				if (!save_asm_output) systemf("del /F /Q %s", output_file);
 			} break;
 		}
 	}
-
-	if (!save_asm_output)
-		systemf("rm %s", output_file);
 
 	return 0;
 }

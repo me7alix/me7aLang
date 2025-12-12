@@ -85,9 +85,7 @@ void get_folder(char *dst, const char *file) {
 		size_t len = slash - file;
 		memcpy(dst, file, len);
 		dst[len] = '\0';
-	} else {
-		dst[0] = '\0';
-	}
+	} else dst[0] = '\0';
 }
 
 bool insert_macro(Lexer *entry, size_t *cur_tok) {
