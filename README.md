@@ -18,12 +18,12 @@ cd me7aLang
 
 2. Build the compiler:
 ```bash
-make
+make release -B
 ```
 
 3. Compile and run an example:
 ```bash
-./build/metc -o ./build/fib ./examples/fib.m7
+./build/release/metc -o ./build/fib ./examples/fib.m7
 ./build/fib
 ```
 
