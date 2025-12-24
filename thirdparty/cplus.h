@@ -1,8 +1,5 @@
-#ifndef _CP_H_
-#define _CP_H_
-
-#include <stdio.h>
-#include <string.h>
+#ifndef CP_H_
+#define CP_H_
 
 #ifndef CP_DA_INIT_CAP
 #define CP_DA_INIT_CAP 256
@@ -10,6 +7,10 @@
 
 #ifndef CP_HT_INIT_CAP
 #define CP_HT_INIT_CAP 128
+#endif
+
+#ifndef CP_ARENA_INIT_CAP
+#define CP_ARENA_INIT_CAP (8*1024)
 #endif
 
 #ifndef CP_REALLOC
@@ -27,9 +28,14 @@
 #define CP_FREE free
 #endif
 
-#ifndef CP_MEMMOVE
+#ifndef CP_MEMCPY
 #include <string.h>
-#define CP_MEMMOVE memmove
+#define CP_MEMCPY memcpy
+#endif
+
+#ifndef CP_STRLEN
+#include <string.h>
+#define CP_STRLEN strlen
 #endif
 
 #ifndef _CP_RUNTIME_CHECKS
@@ -120,7 +126,7 @@
         CP_ASSERT(_idx <= _old); \
         da_reserve((da), _old + 1); \
         if (_idx < _old) { \
-            CP_MEMMOVE((da)->items + _idx + 1, \
+            CP_MEMCPY((da)->items + _idx + 1, \
                        (da)->items + _idx, \
                        sizeof *(da)->items * (_old - _idx)); \
         } \
@@ -141,6 +147,9 @@
         da_shrink(da); \
     } while (0)
 
+#define da_reset(da) \
+    do { (da)->count = 0; } while (0)
+
 #define da_remove_unordered(da, index) \
     do { \
         da_get(da, (index)) = da_last(da); \
@@ -150,7 +159,7 @@
 #define da_remove_ordered(da, index) \
     do { \
         da_get(da, index) = da_last(da); \
-        CP_MEMMOVE((da)->items+(index), (da)->items+(index)+1, \
+        CP_MEMCPY((da)->items+(index), (da)->items+(index)+1, \
                 sizeof(*(da)->items)*((da)->count-index)); \
         (da)->count--; \
     } while (0)
@@ -173,7 +182,7 @@
     do { \
         CP_ASSERT(new_items); \
         da_reserve((da), (da)->count + (new_items_count)); \
-        CP_MEMMOVE((da)->items + (da)->count, (new_items), (new_items_count)*sizeof(*(da)->items)); \
+        CP_MEMCPY((da)->items + (da)->count, (new_items), (new_items_count)*sizeof(*(da)->items)); \
         (da)->count += (new_items_count); \
     } while (0)
 
@@ -341,6 +350,7 @@ int ht_type##_compare(key_type a, key_type b) { \
 /* String builder */
 
 #include <stdarg.h>
+#include <stdio.h>
 
 typedef DA(char) StringBuilder;
 
@@ -362,7 +372,32 @@ static inline int sb_appendf(StringBuilder *sb, const char *fmt, ...) {
 }
 
 #define sb_append(sb, c) da_append(sb, c)
-#define sb_reset(sb)     da_resize(sb, 0)
+#define sb_reset(sb)     da_reset(sb)
 #define sb_free(sb)      da_free(sb)
 
-#endif // _CP_H_
+/* Arena allocator */
+
+typedef DA(u8) Arena;
+
+static void *arena_alloc(Arena *arena, size_t size) {
+    if (size == 0) return NULL;
+    if (arena->capacity == 0) da_reserve(arena, CP_ARENA_INIT_CAP);
+    da_reserve(arena, arena->count + size);
+    arena->count += size;
+    return arena->items + arena->count - size;
+}
+
+static void *arena_memdup(Arena *arena, void *p, size_t size) {
+    void *duped_mem = arena_alloc(arena, size);
+    CP_MEMCPY(duped_mem, p, size);
+    return duped_mem;
+}
+
+static char *arena_strdup(Arena *arena, char *str) {
+    return (char *) arena_memdup(arena, str, CP_STRLEN(str) + 1);
+}
+
+#define arena_free(ar)  da_free(ar)
+#define arena_reset(ar) da_reset(ar)
+
+#endif // CP_H_
