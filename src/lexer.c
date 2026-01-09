@@ -6,21 +6,21 @@
 
 #include "../include/lexer.h"
 
-char *get_word(Lexer *lexer) {
-	while (*lexer->cur_char == ' ')
-		lexer->cur_char++;
-
+char *get_id(Lexer *lexer) {
 	char *start = lexer->cur_char;
+
 	while (isalpha(*lexer->cur_char) ||
 		isdigit(*lexer->cur_char) ||
 		*lexer->cur_char == '_')
 		lexer->cur_char++;
 	lexer->cur_char--;
 
-	size_t l = lexer->cur_char - start + 1;
-	char *word = malloc(sizeof(char) * (l+1));
-	memcpy(word, start, l);
-	word[l] = '\0';
+	size_t len = lexer->cur_char - start + 1;
+
+	char *word = malloc(sizeof(char) * (len+1));
+	memcpy(word, start, len);
+	word[len] = '\0';
+
 	return word;
 }
 
@@ -298,9 +298,10 @@ Lexer lexer_lex(char *file, char *code) {
 				} else if (is_tok(&lexer, "sizeof",  TOK_SIZEOF, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "return",  TOK_RET, lexer.cur_char)) {
 				} else if (is_tok(&lexer, "import",  TOK_IMPORT, lexer.cur_char)) {
-				} else if (is_tok(&lexer, "fn",      TOK_FUNC, lexer.cur_char)) {
-				} else if (isalpha(*lexer.cur_char)) add_token(&lexer, TOK_ID, get_word(&lexer));
+				} else if (is_tok(&lexer, "fn",      TOK_FUNC, lexer.cur_char)) {}
 
+				else if (isalpha(*lexer.cur_char) || *lexer.cur_char == '_')
+					add_token(&lexer, TOK_ID, get_id(&lexer));
 				else lexer_error(lexer.cur_loc, "error: unknown token");
 			} break;
 		}

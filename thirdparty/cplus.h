@@ -28,9 +28,9 @@
 #define CP_FREE free
 #endif
 
-#ifndef CP_MEMCPY
+#ifndef CP_MEMMOVE
 #include <string.h>
-#define CP_MEMCPY memcpy
+#define CP_MEMMOVE memmove
 #endif
 
 #ifndef CP_STRLEN
@@ -56,10 +56,10 @@
 #ifndef CP_INT_DEFINED
     typedef unsigned int uint;
     #ifdef CP_USE_INT /* optional for any system that might not have stdint.h */
-        typedef unsigned char       u8;
-        typedef signed char         i8;
+        typedef unsigned char      u8;
+        typedef signed char        i8;
         typedef unsigned short     u16;
-        typedef signed short        i16;
+        typedef signed short       i16;
         typedef unsigned long int  u32;
         typedef signed long int    i32;
         typedef unsigned long long u64;
@@ -126,7 +126,7 @@
         CP_ASSERT(_idx <= _old); \
         da_reserve((da), _old + 1); \
         if (_idx < _old) { \
-            CP_MEMCPY((da)->items + _idx + 1, \
+            CP_MEMMOVE((da)->items + _idx + 1, \
                        (da)->items + _idx, \
                        sizeof *(da)->items * (_old - _idx)); \
         } \
@@ -159,7 +159,7 @@
 #define da_remove_ordered(da, index) \
     do { \
         da_get(da, index) = da_last(da); \
-        CP_MEMCPY((da)->items+(index), (da)->items+(index)+1, \
+        CP_MEMMOVE((da)->items+(index), (da)->items+(index)+1, \
                 sizeof(*(da)->items)*((da)->count-index)); \
         (da)->count--; \
     } while (0)
@@ -182,7 +182,7 @@
     do { \
         CP_ASSERT(new_items); \
         da_reserve((da), (da)->count + (new_items_count)); \
-        CP_MEMCPY((da)->items + (da)->count, (new_items), (new_items_count)*sizeof(*(da)->items)); \
+        CP_MEMMOVE((da)->items + (da)->count, (new_items), (new_items_count)*sizeof(*(da)->items)); \
         (da)->count += (new_items_count); \
     } while (0)
 
@@ -377,19 +377,48 @@ static inline int sb_appendf(StringBuilder *sb, const char *fmt, ...) {
 
 /* Arena allocator */
 
-typedef DA(u8) Arena;
+#define CP_ALIGN_UP(x, a) (((x) + ((a) - 1)) & ~((a) - 1))
 
-static void *arena_alloc(Arena *arena, size_t size) {
-    if (size == 0) return NULL;
-    if (arena->capacity == 0) da_reserve(arena, CP_ARENA_INIT_CAP);
-    da_reserve(arena, arena->count + size);
-    arena->count += size;
-    return arena->items + arena->count - size;
+typedef struct {
+	DA(u8) buf;
+	void *last_ptr;
+	size_t last_sz;
+} Arena;
+
+static void *arena_alloc(Arena *a, size_t size) {
+    size = CP_ALIGN_UP(size, sizeof(void*));
+
+    if (a->buf.count == 0)
+        da_reserve(&a->buf, CP_ARENA_INIT_CAP);
+
+    da_reserve(&a->buf, a->buf.count + size);
+    void *p = a->buf.items + a->buf.count;
+    a->buf.count += size;
+
+    a->last_ptr = p;
+    a->last_sz  = size;
+    return p;
+}
+
+static void *arena_realloc(Arena *a, void *oldptr, size_t oldsz, size_t newsz) {
+    if (newsz <= oldsz) return oldptr;
+
+    if (oldptr == a->last_ptr) {
+        size_t extra = newsz - oldsz;
+        da_reserve(&a->buf, a->buf.count + extra);
+        a->buf.count += extra;
+        a->last_sz = newsz;
+        return oldptr;
+    }
+
+    void *newptr = arena_alloc(a, newsz);
+    memcpy(newptr, oldptr, oldsz);
+    return newptr;
 }
 
 static void *arena_memdup(Arena *arena, void *p, size_t size) {
     void *duped_mem = arena_alloc(arena, size);
-    CP_MEMCPY(duped_mem, p, size);
+    CP_MEMMOVE(duped_mem, p, size);
     return duped_mem;
 }
 
@@ -397,7 +426,7 @@ static char *arena_strdup(Arena *arena, char *str) {
     return (char *) arena_memdup(arena, str, CP_STRLEN(str) + 1);
 }
 
-#define arena_free(ar)  da_free(ar)
-#define arena_reset(ar) da_reset(ar)
+#define arena_free(ar)  da_free((ar)->buf)
+#define arena_reset(ar) da_reset((ar)->buf)
 
 #endif // CP_H_
