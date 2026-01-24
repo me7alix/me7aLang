@@ -23,7 +23,7 @@ make release -B
 
 3. Compile and run an example:
 ```bash
-./build/release/metc -o ./build/fib ./examples/fib.m7
+./build/release/m7c -o ./build/fib ./examples/fib.m7
 ./build/fib
 ```
 

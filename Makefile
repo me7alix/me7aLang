@@ -17,8 +17,8 @@ endif
 
 DEBUG_DIR := build/debug
 RELEASE_DIR := build/release
-OUT_DEBUG := $(DEBUG_DIR)/metc$(EXE)
-OUT_RELEASE := $(RELEASE_DIR)/metc$(EXE)
+OUT_DEBUG := $(DEBUG_DIR)/m7c$(EXE)
+OUT_RELEASE := $(RELEASE_DIR)/m7c$(EXE)
 
 ifeq ($(OS),Windows_NT)
 ifdef COMSPEC
