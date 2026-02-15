@@ -1,7 +1,7 @@
 import "raylib.m7"
 
-#SCREEN_WIDTH  800
-#SCREEN_HEIGHT 600
+def SCREEN_WIDTH  800
+def SCREEN_HEIGHT 600
 
 fn main() {
 	rl_init_window(SCREEN_WIDTH, SCREEN_HEIGHT, "Ping pong")

@@ -1,9 +1,9 @@
 import "std.m7"
 import "raylib.m7"
 
-#MAP_W 20
-#MAP_H 20
-#TILE  30
+def MAP_W 20
+def MAP_H 20
+def TILE  30
 
 struct Point {
 	x: int,
