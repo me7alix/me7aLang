@@ -1,16 +1,12 @@
-#ifndef CP_H_
-#define CP_H_
+#ifndef CPLUS_H_
+#define CPLUS_H_
 
 #ifndef CP_DA_INIT_CAP
 #define CP_DA_INIT_CAP 256
 #endif
 
 #ifndef CP_HT_INIT_CAP
-#define CP_HT_INIT_CAP 128
-#endif
-
-#ifndef CP_ARENA_INIT_CAP
-#define CP_ARENA_INIT_CAP (8*1024)
+#define CP_HT_INIT_CAP 256
 #endif
 
 #ifndef CP_REALLOC
@@ -53,6 +49,10 @@
 #define CP_DECLTYPE_CAST(T)
 #endif // __cplusplus
 
+#ifndef ARR_LEN
+#define ARR_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
+#endif
+
 #ifndef CP_INT_DEFINED
     typedef unsigned int uint;
     #ifdef CP_USE_INT /* optional for any system that might not have stdint.h */
@@ -77,10 +77,6 @@
         typedef int64_t  i64;
     #endif
     #define CP_INT_DEFINED
-#endif
-
-#ifndef ARR_LEN
-#define ARR_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
 #endif
 
 /* Dynamic array */
@@ -199,7 +195,7 @@
         size_t count; \
         size_t capacity; \
     } ht_type; \
-    u64 ht_type##_hashf(key_type key); \
+    u32 ht_type##_hashf(key_type key); \
     int ht_type##_compare(key_type a, key_type b); \
     void ht_type##_add(ht_type *ht, key_type key, value_type val); \
     value_type *ht_type##_get(ht_type *ht, key_type key); \
@@ -207,7 +203,7 @@
     void ht_type##_free(ht_type *ht);
 
 #define HT_IMPL(ht_type, key_type, value_type) \
-extern u64 ht_type##_hashf(key_type key); \
+extern u32 ht_type##_hashf(key_type key); \
 extern int ht_type##_compare(key_type a, key_type b); \
 \
 void ht_type##_add(ht_type *ht, key_type key, value_type val) { \
@@ -225,9 +221,7 @@ void ht_type##_add(ht_type *ht, key_type key, value_type val) { \
         cur = cur->next; \
     } \
     ht_type##_node *n = (ht_type##_node*) CP_CALLOC(1, sizeof(ht_type##_node)); \
-    n->key = key; \
-    n->val = val; \
-    n->next = ht->arr[idx]; \
+    *n = (ht_type##_node) {key, val, ht->arr[idx]}; \
     ht->arr[idx] = n; \
     ht->count++; \
     if (ht->count > ht->capacity * 2) { \
@@ -298,25 +292,25 @@ void ht_type##_free(ht_type *ht) { \
     HT_DECL(ht_type, key_type, value_type) \
     HT_IMPL(ht_type, key_type, value_type)
 
-#define ht_foreach_node(ht_type, ht, nodevar) \
+#define ht_foreach_node(ht_type, nodevar, ht) \
     for (size_t _ht_idx = 0; (ht)->capacity && _ht_idx < (ht)->capacity; ++_ht_idx) \
         for (ht_type##_node *nodevar = (ht)->arr[_ht_idx]; nodevar; nodevar = nodevar->next)
 
-static inline u64 strhash(char *str) {
-    u64 h = 14695981039346656037ULL;
+static inline u32 strhash(char *str) {
+    u32 h = 1144290428;
     u8 *p = (u8*)(str);
     while (*p) {
-        h ^= (u64)(*p++);
-        h *= 1099511628211ULL;
+        h ^= (u32)(*p++);
+        h *= 2070933403;
     }
     return h;
 }
 
 #define numhash(num) \
-    ((u64)((u64)6364136223846793005ULL * (u64)(num) + 1442695040888963407ULL))
+    ((u32)((u32)1462847356 * (u32)(num) + 1550508858))
 
 #define hash_combine(h1, h2) \
-    h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2))
+    h1 ^ (h2 + 581019932 + (h1 << 3) + (h1 >> 2))
 
 #define HT_DECL_STR(ht_type, value_type) \
     HT_DECL(ht_type, char*, value_type)
@@ -324,7 +318,7 @@ static inline u64 strhash(char *str) {
 #define HT_IMPL_STR(ht_type, value_type) \
 HT_IMPL(ht_type, char*, value_type) \
 \
-u64 ht_type##_hashf(char* s) { \
+u32 ht_type##_hashf(char* s) { \
     return strhash(s); \
 } \
 \
@@ -339,7 +333,7 @@ int ht_type##_compare(char* a, char* b) { \
 #define HT_IMPL_NUM(ht_type, key_type, value_type) \
 HT_IMPL(ht_type, key_type, value_type) \
 \
-u64 ht_type##_hashf(key_type num) { \
+u32 ht_type##_hashf(key_type num) { \
     return numhash(num); \
 } \
 \
@@ -375,58 +369,4 @@ static inline int sb_appendf(StringBuilder *sb, const char *fmt, ...) {
 #define sb_reset(sb)     da_reset(sb)
 #define sb_free(sb)      da_free(sb)
 
-/* Arena allocator */
-
-#define CP_ALIGN_UP(x, a) (((x) + ((a) - 1)) & ~((a) - 1))
-
-typedef struct {
-	DA(u8) buf;
-	void *last_ptr;
-	size_t last_sz;
-} Arena;
-
-static void *arena_alloc(Arena *a, size_t size) {
-    size = CP_ALIGN_UP(size, sizeof(void*));
-
-    if (a->buf.count == 0)
-        da_reserve(&a->buf, CP_ARENA_INIT_CAP);
-
-    da_reserve(&a->buf, a->buf.count + size);
-    void *p = a->buf.items + a->buf.count;
-    a->buf.count += size;
-
-    a->last_ptr = p;
-    a->last_sz  = size;
-    return p;
-}
-
-static void *arena_realloc(Arena *a, void *oldptr, size_t oldsz, size_t newsz) {
-    if (newsz <= oldsz) return oldptr;
-
-    if (oldptr == a->last_ptr) {
-        size_t extra = newsz - oldsz;
-        da_reserve(&a->buf, a->buf.count + extra);
-        a->buf.count += extra;
-        a->last_sz = newsz;
-        return oldptr;
-    }
-
-    void *newptr = arena_alloc(a, newsz);
-    memcpy(newptr, oldptr, oldsz);
-    return newptr;
-}
-
-static void *arena_memdup(Arena *arena, void *p, size_t size) {
-    void *duped_mem = arena_alloc(arena, size);
-    CP_MEMMOVE(duped_mem, p, size);
-    return duped_mem;
-}
-
-static char *arena_strdup(Arena *arena, char *str) {
-    return (char *) arena_memdup(arena, str, CP_STRLEN(str) + 1);
-}
-
-#define arena_free(ar)  da_free((ar)->buf)
-#define arena_reset(ar) da_reset((ar)->buf)
-
-#endif // CP_H_
+#endif // CPLUS_H_

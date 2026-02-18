@@ -37,7 +37,7 @@ int pathcmp(const char *a, const char *b) {
 #endif
 }
 
-u64 ImportedTable_hashf(char *str) {
+u32 ImportedTable_hashf(char *str) {
 	char real_path[512];
 #if defined(_WIN32)
 	#include <windows.h>

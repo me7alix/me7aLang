@@ -686,7 +686,7 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 	TAC_Program prog = {0};
 	label_id = 0;
 
-	ht_foreach_node(SymbolTable, &p->st, n) {
+	ht_foreach_node(SymbolTable, n, &p->st) {
 		if (n->key.type == SBL_FUNC_EXTERN) {
 			da_append(&prog.externs, ((TAC_Extern){
 				.name = n->val.func_extern.extern_smb,

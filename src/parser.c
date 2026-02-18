@@ -33,7 +33,7 @@ void set_nested(int pn[16], int n[16]) {
 HT_IMPL_STR(UserTypes, UserType)
 HT_IMPL(SymbolTable, SymbolKey, Symbol)
 
-u64 SymbolTable_hashf(SymbolKey key) {
+u32 SymbolTable_hashf(SymbolKey key) {
 	return hash_combine(strhash(key.id), numhash(key.type));
 }
 
