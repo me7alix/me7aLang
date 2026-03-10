@@ -40,17 +40,32 @@ struct Type {
 	};
 };
 
-typedef  struct {
-	Type type;
-	char *id;
-} Field;
+typedef struct AST_Node AST_Node;
 
-struct UserType {
-	TypeKind kind;
+typedef struct {
+	enum {
+		STMEM_FIELD,
+		STMEM_METHOD,
+	} kind;
 
 	union {
 		struct {
-			DA(Field) fields;
+			Type type;
+			char *id;
+		} field;
+		struct {
+			AST_Node *func;
+		} method;
+	} as;
+} StructMember;
+
+struct UserType {
+	TypeKind kind;
+	char *id;
+
+	union {
+		struct {
+			DA(StructMember) members;
 		} ustruct;
 	};
 };

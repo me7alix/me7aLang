@@ -70,8 +70,11 @@ uint get_type_size(Type type) {
 		default: return 1 << get_reg_row(type);
 		case TYPE_STRUCT: {
 			uint total = 0;
-			da_foreach (Field, field, &type.user->ustruct.fields)
-				total += get_type_size(field->type);
+			da_foreach (StructMember, member, &type.user->ustruct.members) {
+				if (member->kind == STMEM_FIELD) {
+					total += get_type_size(member->as.field.type);
+				}
+			}
 			return total;
 		} break;
 	}
@@ -83,12 +86,14 @@ uint get_struct_alignment(TAC_Operand var) {
 
 	for (size_t i = 0; i < var.var.fields.count; i++) {
 		char *off = da_get(&var.var.fields, i);
-		da_foreach (Field, field, &var.var.type.user->ustruct.fields) {
-			total += get_type_size(field->type);
-			if (strcmp(field->id, off) == 0) {
-				var.var.type = field->type;
-				total -= get_type_size(field->type);
-				break;
+		da_foreach (StructMember, member, &var.var.type.user->ustruct.members) {
+			if (member->kind == STMEM_FIELD) {
+				total += get_type_size(member->as.field.type);
+				if (strcmp(member->as.field.id, off) == 0) {
+					var.var.type = member->as.field.type;
+					total -= get_type_size(member->as.field.type);
+					break;
+				}
 			}
 		}
 	}
@@ -123,22 +128,22 @@ char *opr_to_nasm(TAC_Operand opr) {
 		} break;
 
 		case OPR_VAR: {
+			uint field_off = get_struct_alignment(opr);
 			char ts[32]; opr_type_to_stack(opr, ts);
+
 			if (opr.var.kind == VAR_STACK) {
 				uint off = *OffTable_get(&stack_table, opr.var.addr_id);
-				sprintf(rbuf, "%s [rbp - %u]", ts, off - get_struct_alignment(opr));
+				sprintf(rbuf, "%s [rbp - %u]", ts, off - field_off);
 			} else if (opr.var.kind == VAR_ADDR) {
 				if (opr.var.addr_kind == VAR_STACK) {
 					uint off = *OffTable_get(&stack_table, opr.var.addr_id);
 					sb_appendf(&body, "    mov rax, qword [rbp - %u]\n", off);
-					sprintf(rbuf, "%s [rax + %u]", ts, get_struct_alignment(opr));
+					sprintf(rbuf, "%s [rax + %u]", ts, field_off);
 				} else if (opr.var.addr_kind == VAR_DATA) {
-					uint field_off = get_struct_alignment(opr);
 					sb_appendf(&body, "    lea rax, [rel D%u + %lu]\n", opr.var.addr_id, field_off);
 					sprintf(rbuf, "%s [rax]", ts);
 				} else UNREACHABLE;
 			} else if (opr.var.kind == VAR_DATA) {
-				uint field_off = get_struct_alignment(opr);
 				sprintf(rbuf, "%s [rel D%u + %u]", ts, opr.var.addr_id, field_off);
 			}
 		} break;
@@ -553,19 +558,23 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				char ts[32]; opr_type_to_stack(ci.dst, ts);
 				total_offset_add(get_type_size(ci.dst.var.type));
 				OffTable_add(&stack_table, ci.dst.var.addr_id, total_offset);
+				size_t field_off = get_struct_alignment(ci.arg1);
 
 				if (ci.arg1.var.kind == VAR_ADDR) {
 					if (ci.arg1.var.addr_kind == VAR_STACK) {
 						uint off = *OffTable_get(&stack_table, ci.arg1.var.addr_id);
 						sb_appendf(&body, "    mov rax, [rbp - %u]\n", off);
+						sb_appendf(&body, "    add rax, %zu\n", field_off);
 					} else if (ci.arg1.var.addr_kind == VAR_DATA) {
 						sb_appendf(&body, "    lea rax, [rel D%u]\n", ci.arg1.var.addr_id);
+						sb_appendf(&body, "    add rax, %zu\n", field_off);
 					}
 				} else if (ci.arg1.var.kind == VAR_STACK) {
 					uint off = *OffTable_get(&stack_table, ci.arg1.var.addr_id);
-					sb_appendf(&body, "    lea rax, [rbp - %u]\n", off);
+					sb_appendf(&body, "    lea rax, [rbp - %u]\n", off - field_off);
 				} else if (ci.arg1.var.kind == VAR_DATA) {
 					sb_appendf(&body, "    lea rax, [rel D%u]\n", ci.arg1.var.addr_id);
+					sb_appendf(&body, "    add rax, %zu\n", field_off);
 				}
 
 				sprintf(dst, "%s", opr_to_nasm(ci.dst));

@@ -1,19 +1,28 @@
 import "std.m7"
 
 struct Address {
-	city: *i8,
-	post_code: int,
+	city:      *i8
+	post_code: int
+
+	fn print(a: int) {
+		printf("%s [%d]\n", self.city, self.post_code)
+	}
 }
 
 struct Person {
-	name: *i8,
-	salary: int,
-	addr: Address,
-}
+	name:   *i8
+	salary: int
+	addr:   Address
 
-fn person_print(p: *Person) {
-	printf("Name: %s\nSalary: %d\nCity: %s\nPost code: %d\n",
-		(*p).name, (*p).salary, (*p).addr.city, (*p).addr.post_code)
+	fn print() {
+		printf(
+			"Name: %s\nSalary: %d\n",
+			self.name, self.salary,
+		)
+
+		printf("Address: ")
+		self.addr.print(3)
+	}
 }
 
 fn main() {
@@ -22,5 +31,5 @@ fn main() {
 	me.salary = 777
 	me.addr.city = "New York"
 	me.addr.post_code = 100101
-	person_print(&me)
+	me.print()
 }

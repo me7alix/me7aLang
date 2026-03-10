@@ -6,7 +6,8 @@
 #include "../include/tac_ir.h"
 
 char *tac_ir_dump_opr_type(TAC_Operand op) {
-	switch (tac_ir_get_opr_type(op).kind) {
+	Type type = tac_ir_get_opr_type(op);
+	switch (type.kind) {
 		case TYPE_INT:    return "int";
 		case TYPE_UINT:   return "uint";
 		case TYPE_I32:    return "i32";
@@ -21,7 +22,10 @@ char *tac_ir_dump_opr_type(TAC_Operand op) {
 		case TYPE_IPTR:   return "iptr";
 		case TYPE_POINTER:
 		case TYPE_ARRAY:  return "ptr";
-		case TYPE_STRUCT: return "struct";
+		case TYPE_STRUCT:
+			char *ns = malloc(256);
+			sprintf(ns, "struct<%s>", type.user->id);
+			return ns;
 		default:          return "ERR";
 	}
 }
@@ -47,6 +51,18 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 				case VAR_DATA:
 					sprintf(buf, "{%u}:%s", opr.var.addr_id, tac_ir_dump_opr_type(opr));
 					break;
+			}
+
+			if (opr.var.fields.count > 0) {
+				char scnd[256];
+				strcpy(scnd, buf);
+
+				StringBuilder fields = {0};
+				da_foreach (char*, field, &opr.var.fields) {
+					sb_appendf(&fields, ".%s", *field);
+				}
+
+				sprintf(buf, "%s|%s", scnd, fields.items);
 			}
 		} break;
 

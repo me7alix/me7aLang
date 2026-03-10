@@ -196,6 +196,7 @@ Lexer lexer_lex(char *file, char *code) {
 			case '\r':
 			case '\n': {
 				switch (da_last(&l.tokens).kind) {
+					case TOK_OPAR: case TOK_DOT:
 					case TOK_SEMI: case TOK_CBRA:
 					case TOK_OBRA: case TOK_COM: break;
 					default: add_token(&l, TOK_SEMI, ";");

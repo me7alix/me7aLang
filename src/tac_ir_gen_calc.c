@@ -4,11 +4,30 @@ bool tac_ir_opr_calc(AST_Node *en, TAC_Operand l, TAC_Operand r, TAC_Operand *re
 	i64 res;
 
 	if (en->kind == AST_BIN_EXP) {
-		if (!(l.kind == OPR_LITERAL && r.kind == OPR_LITERAL))
+		if (l.kind != OPR_LITERAL || r.kind != OPR_LITERAL)
 			return false;
 
 		if (l.literal.type.kind != r.literal.type.kind)
 			return false;
+
+		if (l.literal.kind == LIT_STR && en->expr_binary.op == AST_OP_ADD) {
+			size_t len1 = strlen(l.literal.str);
+			size_t len2 = strlen(r.literal.str);
+			char *str = malloc(len1 + len2 + 1);
+			sprintf(str, "%s%s", l.literal.str, r.literal.str);
+			printf(">%s\n", str);
+
+			*ret = (TAC_Operand){
+				.kind = OPR_LITERAL,
+				.literal = {
+					.kind = LIT_STR,
+					.type = l.literal.type,
+					.str = str,
+				},
+			};
+
+			return true;
+		}
 
 		int op = en->expr_binary.op;
 		i64 lv = l.literal.lint;
@@ -25,7 +44,7 @@ bool tac_ir_opr_calc(AST_Node *en, TAC_Operand l, TAC_Operand r, TAC_Operand *re
 				break;
 			default: return false;
 		}
-	} else if (en->kind == AST_BIN_EXP) {
+	} else if (en->kind == AST_UN_EXP) {
 		if (!(l.kind == OPR_LITERAL))
 			return false;
 

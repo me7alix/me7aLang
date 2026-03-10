@@ -83,7 +83,7 @@ typedef enum {
 	AST_STRING, AST_VAR_MUT, AST_FUNC_RET_TYPE,
 	AST_FOR_STMT, AST_UN_OP, AST_BIN_OP, AST_PROG,
 	AST_LOOP_BREAK, AST_LOOP_CONTINUE, AST_UN_EXP,
-	AST_ELSE_STMT, AST_FUNC_DEF_ARG_ANY,
+	AST_ELSE_STMT, AST_FUNC_DEF_ARG_ANY, AST_METHOD_CALL,
 } AST_NodeKind;
 
 typedef struct AST_Node AST_Node;
@@ -108,6 +108,12 @@ struct AST_Node {
 			AST_Nodes args;
 			Type type;
 		} func_call;
+		struct {
+			char *id;
+			char *struct_name;
+			AST_Nodes args;
+			Type type;
+		} method_call;
 		struct {
 			AST_Nodes stmts;
 		} body;
@@ -203,6 +209,7 @@ typedef struct {
 void parser_symbol_table_add(Parser *p, SymbolType st, char *id, Symbol smbl);
 Symbol *parser_symbol_table_get(Parser *p, SymbolType st, char *id);
 
+Type parser_get_type(Parser *p, AST_Node *n);
 Type parse_type(Parser *parser);
 Type parser_get_type(Parser *p, AST_Node *n);
 bool compare_types(Type a, Type b);
@@ -213,12 +220,16 @@ Token *parser_next(Parser *p);
 
 long long parse_int(char *data);
 Symbol *st_get(SymbolTable *st, const char *id);
-void expect_token(Token *token, TokenKind type);
+
+#define expect_token(tok, kind) \
+	expect_token_f(tok, kind, #kind)
+void expect_token_f(Token *token, TokenKind type, char *ts);
+
 Parser parser_parse(Token *tokens);
 void parser_free(Parser parser);
-void expect_token(Token *token, TokenKind type);
 AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart);
 AST_Node *parse_func_call(Parser *parser);
+AST_Node *parse_method_call(Parser *parser);
 AST_Node *ast_alloc(AST_Node node);
 
 #define UNREACHABLE do { fprintf(stderr, "%s:%d: unreachable\n", __FILE__, __LINE__); exit(1); } while(0)

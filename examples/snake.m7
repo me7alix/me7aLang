@@ -7,8 +7,8 @@ def MAP_HEIGHT 20
 def MAP_SIZE   (MAP_WIDTH * MAP_HEIGHT)
 
 struct Vec2 {
-	x: int,
-	y: int,
+	x: int
+	y: int
 }
 
 snake:     [MAP_SIZE]Vec2
