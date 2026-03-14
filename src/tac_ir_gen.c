@@ -600,7 +600,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 			} break;
 
 			case AST_LOOP_BREAK:
-				if (ctx->loop_gen <= 0) lexer_error(cn->loc, "error: break outside of a loop");
+				if (ctx->loop_gen <= 0) throw_error(cn->loc, "break outside of a loop");
 				da_append(&func->body, ((TAC_Instruction){
 					.op = OP_JUMP,
 					.dst = (TAC_Operand) {
@@ -611,7 +611,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 				break;
 
 			case AST_LOOP_CONTINUE:
-				if (ctx->loop_gen <= 0) lexer_error(cn->loc, "error: continue outside of a loop");
+				if (ctx->loop_gen <= 0) throw_error(cn->loc, "continue outside of a loop");
 				if (ctx->for_var_mut) tac_ir_gen_var_mut(prog, func, ctx->for_var_mut);
 				da_append(&func->body, ((TAC_Instruction){
 					.op = OP_JUMP,

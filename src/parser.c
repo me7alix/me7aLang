@@ -79,14 +79,14 @@ long long calc_arr_len(AST_Node *e) {
 	switch (e->kind) {
 	case AST_LITERAL: {
 		if (e->literal.kind != LIT_INT)
-			lexer_error(e->loc, "error: expected integer literal");
+			throw_error(e->loc, "expected integer literal");
 		return e->literal.lint;
 	} break;
 
 	case AST_UN_EXP: {
 		switch (e->expr_unary.op) {
 			case AST_OP_NEG: return -calc_arr_len(e->expr_unary.v);
-			default: lexer_error(e->loc, "error: invalid unary operator in array size");
+			default: throw_error(e->loc, "invalid unary operator in array size");
 		}
 	} break;
 
@@ -98,12 +98,12 @@ long long calc_arr_len(AST_Node *e) {
 			case AST_OP_SUB: return le - re;
 			case AST_OP_MUL: return le * re;
 			case AST_OP_DIV: return le / re;
-			default: lexer_error(e->loc, "error: invalid binary operator in array size");
+			default: throw_error(e->loc, "invalid binary operator in array size");
 		}
 	} break;
 
 	default:
-		lexer_error(e->loc, "error: wrong expression");
+		throw_error(e->loc, "wrong expression");
 	}
 
 	return 0;
@@ -131,9 +131,10 @@ Type parse_type(Parser *p) {
 		long long calculatedArrLen = calc_arr_len(arrLenExpr);
 
 		if (calculatedArrLen <= 0)
-			lexer_error(arrLenExpr->loc, "error: array size must be greater than zero");
+			throw_error(arrLenExpr->loc, "array size must be greater than zero");
 		arrLen = calculatedArrLen;
 	}
+
 
 	char *tn = parser_peek(p)->data;
 	if      (!strcmp(tn, "int"))   type.kind = TYPE_INT;
@@ -154,7 +155,7 @@ Type parse_type(Parser *p) {
 		if (utype) {
 			type.kind = utype->kind;
 			type.user = utype;
-		} else lexer_error(loc, "error: no such type");
+		} else throw_error(loc, "no such type");
 	}
 
 	if (isPtr) {
@@ -186,8 +187,8 @@ AST_Node *ast_alloc(AST_Node node) {
 void expect_token_f(Token *token, TokenKind type, char *ts) {
 	if (token->kind == type) return;
 
-	char err[256]; sprintf(err, "error: %s expected", ts);
-	lexer_error(token->loc, err);
+	char err[256]; sprintf(err, "%s expected", ts);
+	throw_error(token->loc, err);
 }
 
 // Type checking occurs at the analysis stage
@@ -221,7 +222,7 @@ AST_Node *parse_func_call(Parser *p) {
 
 	Symbol *fcf = parser_symbol_table_get(p, SBL_FUNC_DEF,    fcn->func_call.id);
 	Symbol *fce = parser_symbol_table_get(p, SBL_FUNC_EXTERN, fcn->func_call.id);
-	if (!fcf && !fce) lexer_error(fcn->loc, "error: calling an undeclared function");
+	if (!fcf && !fce) throw_error(fcn->loc, "calling an undeclared function");
 
 	AST_Nodes fargs;
 	if (fcf) {
@@ -248,14 +249,14 @@ AST_Node *parse_func_call(Parser *p) {
 
 		if (!met_any) {
 			if (arg_cnt + 1 > fargs.count)
-				lexer_error(fcn->loc, "error: too many arguments");
+				throw_error(fcn->loc, "too many arguments");
 
 			Type farg_type = fargs.items[arg_cnt++]->func_def_arg.type;
 			expr = parse_expr(p, EXPR_PARSING_FUNC_CALL, &farg_type);
 			Type expr_type = parser_get_type(p, expr);
 
 			if (!compare_types(expr_type, farg_type))
-				lexer_error(expr->loc, "error: types mismatching");
+				throw_error(expr->loc, "types mismatching");
 		} else {
 			expr = parse_expr(p, EXPR_PARSING_FUNC_CALL, NULL);
 		}
@@ -265,7 +266,7 @@ AST_Node *parse_func_call(Parser *p) {
 	}
 
 	if (!met_any && !is_next_any && arg_cnt < fargs.count)
-		lexer_error(fcn->loc, "error: not enough arguments");
+		throw_error(fcn->loc, "not enough arguments");
 
 	parser_next(p);
 	return fcn;
@@ -291,7 +292,7 @@ AST_Node *parse_var_def(Parser *p) {
 	}
 
 	if (parser_symbol_table_get(p, SBL_VAR, vdn->var_def.id))
-		lexer_error(vdn->loc, "error: redifinition of the variable");
+		throw_error(vdn->loc, "redifinition of the variable");
 
 	parser_symbol_table_add(p, SBL_VAR, vdn->var_def.id, (Symbol) {
 		.variable.type = type,
@@ -330,7 +331,7 @@ AST_Node *parse_var_assign(Parser *p) {
 
 	assert(vdn->var_def.type.kind);
 	Symbol *vds = parser_symbol_table_get(p, SBL_VAR, vdn->var_def.id);
-	if (vds) lexer_error(vdn->loc, "error: redifinition of the variable");
+	if (vds) throw_error(vdn->loc, "redifinition of the variable");
 	parser_symbol_table_add(p, SBL_VAR, vdn->var_def.id, (Symbol) {
 		.variable.type = vdn->var_def.type,
 	});
@@ -360,12 +361,12 @@ AST_Node *parse_func_return(Parser *p, AST_Node *func) {
 	parser_next(p);
 	if (parser_peek(p)->kind == TOK_SEMI) {
 		if (ret->func_ret.type.kind != TYPE_NULL)
-			lexer_error(ret->loc, "error: you must return something");
+			throw_error(ret->loc, "you must return something");
 		ret->func_ret.type = (Type) {.kind = TYPE_NULL};
 	} else {
 		ret->func_ret.expr = parse_expr(p, EXPR_PARSING_VAR, NULL);
 		if (!compare_types(parser_get_type(p, ret->func_ret.expr), ret->func_ret.type))
-			lexer_error(ret->func_ret.expr->loc, "error: wrong type");
+			throw_error(ret->func_ret.expr->loc, "wrong type");
 	}
 
 	return ret;
@@ -450,42 +451,44 @@ AST_Node *parse_body(Parser *p, AST_Node *func) {
 
 	while (true) {
 		switch (parser_peek(p)->kind) {
-			case TOK_CBRA: goto ex;
-			case TOK_OBRA:
-				da_append(&body->body.stmts, parse_body(p, func));
-				break;
+		case TOK_SEMI: break;
+		case TOK_CBRA: goto ex;
 
-			case TOK_ID: {
-				if ((parser_looknext(p))->kind == TOK_COL)
-					da_append(&body->body.stmts, parse_var_def(p));
-				else if ((parser_looknext(p))->kind == TOK_ASSIGN)
-					da_append(&body->body.stmts, parse_var_assign(p));
-				else if ((parser_looknext(p))->kind == TOK_OPAR)
-					da_append(&body->body.stmts, parse_func_call(p));
-				else da_append(&body->body.stmts, parse_var_mut(p, EXPR_PARSING_VAR));
-			} break;
+		case TOK_OBRA:
+			da_append(&body->body.stmts, parse_body(p, func));
+			break;
 
-			case TOK_BREAK:
-				da_append(&body->body.stmts, ast_new({
-					.kind = AST_LOOP_BREAK,
-					.loc = parser_next(p)->loc,
-				}));
-				expect_token(parser_peek(p), TOK_SEMI);
-				break;
+		case TOK_ID: {
+			if ((parser_looknext(p))->kind == TOK_COL)
+				da_append(&body->body.stmts, parse_var_def(p));
+			else if ((parser_looknext(p))->kind == TOK_ASSIGN)
+				da_append(&body->body.stmts, parse_var_assign(p));
+			else if ((parser_looknext(p))->kind == TOK_OPAR)
+				da_append(&body->body.stmts, parse_func_call(p));
+			else da_append(&body->body.stmts, parse_var_mut(p, EXPR_PARSING_VAR));
+		} break;
 
-			case TOK_CONTINUE:
-				da_append(&body->body.stmts, ast_new({
-					.kind = AST_LOOP_CONTINUE,
-					.loc = parser_next(p)->loc,
-				}));
-				expect_token(parser_peek(p), TOK_SEMI);
-				break;
+		case TOK_BREAK:
+			da_append(&body->body.stmts, ast_new({
+				.kind = AST_LOOP_BREAK,
+				.loc = parser_next(p)->loc,
+			}));
+			expect_token(parser_peek(p), TOK_SEMI);
+			break;
 
-			case TOK_IF_SYM:    da_append(&body->body.stmts, parse_if_stmt(p, func));     break;
-			case TOK_WHILE_SYM: da_append(&body->body.stmts, parse_while_stmt(p, func));  break;
-			case TOK_FOR_SYM:   da_append(&body->body.stmts, parse_for_stmt(p, func));    break;
-			case TOK_RET:       da_append(&body->body.stmts, parse_func_return(p, func)); break;
-			default: da_append(&body->body.stmts, parse_var_mut(p, EXPR_PARSING_VAR));    break;
+		case TOK_CONTINUE:
+			da_append(&body->body.stmts, ast_new({
+				.kind = AST_LOOP_CONTINUE,
+				.loc = parser_next(p)->loc,
+			}));
+			expect_token(parser_peek(p), TOK_SEMI);
+			break;
+
+		case TOK_IF_SYM:    da_append(&body->body.stmts, parse_if_stmt(p, func));     break;
+		case TOK_WHILE_SYM: da_append(&body->body.stmts, parse_while_stmt(p, func));  break;
+		case TOK_FOR_SYM:   da_append(&body->body.stmts, parse_for_stmt(p, func));    break;
+		case TOK_RET:       da_append(&body->body.stmts, parse_func_return(p, func)); break;
+		default: da_append(&body->body.stmts, parse_var_mut(p, EXPR_PARSING_VAR));    break;
 		}
 
 		parser_next(p);
@@ -544,7 +547,7 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 
 	char *pref = "method";
 	if (strncmp(pref, fdn->func_def.id, strlen(pref)) == 0) {
-		lexer_error(fdn->loc, "error: `method` prefix is reserved, you cannot use it");
+		throw_error(fdn->loc, "`method` prefix is reserved, you cannot use it");
 	}
 
 	parser_next(p);
@@ -586,19 +589,19 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 	Symbol *se  = parser_symbol_table_get(p, SBL_FUNC_EXTERN, fdn->func_def.id);
 	Symbol *sf  = parser_symbol_table_get(p, SBL_FUNC_DEF, fdn->func_def.id);
 
-	if (se || seu) lexer_error(fdn->loc, "error: the symbol is already in use");
+	if (se || seu) throw_error(fdn->loc, "the symbol is already in use");
 	else if (sf) {
 		if (sf->func_def.is_def)
-			lexer_error(fdn->loc, "error: function redefinition");
+			throw_error(fdn->loc, "function redefinition");
 		if (!compare_types(sf->func_def.type, fds.func_def.type))
-			lexer_error(fdn->loc, "error: wrong function return type in the function declaration");
+			throw_error(fdn->loc, "wrong function return type in the function declaration");
 		if (sf->func_def.args.count != fds.func_def.args.count)
-			lexer_error(fdn->loc, "error: wrong number of arguments in the function declaration");
+			throw_error(fdn->loc, "wrong number of arguments in the function declaration");
 		for (size_t i = 0; i < fds.func_def.args.count; i++) {
 			Type l = fds.func_def.args.items[i]->func_def_arg.type;
 			Type r = sf->func_def.args.items[i]->func_def_arg.type;
 			if (!compare_types(l, r))
-				lexer_error(fdn->loc, "error: wrong type in the function declaration");
+				throw_error(fdn->loc, "wrong type in the function declaration");
 		}
 
 		sf->func_def.is_def = true;
@@ -647,7 +650,7 @@ void parse_extern(Parser *p) {
 	Symbol *seu = parser_symbol_table_get(p, SBL_FUNC_EX_USED, id);
 
 	if (sf || se || seu)
-		lexer_error(loc, "error: the symbol is already in use used");
+		throw_error(loc, "the symbol is already in use used");
 
 	parser_symbol_table_add(p, SBL_FUNC_EXTERN, id, fes);
 	parser_symbol_table_add(p, SBL_FUNC_EX_USED, extern_smb, (Symbol){0});
@@ -718,40 +721,63 @@ Parser parser_parse(Token *tokens) {
 
 	while (parser_peek(&p)->kind != TOK_EOF) {
 		switch (parser_peek(&p)->kind) {
-			case TOK_STRUCT:
-				parse_struct(&p);
-				break;
+		case TOK_SEMI:
+			break;
 
-			case TOK_EXTERN:
-				parse_extern(&p);
-				break;
+		case TOK_STRUCT:
+			parse_struct(&p);
+			break;
 
-			case TOK_IMPORT:
+		case TOK_EXTERN:
+			parse_extern(&p);
+			break;
+
+		case TOK_IMPORT:
+			parser_next(&p);
+			parser_next(&p);
+			break;
+
+		case TOK_MACRO_OBJ:
+			while (parser_peek(&p)->kind != TOK_SEMI)
 				parser_next(&p);
+			break;
+
+		case TOK_MACRO_FUNC:
+			parser_next(&p);
+			expect_token(parser_next(&p), TOK_ID);
+			expect_token(parser_next(&p), TOK_OPAR);
+			while (parser_peek(&p)->kind != TOK_CPAR)
 				parser_next(&p);
-				break;
 
-			case TOK_MACRO:
-				while (parser_peek(&p)->kind != TOK_SEMI)
-					parser_next(&p);
-				break;
+			parser_next(&p);
+			expect_token(parser_next(&p), TOK_OBRA);
+			int braCnt = 1;
+			while (true) {
+				parser_next(&p);
+				if (parser_peek(&p)->kind == TOK_CBRA) {
+					braCnt--;
+					if (braCnt == 0) break;
+				} else if (parser_peek(&p)->kind == TOK_OBRA) {
+					braCnt++;
+				}
+			}
+			break;
 
-			case TOK_FUNC: {
-				AST_Node *func = parse_function(&p, NULL);
-				if (func) da_append(&prog->program.stmts, func);
-			} break;
+		case TOK_FUNC: {
+			AST_Node *func = parse_function(&p, NULL);
+			if (func) da_append(&prog->program.stmts, func);
+		} break;
 
-			case TOK_ID:
-				if ((parser_looknext(&p))->kind == TOK_COL) {
-					parse_var_def(&p);
-				} else if ((parser_looknext(&p))->kind == TOK_ASSIGN) {
-					parse_var_assign(&p);
-				} else lexer_error(parser_peek(&p)->loc, "error: unexpected top level declaration");
-				break;
+		case TOK_ID:
+			if ((parser_looknext(&p))->kind == TOK_COL) {
+				parse_var_def(&p);
+			} else if ((parser_looknext(&p))->kind == TOK_ASSIGN) {
+				parse_var_assign(&p);
+			} else throw_error(parser_peek(&p)->loc, "unexpected top level declaration");
+			break;
 
-			default:
-				lexer_error(parser_peek(&p)->loc, "error: unexpected top level declaration");
-				break;
+		default:
+			throw_error(parser_peek(&p)->loc, "unexpected top level declaration");
 		}
 
 		parser_next(&p);

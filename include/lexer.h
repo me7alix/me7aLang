@@ -14,9 +14,9 @@ typedef enum {
 	TOK_IF_SYM, TOK_WHILE_SYM, TOK_STAR, TOK_AMP, TOK_COM, TOK_TRUE, TOK_FALSE,
 	TOK_SLASH, TOK_INT, TOK_FLOAT, TOK_OBRA, TOK_COL, TOK_SIZEOF, TOK_OSQBRA,
 	TOK_CSQBRA, TOK_CBRA, TOK_DOT, TOK_PLUS_EQ, TOK_MINUS_EQ, TOK_STAR_EQ,
-	TOK_SLASH_EQ, TOK_EOF, TOK_BREAK, TOK_CONTINUE, TOK_IMPORT, TOK_MACRO,
+	TOK_SLASH_EQ, TOK_EOF, TOK_BREAK, TOK_CONTINUE, TOK_IMPORT, TOK_MACRO_OBJ,
 	TOK_ELSE_SYM, TOK_PS, TOK_ANY, TOK_FUNC, TOK_LEFT_SHIFT, TOK_RIGHT_SHIFT,
-	TOK_TILDA, TOK_XOR,
+	TOK_TILDA, TOK_XOR, TOK_MACRO_FUNC,
 } TokenKind;
 
 typedef struct {
@@ -38,7 +38,7 @@ typedef struct {
 	Location cur_loc;
 } Lexer;
 
-void lexer_error(Location loc, char *error);
+void throw_error(Location loc, char *error);
 Lexer lexer_lex(char *file, char *code);
 void lexer_free(Lexer *lexer);
 

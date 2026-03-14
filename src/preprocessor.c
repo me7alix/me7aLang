@@ -6,9 +6,50 @@
 #include "../thirdparty/cplus.h"
 #include "../include/preprocessor.h"
 
-typedef DA(Token) Macro;
+typedef DA(Token) Tokens;
+
+typedef struct {
+	enum {
+		MACRO_OBJ,
+		MACRO_FUNC,
+	} kind;
+
+	union {
+		struct {
+			DA(char*) args;
+			Tokens body;
+		} func;
+
+		struct {
+			Tokens body;
+		} obj;
+	} as;
+} Macro;
+
 HT(ImportedTable, char*, bool)
 HT_STR(MacroTable, Macro)
+
+Token next(PreprocCtx *p) {
+	Token tok = *p->token;
+	p->token++;
+	return tok;
+}
+
+Token peek2(PreprocCtx *p) {
+	return *(p->token + 1);
+}
+
+Token peek(PreprocCtx *p) {
+	return *p->token;
+}
+
+size_t get_ind(PreprocCtx *p) {
+	return p->token - p->lexer.tokens.items;
+}
+
+void insert(PreprocCtx *p, Token tok) {
+	da_insert(&p->lexer.tokens, get_ind(p), tok);
+}
 
 ImportedTable it   = {0};
 MacroTable    mt   = {0};
@@ -55,8 +96,9 @@ int ImportedTable_compare(char *cur_str, char *str) {
 	return pathcmp(cur_str, str);
 }
 
-Lexer *get_lexer(Imports *imports, char *file, bool *is_imported) {
-	*is_imported = false;
+Lexer get_lexer(Imports *imports, char *file, bool *isImported) {
+	*isImported = false;
+
 	da_foreach(char*, imp, imports) {
 		sb_reset(&path);
 		sb_appendf(&path, "%s/%s", *imp, file);
@@ -64,18 +106,13 @@ Lexer *get_lexer(Imports *imports, char *file, bool *is_imported) {
 		char *code = read_file(path.items);
 		if (code) {
 			if (ImportedTable_get(&it, path.items)) {
-				*is_imported = true;
-				return NULL;
+				*isImported = true;
+				return (Lexer){0};
 			}
 
-			Lexer *lexer = malloc(sizeof(Lexer));
-			*lexer = lexer_lex(path.items, code);
-
-			return lexer;
+			return lexer_lex(path.items, code);
 		}
 	}
-
-	return NULL;
 }
 
 
@@ -88,75 +125,227 @@ void get_folder(char *dst, const char *file) {
 	} else dst[0] = '\0';
 }
 
-bool insert_macro(Lexer *entry, size_t *cur_tok) {
-	Macro *macro = MacroTable_get(&mt, da_get(&entry->tokens, *cur_tok).data);
-	if (!macro) return false;
-	da_remove_ordered(&entry->tokens, *cur_tok);
+void resolve_pars(PreprocCtx *p, Tokens *arg) {
+	da_append(arg, next(p));
 
-	for (size_t j = 0; j < macro->count; j++) {
-		da_insert(&entry->tokens, *cur_tok, da_get(macro, j));
-		if (!insert_macro(entry, cur_tok))
-			(*cur_tok)++;
+	while (peek(p).kind != TOK_CPAR) {
+		if (peek(p).kind == TOK_OPAR) {
+			resolve_pars(p, arg);
+		} else if (peek(p).kind == TOK_EOF) {
+			p->token--;
+			throw_error(peek(p).loc, "TOK_CPAR expected");
+		}
+
+		da_append(arg, peek(p));
+		next(p);
+	}
+}
+
+bool insert_macro(PreprocCtx *p) {
+	Macro *macro = MacroTable_get(&mt, peek(p).data);
+	if (!macro) return false;
+
+	da_remove_ordered(&p->lexer.tokens, get_ind(p));
+
+	switch (macro->kind) {
+	case MACRO_OBJ:
+		da_foreach (Token, tok, &macro->as.obj.body) {
+			insert(p, *tok);
+			if (!insert_macro(p)) next(p);
+		}
+		break;
+		
+	case MACRO_FUNC:
+		DA(Tokens) args = {0};
+		size_t savedInd = get_ind(p);
+
+		if (peek(p).kind != TOK_OPAR)
+			throw_error(peek(p).loc, "TOK_OPAR expected");
+		next(p);
+
+		while (peek(p).kind != TOK_CPAR) {
+			da_append(&args, (Tokens){0});
+			Tokens *arg = &da_last(&args);
+
+			while (true) {
+				if (peek(p).kind == TOK_COM) {
+					next(p);
+					break;
+				} else if (peek(p).kind == TOK_CPAR) {
+					break;
+				} else if (peek(p).kind == TOK_OPAR) {
+					resolve_pars(p, arg);
+				}
+
+				da_append(arg, peek(p));
+				next(p);
+			}
+		}
+		next(p);
+
+		size_t toDelete = get_ind(p) - savedInd;
+		for (size_t i = 0; i < toDelete; i++) {
+			da_remove_ordered(&p->lexer.tokens, savedInd);
+			p->token--;
+		}
+
+		for (int i = 0; i < macro->as.func.body.count; i++) {
+			Token tok = macro->as.func.body.items[i];
+
+			if (tok.kind == TOK_ID) {
+				for (size_t j = 0; j < macro->as.func.args.count; j++) {
+					char *arg = macro->as.func.args.items[j];
+
+					if (strcmp(arg, tok.data) == 0) {
+						Tokens toks = da_get(&args, j);
+
+						for (int k = 0; k < toks.count; k++) {
+							toks.items[k].loc = tok.loc;
+							insert(p, toks.items[k]);
+							if (!insert_macro(p)) next(p);
+						}
+
+						goto found;
+					}
+				}
+
+				insert(p, tok);
+				if (!insert_macro(p)) next(p);
+				found:;
+			} else {
+				insert(p, tok);
+				next(p);
+			}
+		}
+
+		da_free(&args);
 	}
 
 	return true;
 }
 
-void preprocessor(Imports *imports, Lexer *entry) {
+void preprocessor(PreprocCtx *p) {
 	char *cur_folder = malloc(256);
-	get_folder(cur_folder, entry->cur_loc.file);
-	da_get(imports, 0) = cur_folder;
-	ImportedTable_add(&it, entry->cur_loc.file, true);
+	get_folder(cur_folder, p->lexer.cur_loc.file);
+	da_get(p->imports, 0) = cur_folder;
+	ImportedTable_add(&it, p->lexer.cur_loc.file, true);
 
-	for (size_t cur_tok = 0; cur_tok < entry->tokens.count; cur_tok++) {
-		switch (da_get(&entry->tokens, cur_tok).kind) {
-			case TOK_IMPORT: {
-				cur_tok++;
-				if (da_get(&entry->tokens, cur_tok).kind != TOK_STRING)
-					lexer_error(da_get(&entry->tokens, cur_tok).loc, "error: filepath expected");
+	while (peek(p).kind != TOK_EOF) {
+		switch (peek(p).kind) {
+		case TOK_IMPORT: {
+			next(p);
+			if (peek(p).kind != TOK_STRING)
+				throw_error(peek(p).loc, "filepath expected");
 
-				bool is_imported;
-				Lexer *imp = get_lexer(imports, da_get(&entry->tokens, cur_tok).data, &is_imported);
-				if (!imp && !is_imported)
-					lexer_error(da_get(&entry->tokens, cur_tok).loc, "error: no such file");
+			bool isImported;
+			Lexer imp = get_lexer(p->imports, peek(p).data, &isImported);
+			if (!imp.tokens.items && !isImported)
+				throw_error(peek(p).loc, "no such file");
+			next(p);
 
-				cur_tok++;
-				if (da_get(&entry->tokens, cur_tok).kind != TOK_SEMI)
-					lexer_error(da_get(&entry->tokens, cur_tok).loc, "error: semicolon expected");
+			if (peek(p).kind != TOK_SEMI)
+				throw_error(peek(p).loc, "TOK_SEMI expected");
+			next(p);
 
-				cur_tok++;
-				if (!is_imported) {
-					preprocessor(imports, imp);
+			if (!isImported) {
+				PreprocCtx sp = *p;
+				p->lexer = imp;
+				p->token = imp.tokens.items;
+				preprocessor(p);
+				*p = sp;
 
-					for (size_t j = 0; j < imp->tokens.count - 1; j++) {
-						da_insert(&entry->tokens, cur_tok, da_get(&imp->tokens, j));
-						cur_tok++;
-					}
+				for (size_t j = 0; j < imp.tokens.count - 1; j++) {
+					insert(p, da_get(&imp.tokens, j));
+					next(p);
 				}
-				cur_tok--;
-			} break;
+			}
+			p->token--;
+		} break;
 
-			case TOK_MACRO: {
-				cur_tok++;
-				if (da_get(&entry->tokens, cur_tok).kind != TOK_ID)
-					lexer_error(da_get(&entry->tokens, cur_tok).loc, "error: identifier expected");
-				char *mid = da_get(&entry->tokens, cur_tok).data;
-				Macro macro = {0};
+		case TOK_MACRO_FUNC: {
+			next(p);
 
-				cur_tok++;
-				for (size_t j = 0; da_get(&entry->tokens, cur_tok).kind != TOK_SEMI; j++) {
-					da_append(&macro, da_get(&entry->tokens, cur_tok));
-					cur_tok++;
+			if (peek(p).kind != TOK_ID)
+				throw_error(peek(p).loc, "TOK_ID expected");
+			char *id = peek(p).data;
+			next(p);
+
+			if (peek(p).kind != TOK_OPAR)
+				throw_error(peek(p).loc, "TOK_OPAR expected");
+			next(p);
+
+			Macro macro = {.kind = MACRO_FUNC};
+			while (peek(p).kind != TOK_CPAR) {
+				if (peek(p).kind != TOK_ID)
+					throw_error(peek(p).loc, "TOK_ID expected");
+				da_append(&macro.as.func.args, peek(p).data);
+				next(p);
+
+				if (peek(p).kind == TOK_COM)
+					next(p);
+			}
+			next(p);
+
+			int braCnt = 1;
+			if (peek(p).kind != TOK_OBRA)
+				throw_error(peek(p).loc, "TOK_OBRA expected");
+			next(p);
+
+			while (true) {
+				da_append(&macro.as.func.body, peek(p));
+				next(p);
+
+				if (peek(p).kind == TOK_CBRA) {
+					braCnt--;
+					if (braCnt == 0) break;
+				} else if (peek(p).kind == TOK_OBRA) {
+					braCnt++;
 				}
+			}
 
-				MacroTable_add(&mt, mid, macro);
-			} break;
+			MacroTable_add(&mt, id, macro);
+		} break;
 
-			case TOK_ID: {
-				insert_macro(entry, &cur_tok);
-			} break;
+		case TOK_MACRO_OBJ: {
+			next(p);
+			if (peek(p).kind != TOK_ID)
+				throw_error(peek(p).loc, "TOK_ID expected");
+			char *id = peek(p).data;
+			next(p);
 
-			default:;
+			Macro macro = {.kind = MACRO_OBJ};
+			while (peek(p).kind != TOK_SEMI) {
+				da_append(&macro.as.obj.body, peek(p));
+				next(p);
+			}
+
+			MacroTable_add(&mt, id, macro);
+		} break;
+
+		case TOK_ID:
+			insert_macro(p);
+			break;
+
+		case TOK_STRING:
+			if (peek2(p).kind == TOK_STRING) {
+				char *str1 = peek(p).data;
+				da_remove_ordered(&p->lexer.tokens, get_ind(p));
+				char *str2 = peek(p).data;
+				da_remove_ordered(&p->lexer.tokens, get_ind(p));
+
+				char *nstr = malloc(strlen(str1) + strlen(str2) + 1);
+				sprintf(nstr, "%s%s", str1, str2);
+
+				insert(p, (Token){
+					.kind = TOK_STRING,
+					.data = nstr,
+				});
+			}
+			break;
+
+		default:;
 		}
+
+		next(p);
 	}
 }

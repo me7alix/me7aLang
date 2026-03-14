@@ -10,25 +10,6 @@ bool tac_ir_opr_calc(AST_Node *en, TAC_Operand l, TAC_Operand r, TAC_Operand *re
 		if (l.literal.type.kind != r.literal.type.kind)
 			return false;
 
-		if (l.literal.kind == LIT_STR && en->expr_binary.op == AST_OP_ADD) {
-			size_t len1 = strlen(l.literal.str);
-			size_t len2 = strlen(r.literal.str);
-			char *str = malloc(len1 + len2 + 1);
-			sprintf(str, "%s%s", l.literal.str, r.literal.str);
-			printf(">%s\n", str);
-
-			*ret = (TAC_Operand){
-				.kind = OPR_LITERAL,
-				.literal = {
-					.kind = LIT_STR,
-					.type = l.literal.type,
-					.str = str,
-				},
-			};
-
-			return true;
-		}
-
 		int op = en->expr_binary.op;
 		i64 lv = l.literal.lint;
 		i64 rv = r.literal.lint;
@@ -39,7 +20,7 @@ bool tac_ir_opr_calc(AST_Node *en, TAC_Operand l, TAC_Operand r, TAC_Operand *re
 			case AST_OP_MUL: res = lv * rv; break;
 			case AST_OP_DIV:
 				if (rv == 0)
-					lexer_error(en->loc, "error: division by zero");
+					throw_error(en->loc, "division by zero");
 				res = lv / rv;
 				break;
 			default: return false;

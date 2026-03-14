@@ -82,7 +82,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 			if (!da_get(nodes, 0)->expr_unary.v) error = true;
 		}
 
-		if (error) lexer_error(da_get(nodes, 0)->loc, "error: wrong expression");
+		if (error) throw_error(da_get(nodes, 0)->loc, "wrong expression");
 		return da_get(nodes, 0);
 	}
 
@@ -105,7 +105,8 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 				case AST_UN_EXP:
 					lp = expr_op_precedence(da_get(nodes, i-1)->expr_unary.op, true);
 					break;
-				default: UNREACHABLE;
+				default:
+					throw_error(da_get(nodes, i-1)->loc, "wrong expression");
 				}
 			}
 
@@ -117,13 +118,14 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 				case AST_UN_EXP:
 					rp = expr_op_precedence(da_get(nodes, i+1)->expr_unary.op, false);
 					break;
-				default: UNREACHABLE;
+				default:
+					throw_error(da_get(nodes, i+1)->loc, "wrong expression");
 				}
 			}
 
 			if (lp > rp) isLeft = true;
 			if (lp < -500 && rp < -500)
-				lexer_error(da_get(nodes, i)->loc, "error: wrong expression");
+				throw_error(da_get(nodes, i)->loc, "wrong expression");
 
 			if (isLeft) {
 				switch (da_get(nodes, i-1)->kind) {
@@ -145,7 +147,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 	}
 
 	if (nodes->count == countBefore)
-		lexer_error(da_get(nodes, 0)->loc, "error: wrong expression");
+		throw_error(da_get(nodes, 0)->loc, "wrong expression");
 	return expr_expand(nodes);
 }
 
@@ -171,7 +173,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 
 	case AST_VID: {
 		Symbol *var = parser_symbol_table_get(p, SBL_VAR, expr->vid);
-		if (!var) lexer_error(expr->loc, "error: no such variable in the scope");
+		if (!var) throw_error(expr->loc, "no such variable in the scope");
 		return var->variable.type;
 	} break;
 
@@ -246,16 +248,16 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 							AST_Node *metCall = expr->expr_binary.r;
 
 							if (func->func_def.args.count != metCall->method_call.args.count) {
-								lexer_error(metCall->loc, "error: arguments count mismatching");
+								throw_error(metCall->loc, "arguments count mismatching");
 							}
 
 							for (size_t i = 1; i < func->func_def.args.count; i++) {
 								if (!compare_types(
 										func->func_def.args.items[i]->func_def_arg.type,
 										parser_get_type(p, metCall->method_call.args.items[i]))) {
-									lexer_error(
+									throw_error(
 											metCall->method_call.args.items[i]->loc,
-											"error: types mismatching");
+											"types mismatching");
 								}
 							}
 
@@ -270,8 +272,8 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 					}
 				}
 
-				lexer_error(expr->expr_binary.l->loc,
-						"error: no such method");
+				throw_error(expr->expr_binary.l->loc,
+						"no such method");
 			} else {
 				if (lt.kind == TYPE_POINTER) {
 					expr->expr_binary.l = ast_new({
@@ -294,8 +296,8 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 					}
 				}
 
-				lexer_error(expr->expr_binary.l->loc,
-						"error: no such field");
+				throw_error(expr->expr_binary.l->loc,
+						"no such field");
 			}
 		}
 
@@ -318,7 +320,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 				AST_Node *lit     = le->kind == AST_LITERAL ? le : re;
 				AST_Node *not_lit = le->kind != AST_LITERAL ? le : re;
 				lit->literal.type = parser_get_type(p, not_lit);
-			} else lexer_error(expr->loc, "error: operation on different types");
+			} else throw_error(expr->loc, "operation on different types");
 		}
 
 		switch (expr->expr_binary.op) {
@@ -355,7 +357,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 			Type vt = expr_analysis(p, expr->expr_unary.v, vart);
 			expr->expr_unary.type = vt;
 			if (!is_pointer(vt))
-				lexer_error(expr->expr_unary.v->loc, "error: pointer expected");
+				throw_error(expr->expr_unary.v->loc, "pointer expected");
 			expr->expr_unary.type = *vt.pointer.base;
 		} break;
 
@@ -376,6 +378,7 @@ AST_ExprOp tok_to_binary_expr_op(TokenKind tok) {
 	case TOK_MINUS_EQ:    return AST_OP_SUB_EQ;
 	case TOK_STAR_EQ:     return AST_OP_MUL_EQ;
 	case TOK_SLASH_EQ:    return AST_OP_DIV_EQ;
+	case TOK_NOT_EQ:      return AST_OP_NOT_EQ;
 	case TOK_EQ_EQ:       return AST_OP_EQ;
 	case TOK_EQ:          return AST_OP_VAR_EQ;
 	case TOK_GREAT:       return AST_OP_GREAT;
@@ -396,7 +399,7 @@ AST_ExprOp tok_to_binary_expr_op(TokenKind tok) {
 	case TOK_XOR:         return AST_OP_BW_XOR;
 	case TOK_LEFT_SHIFT:  return AST_OP_BW_LS;
 	case TOK_RIGHT_SHIFT: return AST_OP_BW_RS;
-	default: UNREACHABLE;
+	default: printf("%d\n", tok); UNREACHABLE;
 	}
 }
 
@@ -410,7 +413,7 @@ AST_ExprOp tok_to_unary_expr_op(Token *tok) {
 	case TOK_MINUS:  return AST_OP_NEG;
 	case TOK_TILDA:  return AST_OP_BW_NOT;
 	default:
-		lexer_error(tok->loc, "error: wrong operation");
+		throw_error(tok->loc, "wrong operation");
 		return 0;
 	};
 }
@@ -649,8 +652,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 		} break;
 
 		default:
-			lexer_error(parser_peek(p)->loc,
-					"error: unexpected token");
+			throw_error(parser_peek(p)->loc, "unexpected token");
 		}
 
 		parser_next(p);

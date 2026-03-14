@@ -48,7 +48,7 @@ bool is_tok(Lexer *l, char *tok, TokenKind type, char *str) {
 	return true;
 }
 
-void lexer_error(Location loc, char *error) {
+void throw_error(Location loc, char *error) {
 	size_t lines_num = loc.line_num + 1;
 	size_t chars_num = loc.line_char-loc.line_start + 1;
 	printf("%s:%zu:%zu: %s\n", loc.file, lines_num, chars_num, error);
@@ -249,11 +249,11 @@ Lexer lexer_lex(char *file, char *code) {
 								case '0':  sb_append(&sb, '\0'); break;
 								case 'n':  sb_append(&sb, '\n'); break;
 								case '\"': sb_append(&sb, '\"'); break;
-								default: lexer_error(l.cur_loc, "error: wrong character");
+								default: throw_error(l.cur_loc, "wrong character");
 							}
 							l.cur_char++;
 						} else if (l.cur_char[0] == '\0') {
-							lexer_error(l.cur_loc, "error: unclosed string");
+							throw_error(l.cur_loc, "unclosed string");
 						} else {
 							sb_append(&sb, l.cur_char[0]);
 						}
@@ -274,13 +274,13 @@ Lexer lexer_lex(char *file, char *code) {
 							case 'n':  add_token(&l, TOK_CHAR, "\n"); break;
 							case '\\': add_token(&l, TOK_CHAR, "\\"); break;
 							case '\'': add_token(&l, TOK_CHAR, "'");  break;
-							default: lexer_error(l.cur_loc, "error: wrong character");
+							default: throw_error(l.cur_loc, "wrong character");
 						}
 					} else add_token(&l, TOK_CHAR, l.cur_char);
 
 					l.cur_char++;
 					if (*l.cur_char != '\'') {
-						lexer_error(l.cur_loc, "error: ' expected");
+						throw_error(l.cur_loc, "' expected");
 					}
 				}
 
@@ -299,11 +299,12 @@ Lexer lexer_lex(char *file, char *code) {
 				} else if (is_tok(&l, "return",   TOK_RET, l.cur_char)) {
 				} else if (is_tok(&l, "import",   TOK_IMPORT, l.cur_char)) {
 				} else if (is_tok(&l, "fn",       TOK_FUNC, l.cur_char)) {
-				} else if (is_tok(&l, "def",      TOK_MACRO, l.cur_char)) {}
+				} else if (is_tok(&l, "def",      TOK_MACRO_OBJ, l.cur_char)) {
+				} else if (is_tok(&l, "macro",    TOK_MACRO_FUNC, l.cur_char)) {}
 
 				else if (isalpha(*l.cur_char) || *l.cur_char == '_')
 					add_token(&l, TOK_ID, get_id(&l));
-				else lexer_error(l.cur_loc, "error: unknown token");
+				else throw_error(l.cur_loc, "unknown token");
 			} break;
 		}
 

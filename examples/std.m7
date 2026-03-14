@@ -6,3 +6,4 @@ extern time(ptr: *u0): int
 extern printf(fmt: *i8, ...)
 extern sprintf(buf: *i8, fmt: *i8, ...)
 extern scanf(fmt: *i8, ...)
+extern exit(code: int)

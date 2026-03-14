@@ -4,8 +4,12 @@ struct Address {
 	city:      *i8
 	post_code: int
 
-	fn print(a: int) {
-		printf("%s [%d]\n", self.city, self.post_code)
+	fn print() {
+		printf(
+			"%s [%d]\n",
+			self.city,
+			self.post_code,
+		)
 	}
 }
 
@@ -16,12 +20,13 @@ struct Person {
 
 	fn print() {
 		printf(
-			"Name: %s\nSalary: %d\n",
-			self.name, self.salary,
+			"Name: %s\n" "Salary: %d\n",
+			self.name,
+			self.salary,
 		)
 
 		printf("Address: ")
-		self.addr.print(3)
+		self.addr.print()
 	}
 }
 
