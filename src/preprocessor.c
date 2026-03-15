@@ -29,30 +29,29 @@ typedef struct {
 HT(ImportedTable, char*, bool)
 HT_STR(MacroTable, Macro)
 
-Token next(PreprocCtx *p) {
-	Token tok = *p->token;
-	p->token++;
-	return tok;
+Token peek(PreprocCtx *p) {
+	return da_get(&p->lexer.tokens, p->cur_tok);
 }
 
 Token peek2(PreprocCtx *p) {
-	return *(p->token + 1);
+	p->cur_tok++;
+	Token tok = peek(p);
+	p->cur_tok--;
+	return tok;
 }
 
-Token peek(PreprocCtx *p) {
-	return *p->token;
-}
-
-size_t get_ind(PreprocCtx *p) {
-	return p->token - p->lexer.tokens.items;
+Token next(PreprocCtx *p) {
+	Token tok = peek(p);
+	p->cur_tok++;
+	return tok;
 }
 
 void insert(PreprocCtx *p, Token tok) {
-	da_insert(&p->lexer.tokens, get_ind(p), tok);
+	da_insert(&p->lexer.tokens, p->cur_tok, tok);
 }
 
 void remove_tok(PreprocCtx *p) {
-	da_remove_ordered(&p->lexer.tokens, get_ind(p));
+	da_remove_ordered(&p->lexer.tokens, p->cur_tok);
 }
 
 ImportedTable it   = {0};
@@ -136,7 +135,7 @@ void resolve_pars(PreprocCtx *p, Tokens *arg) {
 		if (peek(p).kind == TOK_OPAR) {
 			resolve_pars(p, arg);
 		} else if (peek(p).kind == TOK_EOF) {
-			p->token--;
+			p->cur_tok--;
 			throw_error(peek(p).loc, "TOK_CPAR expected");
 		}
 
@@ -160,7 +159,7 @@ bool insert_macro(PreprocCtx *p) {
 		
 	case MACRO_FUNC:
 		DA(Tokens) args = {0};
-		size_t savedInd = get_ind(p);
+		size_t savedInd = p->cur_tok;
 
 		if (peek(p).kind != TOK_OPAR)
 			throw_error(peek(p).loc, "TOK_OPAR expected");
@@ -186,10 +185,10 @@ bool insert_macro(PreprocCtx *p) {
 		}
 		next(p);
 
-		size_t toDelete = get_ind(p) - savedInd;
+		size_t toDelete = p->cur_tok - savedInd;
 		for (size_t i = 0; i < toDelete; i++) {
 			da_remove_ordered(&p->lexer.tokens, savedInd);
-			p->token--;
+			p->cur_tok--;
 		}
 
 		for (int i = 0; i < macro->as.func.body.count; i++) {
@@ -241,8 +240,8 @@ void preprocessor(PreprocCtx *p) {
 				throw_error(peek(p).loc, "filepath expected");
 
 			bool isImported;
-			Lexer imp = get_lexer(p->imports, peek(p).data, &isImported);
-			if (!imp.tokens.items && !isImported)
+			Lexer importedLex = get_lexer(p->imports, peek(p).data, &isImported);
+			if (!importedLex.tokens.items && !isImported)
 				throw_error(peek(p).loc, "no such file");
 			next(p);
 
@@ -251,18 +250,21 @@ void preprocessor(PreprocCtx *p) {
 			next(p);
 
 			if (!isImported) {
-				PreprocCtx sp = *p;
-				p->lexer = imp;
-				p->token = imp.tokens.items;
-				preprocessor(p);
-				*p = sp;
+				PreprocCtx nctx = {
+					.imports = p->imports,
+					.lexer = importedLex,
+				};
 
-				for (size_t j = 0; j < imp.tokens.count - 1; j++) {
-					insert(p, da_get(&imp.tokens, j));
+				preprocessor(&nctx);
+				importedLex = nctx.lexer;
+
+				for (size_t j = 0; j < importedLex.tokens.count - 1; j++) {
+					insert(p, da_get(&importedLex.tokens, j));
 					next(p);
 				}
 			}
-			p->token--;
+
+			p->cur_tok--;
 		} break;
 
 		case TOK_MACRO_FUNC: {
@@ -335,7 +337,7 @@ void preprocessor(PreprocCtx *p) {
 		next(p);
 	}
 
-	p->token = p->lexer.tokens.items;
+	p->cur_tok = 0;
 	while (peek(p).kind != TOK_EOF) {
 		if (
 			peek(p).kind  == TOK_STRING &&
@@ -353,7 +355,10 @@ void preprocessor(PreprocCtx *p) {
 				.kind = TOK_STRING,
 				.data = nstr,
 			});
-		} else next(p);
+		} else {
+			next(p);
+			continue;
+		}
 
 		if (peek2(p).kind != TOK_STRING) {
 			next(p);

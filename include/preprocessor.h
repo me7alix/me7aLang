@@ -8,7 +8,7 @@ typedef DA(char*) Imports;
 typedef struct {
 	Imports *imports;
 	Lexer lexer;
-	Token *token;
+	size_t cur_tok;	
 } PreprocCtx;
 
 char *read_file(const char *filename);

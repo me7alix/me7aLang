@@ -176,7 +176,6 @@ int main(int argc, char **argv) {
 	PreprocCtx preprocCtx = {
 		.imports = &imports,
 		.lexer = entry_point,
-		.token = entry_point.tokens.items,
 	};
 
 	preprocessor(&preprocCtx);
