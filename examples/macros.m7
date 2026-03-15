@@ -1,6 +1,7 @@
 import "std.m7"
 
 def NUM 10
+def ENDL "\n"
 
 macro ADD(a, b) { (a) + (b) }
 
@@ -10,5 +11,5 @@ fn add(a: int, b: int): int {
 
 fn main() {
 	// 3 + 4 + 10
-	printf("%d\n", ADD(add(3, 4), NUM))
+	printf("%d"ENDL, ADD(add(3, 4), NUM))
 }

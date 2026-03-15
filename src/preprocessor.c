@@ -51,6 +51,10 @@ void insert(PreprocCtx *p, Token tok) {
 	da_insert(&p->lexer.tokens, get_ind(p), tok);
 }
 
+void remove_tok(PreprocCtx *p) {
+	da_remove_ordered(&p->lexer.tokens, get_ind(p));
+}
+
 ImportedTable it   = {0};
 MacroTable    mt   = {0};
 StringBuilder path = {0};
@@ -144,8 +148,7 @@ void resolve_pars(PreprocCtx *p, Tokens *arg) {
 bool insert_macro(PreprocCtx *p) {
 	Macro *macro = MacroTable_get(&mt, peek(p).data);
 	if (!macro) return false;
-
-	da_remove_ordered(&p->lexer.tokens, get_ind(p));
+	remove_tok(p);
 
 	switch (macro->kind) {
 	case MACRO_OBJ:
@@ -326,26 +329,34 @@ void preprocessor(PreprocCtx *p) {
 			insert_macro(p);
 			break;
 
-		case TOK_STRING:
-			if (peek2(p).kind == TOK_STRING) {
-				char *str1 = peek(p).data;
-				da_remove_ordered(&p->lexer.tokens, get_ind(p));
-				char *str2 = peek(p).data;
-				da_remove_ordered(&p->lexer.tokens, get_ind(p));
-
-				char *nstr = malloc(strlen(str1) + strlen(str2) + 1);
-				sprintf(nstr, "%s%s", str1, str2);
-
-				insert(p, (Token){
-					.kind = TOK_STRING,
-					.data = nstr,
-				});
-			}
-			break;
-
 		default:;
 		}
 
 		next(p);
+	}
+
+	p->token = p->lexer.tokens.items;
+	while (peek(p).kind != TOK_EOF) {
+		if (
+			peek(p).kind  == TOK_STRING &&
+			peek2(p).kind == TOK_STRING
+		) {
+			char *str1 = peek(p).data;
+			remove_tok(p);
+			char *str2 = peek(p).data;
+			remove_tok(p);
+
+			char *nstr = malloc(strlen(str1) + strlen(str2) + 1);
+			sprintf(nstr, "%s%s", str1, str2);
+
+			insert(p, (Token){
+				.kind = TOK_STRING,
+				.data = nstr,
+			});
+		} else next(p);
+
+		if (peek2(p).kind != TOK_STRING) {
+			next(p);
+		}
 	}
 }
