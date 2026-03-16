@@ -156,7 +156,7 @@ bool insert_macro(PreprocCtx *p) {
 			if (!insert_macro(p)) next(p);
 		}
 		break;
-		
+
 	case MACRO_FUNC:
 		DA(Tokens) args = {0};
 		size_t savedInd = p->cur_tok;
@@ -185,52 +185,60 @@ bool insert_macro(PreprocCtx *p) {
 		}
 		next(p);
 
+		if (macro->as.func.args.count != args.count) {
+			throw_error(peek(p).loc, "arguments count mismatching");
+		}
+
 		size_t toDelete = p->cur_tok - savedInd;
 		for (size_t i = 0; i < toDelete; i++) {
 			da_remove_ordered(&p->lexer.tokens, savedInd);
 			p->cur_tok--;
 		}
 
-		for (int i = 0; i < macro->as.func.body.count; i++) {
-			Token tok = macro->as.func.body.items[i];
+		savedInd = p->cur_tok;
 
-			if (tok.kind == TOK_ID) {
+		da_foreach (Token, tok, &macro->as.func.body) {
+			if (tok->kind == TOK_ID) {
 				for (size_t j = 0; j < macro->as.func.args.count; j++) {
 					char *arg = macro->as.func.args.items[j];
 
-					if (strcmp(arg, tok.data) == 0) {
-						Tokens toks = da_get(&args, j);
-
-						for (int k = 0; k < toks.count; k++) {
-							toks.items[k].loc = tok.loc;
-							insert(p, toks.items[k]);
-							if (!insert_macro(p)) next(p);
+					if (strcmp(arg, tok->data) == 0) {
+						da_foreach (Token, argTok, &da_get(&args, j)) {
+							argTok->loc = tok->loc;
+							insert(p, *argTok);
+							next(p);
 						}
 
 						goto found;
 					}
 				}
 
-				insert(p, tok);
-				if (!insert_macro(p)) next(p);
+				insert(p, *tok);
+				next(p);
 				found:;
 			} else {
-				insert(p, tok);
+				insert(p, *tok);
 				next(p);
 			}
 		}
 
+		p->cur_tok = savedInd;
+
+		preprocessor(p, true);
+		p->cur_tok--;
 		da_free(&args);
 	}
 
 	return true;
 }
 
-void preprocessor(PreprocCtx *p) {
-	char *cur_folder = malloc(256);
-	get_folder(cur_folder, p->lexer.cur_loc.file);
-	da_get(p->imports, 0) = cur_folder;
-	ImportedTable_add(&it, p->lexer.cur_loc.file, true);
+void preprocessor(PreprocCtx *p, bool skip) {
+	if (!skip) {
+		char *cur_folder = malloc(256);
+		get_folder(cur_folder, p->lexer.cur_loc.file);
+		da_get(p->imports, 0) = cur_folder;
+		ImportedTable_add(&it, p->lexer.cur_loc.file, true);
+	}
 
 	while (peek(p).kind != TOK_EOF) {
 		switch (peek(p).kind) {
@@ -255,7 +263,7 @@ void preprocessor(PreprocCtx *p) {
 					.lexer = importedLex,
 				};
 
-				preprocessor(&nctx);
+				preprocessor(&nctx, false);
 				importedLex = nctx.lexer;
 
 				for (size_t j = 0; j < importedLex.tokens.count - 1; j++) {

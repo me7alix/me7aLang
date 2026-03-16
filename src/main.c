@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
 		.lexer = entry_point,
 	};
 
-	preprocessor(&preprocCtx);
+	preprocessor(&preprocCtx, false);
 	entry_point = preprocCtx.lexer;
 
 	Parser parser = parser_parse(entry_point.tokens.items);

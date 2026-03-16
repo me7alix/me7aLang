@@ -551,6 +551,13 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						sb_appendf(&body, "    mov %s, %s\n", arg2, opr_to_nasm(ci.arg1));
 						sb_appendf(&body, "    mov %s, %s\n", dst, arg2);
 					}
+				} else {
+					if (tac_ir_get_opr_type(ci.dst).kind == TYPE_STRUCT) {
+						sb_appendf(&body, "    xor rax, rax\n");
+						sb_appendf(&body, "    lea rdi, %s\n", opr_to_nasm(ci.dst));
+						sb_appendf(&body, "    mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
+						sb_appendf(&body, "    rep stosb\n");
+					}
 				}
 			} break;
 

@@ -1,0 +1,20 @@
+import "da.m7"
+
+DA_DECL(Numbers, int)
+
+fn main() {
+	nums: Numbers
+
+	da_append(nums, 10)
+	da_append(nums, 3)
+	da_append(nums, 5)
+
+	da_remove_ordered(nums, 1)
+
+	printf("count: %zu\n", nums.count)
+	printf("capacity: %zu\n\n", nums.capacity)
+	printf("first: %d\n", da_first(nums))
+	printf("last: %d\n", da_last(nums))
+
+	da_free(nums)
+}

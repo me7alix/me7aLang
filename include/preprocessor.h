@@ -2,6 +2,7 @@
 #define PREPROCESSOR_H
 
 #include "lexer.h"
+#include <stdbool.h>
 
 typedef DA(char*) Imports;
 
@@ -12,6 +13,6 @@ typedef struct {
 } PreprocCtx;
 
 char *read_file(const char *filename);
-void preprocessor(PreprocCtx *p);
+void preprocessor(PreprocCtx *p, bool skip);
 
 #endif

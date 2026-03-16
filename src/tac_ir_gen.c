@@ -624,7 +624,12 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 
 			case AST_WHILE_STMT: {
 				ctx->loop_gen++;
+
+				uint saved_label_start = ctx->label_start;
+				uint saved_label_end = ctx->label_end;
+
 				ctx->label_start = label_id++;
+				ctx->label_end = label_id++;
 
 				da_append(&func->body, ((TAC_Instruction){
 					.op = OP_LABEL,
@@ -636,7 +641,6 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 
 				IRGenExprCtx ectx = {0};
 				TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->stmt_while.expr);
-				ctx->label_end = label_id++;
 
 				da_append(&func->body, ((TAC_Instruction){
 					.op = OP_JUMP_IF_NOT,
@@ -665,6 +669,9 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 					},
 				}));
 
+				ctx->label_start = saved_label_start;
+				ctx->label_end = saved_label_end;
+
 				ctx->loop_gen--;
 			} break;
 
@@ -676,27 +683,29 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 					default: UNREACHABLE;
 				}
 
-				uint label_start = label_id++;
+				uint saved_label_start = ctx->label_start;
+				uint saved_label_end = ctx->label_end;
+
+				ctx->label_start = label_id++;
+				ctx->label_end = label_id++;
 
 				da_append(&func->body, ((TAC_Instruction){
 					.op = OP_LABEL,
 					.arg1 = (TAC_Operand) {
 						.kind = OPR_LABEL,
-						.label_id = label_start,
+						.label_id = ctx->label_start,
 					},
 				}));
 
 				IRGenExprCtx ectx = {0};
 				TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->stmt_for.expr);
 
-				uint label_end = label_id++;
-
 				da_append(&func->body, ((TAC_Instruction){
 					.op = OP_JUMP_IF_NOT,
 					.arg1 = res,
 					.dst = (TAC_Operand) {
 						.kind = OPR_LABEL,
-						.label_id = label_end,
+						.label_id = ctx->label_end,
 					},
 				}));
 
@@ -708,7 +717,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 					.op = OP_JUMP,
 					.dst = (TAC_Operand) {
 						.kind = OPR_LABEL,
-						.label_id = label_start,
+						.label_id = ctx->label_start,
 					},
 				}));
 
@@ -716,9 +725,13 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 					.op = OP_LABEL,
 					.arg1 = (TAC_Operand) {
 						.kind = OPR_LABEL,
-						.label_id = label_end,
+						.label_id = ctx->label_end,
 					},
 				}));
+
+				ctx->label_start = saved_label_start;
+				ctx->label_end = saved_label_end;
+
 				ctx->loop_gen--;
 				ctx->for_var_mut = NULL;
 			} break;

@@ -1,0 +1,71 @@
+import "std.m7"
+
+macro DA_DECL(N, T) {
+	struct N {
+		items:    *T
+		count:    uptr
+		capacity: uptr
+	}
+}
+
+macro da_reserve(da, expected_capacity) {
+	block {
+		if (expected_capacity) > (da).capacity {
+			new_capacity: uptr = 256
+			if (da).capacity != 0 {
+				new_capacity = (da).capacity
+			}
+
+			while (expected_capacity) > new_capacity {
+				new_capacity *= 2
+			}
+
+			(da).capacity = new_capacity
+			(da).items = heap_realloc(
+				(da).items,
+				new_capacity * sizeof(*(da).items),
+			)
+		}
+	}
+}
+
+macro da_append(da, item) {
+	block {
+		da_reserve(da, (da).count + 1)
+
+		(da).items[(da).count] = item
+		(da).count += 1
+	}
+}
+
+macro da_reset(da) { block { (da).count = 0; } }
+macro da_get(da, idx) { (da).items[idx] }
+macro da_first(da) { (da).items[0] }
+macro da_last(da) { (da).items[(da).count - 1] }
+
+macro da_remove_unordered(da, index) {
+	block {
+        da_get(da, (index)) = da_last(da)
+        (da).count -= 1
+	}
+}
+
+macro da_remove_ordered(da, index) {
+    block {
+        da_get(da, index) = da_last(da)
+        mem_move((da).items+(index), (da).items + (index) + 1,
+                sizeof(*(da).items) * ((da).count - index))
+        (da).count -= 1
+	}
+}
+
+macro da_free(da) {
+    block {
+        if (da).items != null {
+            heap_free((da).items);
+		}
+
+        (da).count = 0;
+        (da).capacity = 0;
+    }
+}

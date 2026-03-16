@@ -484,6 +484,11 @@ AST_Node *parse_body(Parser *p, AST_Node *func) {
 			expect_token(parser_peek(p), TOK_SEMI);
 			break;
 
+		case TOK_BLOCK:
+			parser_next(p);
+			da_append(&body->body.stmts, parse_body(p, func));
+			break;
+
 		case TOK_IF_SYM:    da_append(&body->body.stmts, parse_if_stmt(p, func));     break;
 		case TOK_WHILE_SYM: da_append(&body->body.stmts, parse_while_stmt(p, func));  break;
 		case TOK_FOR_SYM:   da_append(&body->body.stmts, parse_for_stmt(p, func));    break;

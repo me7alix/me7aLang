@@ -1,5 +1,9 @@
-extern malloc heap_alloc(cnt: uptr): *u0
-extern free   heap_free(ptr: *u0)
+extern malloc  heap_alloc(cnt: uptr): *u0
+extern realloc heap_realloc(ptr: *u0, cnt: uptr): *u0
+extern free    heap_free(ptr: *u0)
+extern memcpy  mem_copy(dst: *u0, src: *u0, cnt: uptr)
+extern memmove mem_move(dst: *u0, src: *u0, cnt: uptr)
+
 extern srand(seed: int)
 extern rand(): int
 extern time(ptr: *u0): int

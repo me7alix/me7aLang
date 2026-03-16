@@ -299,6 +299,7 @@ Lexer lexer_lex(char *file, char *code) {
 				} else if (is_tok(&l, "return",   TOK_RET, l.cur_char)) {
 				} else if (is_tok(&l, "import",   TOK_IMPORT, l.cur_char)) {
 				} else if (is_tok(&l, "fn",       TOK_FUNC, l.cur_char)) {
+				} else if (is_tok(&l, "block",    TOK_BLOCK, l.cur_char)) {
 				} else if (is_tok(&l, "def",      TOK_MACRO_OBJ, l.cur_char)) {
 				} else if (is_tok(&l, "macro",    TOK_MACRO_FUNC, l.cur_char)) {}
 
