@@ -1,71 +1,76 @@
 import "std.m7"
 
-macro DA_DECL(N, T) {
+macro DeclDynArray(N, T) {
 	struct N {
 		items:    *T
 		count:    uptr
 		capacity: uptr
-	}
-}
 
-macro da_reserve(da, expected_capacity) {
-	block {
-		if (expected_capacity) > (da).capacity {
-			new_capacity: uptr = 256
-			if (da).capacity != 0 {
-				new_capacity = (da).capacity
+		fn reserve(expected_capacity: uptr) {
+			if expected_capacity > self.capacity {
+				new_capacity: uptr = 256
+				if self.capacity != 0 {
+					new_capacity = self.capacity
+				}
+
+				while expected_capacity > new_capacity {
+					new_capacity *= 2
+				}
+
+				self.capacity = new_capacity
+				self.items = heap_realloc(
+					self.items,
+					new_capacity * sizeof(*self.items),
+				)
 			}
-
-			while (expected_capacity) > new_capacity {
-				new_capacity *= 2
-			}
-
-			(da).capacity = new_capacity
-			(da).items = heap_realloc(
-				(da).items,
-				new_capacity * sizeof(*(da).items),
-			)
-		}
-	}
-}
-
-macro da_append(da, item) {
-	block {
-		da_reserve(da, (da).count + 1)
-
-		(da).items[(da).count] = item
-		(da).count += 1
-	}
-}
-
-macro da_reset(da) { block { (da).count = 0; } }
-macro da_get(da, idx) { (da).items[idx] }
-macro da_first(da) { (da).items[0] }
-macro da_last(da) { (da).items[(da).count - 1] }
-
-macro da_remove_unordered(da, index) {
-	block {
-        da_get(da, (index)) = da_last(da)
-        (da).count -= 1
-	}
-}
-
-macro da_remove_ordered(da, index) {
-    block {
-        da_get(da, index) = da_last(da)
-        mem_move((da).items+(index), (da).items + (index) + 1,
-                sizeof(*(da).items) * ((da).count - index))
-        (da).count -= 1
-	}
-}
-
-macro da_free(da) {
-    block {
-        if (da).items != null {
-            heap_free((da).items);
 		}
 
-        (da).count = 0;
-        (da).capacity = 0;
-    }
+		fn append(item: T) {
+			self.reserve(self.count + 1)
+
+			self.items[self.count] = item
+			self.count += 1
+		}
+
+		fn set(index: uptr, item: T) {
+			self.items[index] = item
+		}
+
+		fn get(index: uptr): T {
+			return self.items[index]
+		}
+
+		fn reset() {
+			self.count = 0
+		}
+
+		fn first(): T {
+			return self.get(0:uptr)
+		}
+
+		fn last(): T {
+			return self.get(self.count - 1)
+		}
+
+		fn remove_unordered(index: uptr) {
+			self.set(index, self.last())
+			self.count -= 1
+		}
+
+		fn remove_ordered(index: uptr) {
+			self.set(index, self.last())
+			mem_move(self.items + index, self.items + index + 1,
+					sizeof(*self.items) * (self.count - index))
+			self.count -= 1
+		}
+
+		fn free() {
+			if self.items != null {
+				heap_free(self.items)
+			}
+
+			self.count = 0
+			self.capacity = 0
+		}
+	}	
 }

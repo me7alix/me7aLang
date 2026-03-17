@@ -1,20 +1,20 @@
 import "da.m7"
 
-DA_DECL(Numbers, int)
+DeclDynArray(Numbers, int)
 
 fn main() {
 	nums: Numbers
 
-	da_append(nums, 10)
-	da_append(nums, 3)
-	da_append(nums, 5)
+	nums.append(10)
+	nums.append(3)
+	nums.append(5)
 
-	da_remove_ordered(nums, 1)
+	nums.remove_ordered(1:uptr)
 
 	printf("count: %zu\n", nums.count)
 	printf("capacity: %zu\n\n", nums.capacity)
-	printf("first: %d\n", da_first(nums))
-	printf("last: %d\n", da_last(nums))
+	printf("first: %d\n", nums.first())
+	printf("last: %d\n", nums.last())
 
-	da_free(nums)
+	nums.free()
 }
