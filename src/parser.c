@@ -29,7 +29,7 @@ void set_nested(int pn[16], int n[16]) {
 	memcpy(n, pn, 16 * sizeof(int));
 }
 
-HT_IMPL_STR(UserTypes, UserType)
+HT_IMPL_STR(UserTypes, UserType*)
 HT_IMPL(SymbolTable, SymbolKey, Symbol)
 
 u32 SymbolTable_hashf(SymbolKey key) {
@@ -151,7 +151,7 @@ Type parse_type(Parser *p) {
 	else if (!strcmp(tn, "uptr"))  type.kind = TYPE_UPTR;
 	else if (!strcmp(tn, "u0"))    type.kind = TYPE_NULL;
 	else {
-		UserType *utype = UserTypes_get(&p->ut, tn);
+		UserType *utype = *UserTypes_get(&p->ut, tn);
 		if (utype) {
 			type.kind = utype->kind;
 			type.user = utype;
@@ -199,7 +199,7 @@ AST_Node *parse_method_call(Parser *p) {
 		.method_call.id = parser_next(p)->data,
 	});
 	
-	// first argument of any method is reserved for "self"
+	// the first argument of any method is reserved for "self"
 	da_append(&metCall->method_call.args, NULL);
 
 	expect_token(parser_next(p), TOK_OPAR);
@@ -666,16 +666,13 @@ void parse_extern(Parser *p) {
 void parse_struct(Parser *p) {
 	parser_next(p);
 
-	UserTypes_add(
-		&p->ut,
-		parser_peek(p)->data,
-		(UserType){
-			.kind = TYPE_STRUCT,
-			.id = parser_peek(p)->data,
-		}
-	);
+	UserType *st = malloc(sizeof(*st));
+	*st = (UserType){
+		.kind = TYPE_STRUCT,
+		.id = parser_peek(p)->data,
+	};
 
-	UserType *st = UserTypes_get(&p->ut, parser_next(p)->data);
+	UserTypes_add(&p->ut, parser_next(p)->data, st);
 
 	expect_token(parser_next(p), TOK_OBRA);
 	while (parser_peek(p)->kind != TOK_CBRA) {

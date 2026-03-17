@@ -558,12 +558,12 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 	for (size_t i = 0; i < fn->body.stmts.count; i++) {
 		AST_Node *cn = da_get(&fn->body.stmts, i);
 		switch (cn->kind) {
-			case AST_VAR_DEF:   tac_ir_gen_var_def(prog, func, cn);       break;
-			case AST_FUNC_CALL: tac_ir_gen_func_call(prog, func, cn);     break;
-			case AST_METHOD_CALL: tac_ir_gen_method_call(prog, func, cn); break;
-			case AST_VAR_MUT:   tac_ir_gen_var_mut(prog, func, cn);       break;
-			case AST_IF_STMT:   tac_ir_gen_if_chain(ctx, prog, func, cn); break;
-			case AST_BODY:      tac_ir_gen_body(ctx, prog, func, cn);     break;
+			case AST_VAR_DEF:     tac_ir_gen_var_def(prog, func, cn);       break;
+			case AST_FUNC_CALL:   tac_ir_gen_func_call(prog, func, cn);     break;
+			case AST_METHOD_CALL: tac_ir_gen_method_call(prog, func, cn);   break;
+			case AST_VAR_MUT:     tac_ir_gen_var_mut(prog, func, cn);       break;
+			case AST_IF_STMT:     tac_ir_gen_if_chain(ctx, prog, func, cn); break;
+			case AST_BODY:        tac_ir_gen_body(ctx, prog, func, cn);     break;
 
 			case AST_FUNC_RET: {
 				if (cn->func_ret.type.kind == TYPE_NULL) {
@@ -575,6 +575,8 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 				}
 
 				IRGenExprCtx ctx = {0};
+				ctx.is_right_of_eq = true;
+
 				TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->func_ret.expr);
 				switch (res.kind) {
 					case OPR_LITERAL: {
@@ -780,7 +782,7 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 	label_id = 0;
 
 	ht_foreach_node(UserTypes, kv, &p->ut) {
-		UserType *ut = &kv->val;
+		UserType *ut = kv->val;
 		if (ut->kind == TYPE_STRUCT) {
 			da_foreach(StructMember, member, &ut->ustruct.members) {
 				if (member->kind == STMEM_METHOD) {

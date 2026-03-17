@@ -221,7 +221,14 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 
 		if (expr->expr_binary.op == AST_OP_FIELD) {
 			if (expr->expr_binary.r->kind == AST_METHOD_CALL) {
-				da_foreach (StructMember, member, &lt.user->ustruct.members) {
+				DA(StructMember) mems;
+				if (lt.kind == TYPE_POINTER) {
+					memcpy(&mems, &lt.pointer.base->user->ustruct.members, sizeof(mems));
+				} else if (lt.kind == TYPE_STRUCT){
+					memcpy(&mems, &lt.user->ustruct.members, sizeof(mems));
+				} else throw_error(expr->loc, "struct expected");
+
+				da_foreach (StructMember, member, &mems) {
 					if (member->kind == STMEM_METHOD) {
 						if (strcmp(expr->expr_binary.r->method_call.id,
 								member->as.method.func->func_def.id) == 0) {
@@ -296,7 +303,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 					}
 				}
 
-				throw_error(expr->expr_binary.l->loc,
+				throw_error(expr->loc,
 						"no such field");
 			}
 		}
