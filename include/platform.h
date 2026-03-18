@@ -3,7 +3,7 @@
 
 #include "../thirdparty/cplus.h"
 
-typedef enum : u8 {
+typedef enum {
 	TP_NULL = 0,
 	TP_LINUX,
 	TP_WINDOWS,

@@ -5,16 +5,23 @@ DeclDynArray(Numbers, int)
 fn main() {
 	nums: Numbers
 
-	nums.append(10)
-	nums.append(3)
-	nums.append(5)
+	nums.append(69)
+	nums.append(420)
+	nums.append(56)
+	nums.append(78)
 
 	nums.remove_ordered(1:uptr)
 
 	printf("count: %zu\n", nums.count)
 	printf("capacity: %zu\n\n", nums.capacity)
 	printf("first: %d\n", nums.first())
-	printf("last: %d\n", nums.last())
+	printf("last: %d\n\n", nums.last())
+
+	nums.set(nums.count - 1, 90)
+
+	da_foreach (num, nums) {
+		printf("%zu) %d\n", (num - nums.items + 1):uptr, *num)
+	}
 
 	nums.free()
 }

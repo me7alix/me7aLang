@@ -311,7 +311,9 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 		Type rt = expr_analysis(p, expr->expr_binary.r, vart);
 		expr->expr_binary.type = lt;
 
-		if ((lt.kind == TYPE_IPTR && is_pointer(rt)) ||
+		if (is_pointer(lt) && is_pointer(rt) && expr->expr_binary.op == AST_OP_SUB) {
+			expr->expr_binary.type = (Type){.kind = TYPE_IPTR};
+		} else if ((lt.kind == TYPE_IPTR && is_pointer(rt)) ||
 			(is_pointer(lt) && rt.kind == TYPE_IPTR) ||
 			(lt.kind == TYPE_UPTR && is_pointer(rt)) ||
 			(is_pointer(lt) && rt.kind == TYPE_UPTR)) {

@@ -240,6 +240,10 @@ AST_Node *parse_func_call(Parser *p) {
 	AST_Node *expr;
 
 	while (parser_peek(p)->kind != TOK_CPAR) {
+		if (!met_any)
+			if (arg_cnt >= fargs.count)
+				throw_error(fcn->loc, "too many arguments");
+
 		if (fargs.items[arg_cnt]->kind == AST_FUNC_DEF_ARG_ANY)
 			met_any = true;
 
@@ -248,9 +252,6 @@ AST_Node *parse_func_call(Parser *p) {
 				is_next_any = true;
 
 		if (!met_any) {
-			if (arg_cnt + 1 > fargs.count)
-				throw_error(fcn->loc, "too many arguments");
-
 			Type farg_type = fargs.items[arg_cnt++]->func_def_arg.type;
 			expr = parse_expr(p, EXPR_PARSING_FUNC_CALL, &farg_type);
 			Type expr_type = parser_get_type(p, expr);

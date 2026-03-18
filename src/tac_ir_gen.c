@@ -259,48 +259,106 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		default: UNREACHABLE;
 		}
 
-		// pointers arithmetic
-		if (inst.op == OP_ADD ||
-			inst.op == OP_SUB ||
-			en->expr_binary.op == AST_OP_ARR) {
+		/* Pointers arithmetic */
+
+		int expr_ast_op = en->expr_binary.op;
+
+		if (
+			expr_ast_op == AST_OP_ADD ||
+			expr_ast_op == AST_OP_SUB ||
+			expr_ast_op == AST_OP_ARR
+		) {
 			Type lt = tac_ir_get_opr_type(l);
 			Type rt = tac_ir_get_opr_type(r);
 
-			if (is_pointer(lt) || is_pointer(rt)) {
+			if (
+				(is_pointer(lt) && !is_pointer(rt)) ||
+				(is_pointer(rt) && !is_pointer(lt))
+			) {
 				Type ptr_base;
-				TAC_Operand tm;
+				TAC_Operand not_ptr;
+				TAC_Operand ptr;
+
 				if (is_pointer(lt)) {
 					ptr_base = *lt.pointer.base;
-					tm = r;
+					not_ptr = r;
+					ptr = l;
 				} else if (is_pointer(rt)) {
 					ptr_base = *rt.pointer.base;
-					tm = l;
+					not_ptr = l;
+					ptr = r;
 				}
 
-				TAC_Operand dst = {
-					.kind = OPR_VAR,
-					.var.type = exp_type,
-					.var.addr_id = var_id++,
-				};
+				if (expr_ast_op != AST_OP_SUB) {
+					TAC_Instruction sf = {
+						.op   = OP_MUL,
+						.arg1 = not_ptr,
+						.arg2 = (TAC_Operand) {
+							.kind = OPR_SIZEOF,
+							.size_of.type = (Type){.kind = TYPE_UPTR},
+							.size_of.vtype = ptr_base,
+						},
+						.dst = {
+							.kind = OPR_VAR,
+							.var.type = exp_type,
+							.var.addr_id = var_id++,
+						},
+					};
 
-				TAC_Instruction mult = {
-					.op = OP_MUL,
-					.arg1 = tm,
-					.arg2 = (TAC_Operand) {
-						.kind = OPR_SIZEOF,
-						.size_of.type = (Type) {.kind = TYPE_IPTR},
-						.size_of.vtype = ptr_base,
-					},
-					.dst = dst,
-				};
+					da_append(&func->body, sf);
 
-				da_append(&func->body, mult);
-				if (is_pointer(lt)) inst.arg2 = dst;
-				if (is_pointer(rt)) inst.arg1 = dst;
-				if (en->expr_binary.op == AST_OP_ARR) {
-					inst.op = OP_ADD;
+					if      (is_pointer(rt)) inst.arg1 = sf.dst;
+					else if (is_pointer(lt)) inst.arg2 = sf.dst;
+
+					if (en->expr_binary.op == AST_OP_ARR) {
+						inst.op = OP_ADD;
+						da_append(&func->body, inst);
+						return tac_ir_gen_deref(ctx, func, *exp_type.pointer.base, inst.dst);
+					}
+				} else {
+					TAC_Instruction sf = {
+						.op   = OP_DIV,
+						.arg1 = ptr,
+						.arg2 = (TAC_Operand) {
+							.kind = OPR_SIZEOF,
+							.size_of.type = (Type){.kind = TYPE_UPTR},
+							.size_of.vtype = ptr_base,
+						},
+						.dst = {
+							.kind = OPR_VAR,
+							.var.type = exp_type,
+							.var.addr_id = var_id++,
+						},
+					};
+
+					da_append(&func->body, sf);
+
+					if      (is_pointer(lt)) inst.arg1 = sf.dst;
+					else if (is_pointer(rt)) inst.arg2 = sf.dst;
+				}
+			} else if (is_pointer(lt) && is_pointer(rt)) {
+				if (expr_ast_op == AST_OP_SUB) {
+					TAC_Instruction sf = {
+						.op   = OP_DIV,
+						.arg1 = inst.dst,
+						.arg2 = (TAC_Operand) {
+							.kind = OPR_SIZEOF,
+							.size_of.type = (Type){.kind = TYPE_UPTR},
+							.size_of.vtype = *lt.pointer.base,
+						},
+						.dst = {
+							.kind = OPR_VAR,
+							.var.type = exp_type,
+							.var.addr_id = var_id++,
+						},
+					};
+
 					da_append(&func->body, inst);
-					return tac_ir_gen_deref(ctx, func, *exp_type.pointer.base, inst.dst);
+
+					ctx->last_var = sf.dst.var.addr_id;
+					da_append(&func->body, sf);
+
+					return sf.dst;
 				}
 			}
 		}
