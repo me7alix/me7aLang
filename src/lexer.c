@@ -95,6 +95,13 @@ Lexer lexer_lex(char *file, char *code) {
 			case '^': add_token(&l, TOK_XOR,   "^"); break;
 			case '~': add_token(&l, TOK_TILDA, "~"); break;
 
+			case '#': {
+				if (l.cur_char[1] == '#') {
+					add_token(&l, TOK_ID_CONCAT, "##");
+					l.cur_char++;
+				} else add_token(&l, TOK_TO_STR, "#");
+			} break;
+
 			case '.': {
 				if (l.cur_char[1] == '.' && l.cur_char[2] == '.') {
 					add_token(&l, TOK_ANY,   "...");
@@ -248,6 +255,8 @@ Lexer lexer_lex(char *file, char *code) {
 								case '\\': sb_append(&sb, '\\'); break;
 								case '0':  sb_append(&sb, '\0'); break;
 								case 'n':  sb_append(&sb, '\n'); break;
+								case 't':  sb_append(&sb, '\t'); break;
+								case 'r':  sb_append(&sb, '\r'); break;
 								case '\"': sb_append(&sb, '\"'); break;
 								default: throw_error(l.cur_loc, "wrong character");
 							}
@@ -272,6 +281,8 @@ Lexer lexer_lex(char *file, char *code) {
 						switch (*l.cur_char) {
 							case '0':  add_token(&l, TOK_CHAR, "\0"); break;
 							case 'n':  add_token(&l, TOK_CHAR, "\n"); break;
+							case 'r':  add_token(&l, TOK_CHAR, "\r"); break;
+							case 't':  add_token(&l, TOK_CHAR, "\t"); break;
 							case '\\': add_token(&l, TOK_CHAR, "\\"); break;
 							case '\'': add_token(&l, TOK_CHAR, "'");  break;
 							default: throw_error(l.cur_loc, "wrong character");

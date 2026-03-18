@@ -1,0 +1,14 @@
+extern malloc(cnt: uptr): *u0
+extern realloc(ptr: *u0, cnt: uptr): *u0
+extern calloc(cnt: uptr, size: uptr): *u0
+extern free(ptr: *u0)
+extern memcpy(dst: *u0, src: *u0, cnt: uptr)
+extern memmove(dst: *u0, src: *u0, cnt: uptr)
+extern srand(seed: int)
+extern rand(): int
+extern time(ptr: *u0): int
+extern printf(fmt: *u8, ...)
+extern sprintf(buf: *u8, fmt: *u8, ...)
+extern strcmp(a: *u8, b: *u8): int
+extern scanf(fmt: *u8, ...)
+extern exit(code: int)

@@ -75,4 +75,11 @@ HT_DECL_STR(UserTypes, UserType*)
 #define is_pointer(t) ((t).kind == TYPE_ARRAY || (t).kind == TYPE_POINTER)
 #define get_pointer_base(t) ((t).kind == TYPE_POINTER ? (t).pointer.base : (t).array.elem)
 
+#define type_new(...) type_alloc((Type){__VA_ARGS__})
+static Type *type_alloc(Type type) {
+	Type *nt = malloc(sizeof(*nt));
+	*nt = type;
+	return nt;
+}
+
 #endif //TYPE_H

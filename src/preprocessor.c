@@ -29,24 +29,24 @@ typedef struct {
 HT(ImportedTable, char*, bool)
 HT_STR(MacroTable, Macro)
 
-Token peek(PreprocCtx *p) {
+static Token peek(PreprocCtx *p) {
 	return da_get(&p->lexer.tokens, p->cur_tok);
 }
 
-Token peek2(PreprocCtx *p) {
+static Token peek2(PreprocCtx *p) {
 	p->cur_tok++;
 	Token tok = peek(p);
 	p->cur_tok--;
 	return tok;
 }
 
-Token next(PreprocCtx *p) {
+static Token next(PreprocCtx *p) {
 	Token tok = peek(p);
 	p->cur_tok++;
 	return tok;
 }
 
-void insert(PreprocCtx *p, Token tok) {
+static void insert(PreprocCtx *p, Token tok) {
 	da_insert(&p->lexer.tokens, p->cur_tok, tok);
 }
 
@@ -116,6 +116,8 @@ Lexer get_lexer(Imports *imports, char *file, bool *isImported) {
 			return lexer_lex(path.items, code);
 		}
 	}
+
+	return (Lexer){0};
 }
 
 
@@ -137,6 +139,22 @@ void resolve_pars(PreprocCtx *p, Tokens *arg) {
 		} else if (peek(p).kind == TOK_EOF) {
 			p->cur_tok--;
 			throw_error(peek(p).loc, "TOK_CPAR expected");
+		}
+
+		da_append(arg, peek(p));
+		next(p);
+	}
+}
+
+void resolve_bras(PreprocCtx *p, Tokens *arg) {
+	da_append(arg, next(p));
+
+	while (peek(p).kind != TOK_CBRA) {
+		if (peek(p).kind == TOK_OBRA) {
+			resolve_bras(p, arg);
+		} else if (peek(p).kind == TOK_EOF) {
+			p->cur_tok--;
+			throw_error(peek(p).loc, "TOK_CBRA expected");
 		}
 
 		da_append(arg, peek(p));
@@ -177,6 +195,8 @@ bool insert_macro(PreprocCtx *p) {
 					break;
 				} else if (peek(p).kind == TOK_OPAR) {
 					resolve_pars(p, arg);
+				} else if (peek(p).kind == TOK_OBRA) {
+					resolve_bras(p, arg);
 				}
 
 				da_append(arg, peek(p));
@@ -258,6 +278,7 @@ void preprocessor(PreprocCtx *p, bool skip) {
 			next(p);
 
 			if (!isImported) {
+				char *savedCurFolder = p->imports->items[0];
 				PreprocCtx nctx = {
 					.imports = p->imports,
 					.lexer = importedLex,
@@ -265,6 +286,7 @@ void preprocessor(PreprocCtx *p, bool skip) {
 
 				preprocessor(&nctx, false);
 				importedLex = nctx.lexer;
+				p->imports->items[0] = savedCurFolder;
 
 				for (size_t j = 0; j < importedLex.tokens.count - 1; j++) {
 					insert(p, da_get(&importedLex.tokens, j));
@@ -348,6 +370,44 @@ void preprocessor(PreprocCtx *p, bool skip) {
 	p->cur_tok = 0;
 	while (peek(p).kind != TOK_EOF) {
 		if (
+			peek(p).kind == TOK_TO_STR &&
+			peek2(p).kind == TOK_ID
+		) {
+			remove_tok(p);
+			char *id = peek(p).data;
+			remove_tok(p);
+
+			insert(p, (Token){
+				.kind = TOK_STRING,
+				.data = id,
+			});
+
+			next(p);
+		} else if (
+			peek(p).kind == TOK_ID &&
+			peek2(p).kind == TOK_ID_CONCAT
+		) {
+			char *id1 = peek(p).data;
+			remove_tok(p);
+			remove_tok(p);
+
+			if (peek(p).kind != TOK_ID)
+				throw_error(peek(p).loc, "TOK_ID expected");
+
+			char *id2 = peek(p).data;
+			remove_tok(p);
+
+			char *nid = malloc(strlen(id1) + strlen(id2) + 1);
+			sprintf(nid, "%s%s", id1, id2);
+
+			insert(p, (Token){
+				.kind = TOK_ID,
+				.data = nid,
+			});
+
+			if (peek2(p).kind != TOK_ID_CONCAT)
+				next(p);
+		} else if (
 			peek(p).kind  == TOK_STRING &&
 			peek2(p).kind == TOK_STRING
 		) {
@@ -363,12 +423,10 @@ void preprocessor(PreprocCtx *p, bool skip) {
 				.kind = TOK_STRING,
 				.data = nstr,
 			});
-		} else {
-			next(p);
-			continue;
-		}
 
-		if (peek2(p).kind != TOK_STRING) {
+			if (peek2(p).kind != TOK_STRING)
+				next(p);
+		} else {
 			next(p);
 		}
 	}

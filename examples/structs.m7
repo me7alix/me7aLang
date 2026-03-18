@@ -1,7 +1,7 @@
-import "std.m7"
+import "std/libc.m7"
 
 struct Address {
-	city:      *i8
+	city:      *u8
 	post_code: int
 
 	fn print() {
@@ -14,7 +14,7 @@ struct Address {
 }
 
 struct Person {
-	name:   *i8
+	name:   *u8
 	salary: int
 	addr:   Address
 

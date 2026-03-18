@@ -1,4 +1,4 @@
-import "std.m7"
+import "std/libc.m7"
 
 def NUM 10
 def ENDL "\n"

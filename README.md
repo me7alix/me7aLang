@@ -23,13 +23,13 @@ make release -B
 
 3. Compile and run an example:
 ```bash
-./build/release/m7c -o ./build/fib ./examples/fib.m7
+./build/release/m7c -I ./stdlib -o ./build/fib ./examples/fib.m7
 ./build/fib
 ```
 
 ## Examples
 ```
-import "std.m7"
+import "std/libc.m7"
 
 fn main() {
     printf("Hello, World!\n")

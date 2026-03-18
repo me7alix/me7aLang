@@ -210,20 +210,16 @@ void parser_symbol_table_add(Parser *p, SymbolType st, char *id, Symbol smbl);
 Symbol *parser_symbol_table_get(Parser *p, SymbolType st, char *id);
 
 Type parser_get_type(Parser *p, AST_Node *n);
-Type parse_type(Parser *parser);
+Type *parse_type(Parser *parser);
 Type parser_get_type(Parser *p, AST_Node *n);
 bool compare_types(Type a, Type b);
-
-Token *parser_peek(Parser *p);
-Token *parser_looknext(Parser *p);
-Token *parser_next(Parser *p);
 
 long long parse_int(char *data);
 Symbol *st_get(SymbolTable *st, const char *id);
 
 #define expect_token(tok, kind) \
 	expect_token_f(tok, kind, #kind)
-void expect_token_f(Token *token, TokenKind type, char *ts);
+void expect_token_f(Token token, TokenKind type, char *ts);
 
 Parser parser_parse(Token *tokens);
 void parser_free(Parser parser);
@@ -233,6 +229,6 @@ AST_Node *parse_method_call(Parser *parser);
 AST_Node *ast_alloc(AST_Node node);
 
 #define UNREACHABLE do { fprintf(stderr, "%s:%d: unreachable\n", __FILE__, __LINE__); exit(1); } while(0)
-#define ast_new(...) ast_alloc((AST_Node) __VA_ARGS__)
+#define ast_new(...) ast_alloc((AST_Node){__VA_ARGS__})
 
 #endif

@@ -95,7 +95,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		return (TAC_Operand) {.kind = OPR_NULL};
 	}
 
-	static Type TI8 = {.kind = TYPE_I8};
+	static Type TU8 = {.kind = TYPE_U8};
 	switch (en->kind) {
 	case AST_LITERAL: {
 		ctx->last_var = 0;
@@ -103,7 +103,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			da_append(&prog->globals, ((TAC_GlobalVar){
 				.type = (Type) {
 					.kind = TYPE_ARRAY,
-					.array.elem = &TI8,
+					.array.elem = &TU8,
 					.array.length = strlen(en->literal.str) + 1
 				},
 				.index = data_id,
@@ -115,7 +115,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 				.var.kind = VAR_ADDR,
 				.var.type = (Type) {
 					.kind = TYPE_POINTER,
-					.pointer.base = &TI8
+					.pointer.base = &TU8
 				},
 				.var.addr_id = data_id++,
 				.var.addr_kind = VAR_DATA,

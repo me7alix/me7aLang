@@ -100,6 +100,11 @@ void tac_ir_dump_inst(TAC_Instruction inst, char *res) {
 	tac_ir_dump_opr(inst.dst, dst);
 
 	switch (inst.op) {
+		case OP_BW_AND:      sprintf(res, "    var%s = %s %s %s", dst, arg1, "&",  arg2);  break;
+		case OP_BW_OR:       sprintf(res, "    var%s = %s %s %s", dst, arg1, "|",  arg2);  break;
+		case OP_BW_XOR:      sprintf(res, "    var%s = %s %s %s", dst, arg1, "^",  arg2);  break;
+		case OP_BW_LS:       sprintf(res, "    var%s = %s %s %s", dst, arg1, "<<", arg2);  break;
+		case OP_BW_RS:       sprintf(res, "    var%s = %s %s %s", dst, arg1, ">>", arg2);  break;
 		case OP_ADD:         sprintf(res, "    var%s = %s %s %s", dst, arg1, "+",  arg2);  break;
 		case OP_EQ:          sprintf(res, "    var%s = %s %s %s", dst, arg1, "==", arg2);  break;
 		case OP_NOT:         sprintf(res, "    var%s = !%s", dst, arg1);                   break;
@@ -134,8 +139,6 @@ void tac_ir_dump_inst(TAC_Instruction inst, char *res) {
 				strncat(res, buf, 128);
 			}
 		} break;
-
-		default: UNREACHABLE;
 	}
 }
 

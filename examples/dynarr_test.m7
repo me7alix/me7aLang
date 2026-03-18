@@ -1,4 +1,4 @@
-import "da.m7"
+import "std/dynarr.m7"
 
 DeclDynArray(Numbers, int)
 

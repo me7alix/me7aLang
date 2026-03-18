@@ -1,4 +1,4 @@
-import "std.m7"
+import "std/libc.m7"
 import "raylib.m7"
 
 def TILE_SIZE  30
@@ -23,9 +23,9 @@ fn draw_game() {
 
 	rl_draw_rect(apple.x * TILE_SIZE, apple.y * TILE_SIZE, TILE_SIZE, TILE_SIZE, rl_ColorRed)
 
-	score_text: [64]i8
-	sprintf(score_text:*i8, "Score: %zu", snake_len - 2)
-	rl_draw_text(score_text:*i8, 20, 20, 20, rl_ColorWhite)
+	score_text: [64]u8
+	sprintf(score_text:*u8, "Score: %zu", snake_len - 2)
+	rl_draw_text(score_text:*u8, 20, 20, 20, rl_ColorWhite)
 }
 
 fn snake_follow() {

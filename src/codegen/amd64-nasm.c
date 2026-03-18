@@ -163,6 +163,7 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TYPE_INT:
 					sprintf(rbuf, "%d", (int) opr.literal.lint);
 					break;
+				case TYPE_U32:
 				case TYPE_UINT:
 					sprintf(rbuf, "%u", (uint) opr.literal.lint);
 					break;
@@ -189,7 +190,7 @@ char *opr_to_nasm(TAC_Operand opr) {
 				case TYPE_I64:
 					sprintf(rbuf, "%lli", opr.literal.lint);
 					break;
-				default: UNREACHABLE;
+				default: printf("%d\n", opr.literal.type.kind); UNREACHABLE;
 			}
 		} break;
 

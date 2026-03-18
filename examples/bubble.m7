@@ -1,4 +1,4 @@
-import "std.m7"
+import "std/libc.m7"
 
 fn bubble_sort(arr: *int, cnt: uptr) {
 	while true {

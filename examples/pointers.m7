@@ -1,4 +1,4 @@
-import "std.m7"
+import "std/libc.m7"
 
 fn change_fifth(arr: *int) {
 	*(arr + 4) = 111
@@ -21,7 +21,7 @@ fn main() {
 
 	// here we allocate the second array and copy the values from the first
 
-	arr2: *int = heap_alloc(sizeof(arr1))
+	arr2: *int = malloc(sizeof(arr1))
 
 	for i: uptr = 0; i < 10; i+=1 {
 		arr2[i] = arr1[i]
@@ -32,5 +32,5 @@ fn main() {
 		printf("%lli: %d\n", i, arr2[i])
 	}
 
-	heap_free(arr2)
+	free(arr2)
 }

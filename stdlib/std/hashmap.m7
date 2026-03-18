@@ -1,0 +1,157 @@
+import "std/libc.m7"
+
+macro ht_foreach_node(nodevar, ht, body) {
+    for _ht_idx: uptr = 0; (ht).capacity > 0 && _ht_idx < (ht).capacity; _ht_idx += 1 {
+		for nodevar := (ht).arr[_ht_idx]; nodevar != null; nodevar = nodevar.next body
+	}
+}
+
+fn hash_str(p: *u8): u32 {
+    h: u32 = 1144290428
+
+    while *p != 0 {
+        h = h ^ (*p):u32
+		p = p + 1
+        h *= 2070933403
+    }
+
+    return h
+}
+
+fn hash_combine(h1: u32, h2: u32): u32 {
+    return h1 ^ (h2 + 581019932:u32 + (h1 << 3) + (h1 >> 2))
+}
+
+macro hash_num(num) {
+    ((1462847356:u32 * num:u32 + 1550508858:u32):u32)}
+
+macro DeclHashMap(HT, KT, VT) {
+	fn HT##_hashf(key: KT): u32
+	fn HT##_compare(a: KT, b: KT): int
+
+	struct HT##_node {
+		key:  KT
+		val:  VT
+		next: *HT##_node
+    }
+
+    struct HT {
+        arr:      **HT##_node
+        count:    uptr
+        capacity: uptr
+
+		fn add(key: KT, val: VT) {
+			if self.capacity == 0 {
+				self.capacity = 256
+				self.arr = calloc(self.capacity, sizeof:*u0)
+			}
+
+			idx := HT##_hashf(key):uptr % self.capacity
+			cur := self.arr[idx]
+
+			while cur != null {
+				if HT##_compare(cur.key, key) == 0 {
+					cur.val = val
+					return
+				}
+
+				cur = cur.next
+			}
+
+			n: *HT##_node = calloc(1, sizeof:HT##_node)
+			n.key = key
+			n.val = val
+			n.next = self.arr[idx]
+
+			self.arr[idx] = n
+			self.count += 1
+
+			if self.count > self.capacity * 2 {
+				old_cap := self.capacity
+				new_cap := old_cap * 3
+				new_arr: **HT##_node = calloc(new_cap, sizeof:*u0)
+
+				for i: uptr = 0; i < old_cap; i+=1 {
+					it := self.arr[i]
+
+					while it != null {
+						next := it.next
+						j := HT##_hashf(it.key):uptr % new_cap
+						it.next = new_arr[j]
+						new_arr[j] = it
+						it = next
+					}
+				}
+
+				free(self.arr)
+				self.arr = new_arr
+				self.capacity = new_cap
+			}
+		}
+
+		fn get(key: KT): *VT {
+			if self.capacity == 0 {
+				return null
+			}
+
+			idx := HT##_hashf(key):uptr % self.capacity
+			cur := self.arr[idx]
+			while cur != null {
+				if HT##_compare(cur.key, key) == 0 {
+					return &cur.val
+				}
+
+				cur = cur.next
+			}
+
+			return null
+		}
+
+		fn remove(key: KT) {
+			if self.capacity == 0 {
+				return
+			}
+
+			idx := HT##_hashf(key):uptr % self.capacity
+			cur := self.arr[idx]
+			prev: *HT##_node = null
+
+			while cur != null {
+				if HT##_compare(cur.key, key) == 0 {
+					if prev != null {
+						prev.next = cur.next
+					} else {
+						self.arr[idx] = cur.next
+					}
+
+					free(cur)
+					self.count -= 1
+					return
+				}
+
+				prev = cur
+				cur = cur.next
+			}
+		}
+
+		fn free() {
+			if self.capacity == 0 {
+				return
+			}
+
+			for i: uptr = 0; i < self.capacity; i+=1 {
+				cur := self.arr[i]
+				while cur != null {
+					next := cur.next
+					free(cur)
+					cur = next
+				}
+			}
+
+			free(self.arr)
+			self.arr = null
+			self.capacity = 0
+			self.count = 0
+		}
+    }	
+}

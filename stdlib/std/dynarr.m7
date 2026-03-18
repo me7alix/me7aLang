@@ -1,4 +1,4 @@
-import "std.m7"
+import "std/libc.m7"
 
 macro da_foreach(vn, da) {
 	for vn := da.items; (vn - (da).items):uptr < (da).count; vn = vn + 1 }
@@ -21,7 +21,7 @@ macro DeclDynArray(N, T) {
 				}
 
 				self.capacity = new_capacity
-				self.items = heap_realloc(
+				self.items = realloc(
 					self.items,
 					new_capacity * sizeof(*self.items),
 				)
@@ -62,14 +62,14 @@ macro DeclDynArray(N, T) {
 
 		fn remove_ordered(index: uptr) {
 			self.set(index, self.last())
-			mem_move(self.items + index, self.items + index + 1,
+			memmove(self.items + index, self.items + index + 1,
 					sizeof(*self.items) * (self.count - index))
 			self.count -= 1
 		}
 
 		fn free() {
 			if self.items != null {
-				heap_free(self.items)
+				free(self.items)
 			}
 
 			self.count = 0
