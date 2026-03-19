@@ -236,6 +236,8 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 					if (member->kind == STMEM_METHOD) {
 						if (strcmp(expr->expr_binary.r->method_call.id,
 								member->as.method.func->func_def.id) == 0) {
+							/* Auto-referencing */
+
 							if (lt.kind == TYPE_STRUCT) {
 								Type *nt = malloc(sizeof(*nt));
 								*nt = lt;
@@ -258,19 +260,25 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 							AST_Node *func    = member->as.method.func;
 							AST_Node *metCall = expr->expr_binary.r;
 
+							/* Method call types checking */
+
 							if (func->func_def.args.count != metCall->method_call.args.count) {
 								throw_error(metCall->loc, "arguments count mismatching");
 							}
 
 							for (size_t i = 1; i < func->func_def.args.count; i++) {
-								if (!compare_types(
-										func->func_def.args.items[i]->func_def_arg.type,
-										parser_get_type(p, metCall->method_call.args.items[i]))) {
+								Type req_type = func->func_def.args.items[i]->func_def_arg.type;
+								AST_Node *arg = metCall->method_call.args.items[i];
+								expr_analysis(p, arg, &req_type);
+
+								if (!compare_types(req_type, parser_get_type(p, arg))) {
 									throw_error(
-											metCall->method_call.args.items[i]->loc,
-											"types mismatching");
+										metCall->method_call.args.items[i]->loc,
+										"types mismatching");
 								}
 							}
+
+							/* Passing the struct pointer to the method */
 
 							expr->expr_binary.type = func->func_def.type;
 
@@ -286,6 +294,8 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 				throw_error(expr->expr_binary.l->loc,
 						"no such method");
 			} else {
+				/* Auto-dereferencing */
+
 				if (lt.kind == TYPE_POINTER) {
 					expr->expr_binary.l = ast_new(
 						.kind = AST_UN_EXP,

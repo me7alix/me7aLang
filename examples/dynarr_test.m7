@@ -10,7 +10,7 @@ fn main() {
 	nums.append(56)
 	nums.append(78)
 
-	nums.remove_ordered(1:uptr)
+	nums.remove_ordered(1)
 
 	printf("count: %zu\n", nums.count)
 	printf("capacity: %zu\n\n", nums.capacity)

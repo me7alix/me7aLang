@@ -378,7 +378,10 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 	next(p);
 
 	r->stmt_if.expr = parse_expr(p, EXPR_PARSING_STMT, NULL);
+	if (parser_get_type(p, r->stmt_if.expr).kind != TYPE_BOOL)
+		throw_error(r->stmt_while.expr->loc, "bool expected");
 	next(p);
+
 	r->stmt_if.body = parse_body(p, func);
 
 	if (peek2(p).kind == TOK_ELSE_SYM) {
@@ -403,6 +406,9 @@ AST_Node *parse_while_stmt(Parser *p, AST_Node *func) {
 	AST_Node *r = ast_new(.kind = AST_WHILE_STMT);
 
 	r->stmt_while.expr = parse_expr(p, EXPR_PARSING_STMT, NULL);
+	if (parser_get_type(p, r->stmt_while.expr).kind != TYPE_BOOL)
+		throw_error(r->stmt_while.expr->loc, "bool expected");
+
 	next(p);
 	r->stmt_while.body = parse_body(p, func);
 
@@ -419,16 +425,20 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 
 	nested_push_next(p);
 
-	if (peek2(p).kind == TOK_COL)
+	if (peek2(p).kind == TOK_COL) {
 		r->stmt_for.var = parse_var_def(p);
-	else if (peek2(p).kind == TOK_EQ)
+	} else if (peek2(p).kind == TOK_EQ) {
 		r->stmt_for.var = parse_var_mut(p, EXPR_PARSING_VAR);
-	else if (peek2(p).kind == TOK_ASSIGN)
+	} else if (peek2(p).kind == TOK_ASSIGN) {
 		r->stmt_for.var = parse_var_assign(p);
+	}
 	next(p);
 
 	r->stmt_for.expr = parse_expr(p, EXPR_PARSING_VAR, &r->stmt_for.var->var_def.type);
+	if (parser_get_type(p, r->stmt_for.expr).kind != TYPE_BOOL)
+		throw_error(r->stmt_while.expr->loc, "bool expected");
 	next(p);
+
 	r->stmt_for.mut = parse_var_mut(p, EXPR_PARSING_STMT);
 	next(p);
 
