@@ -2,7 +2,7 @@ import "std/hashmap.m7"
 
 DeclHashMap(HashMapStrInt, *u8, int)
 
-fn HashMapStrInt_compare(a: *u8, b: *u8): int  {
+fn HashMapStrInt_compare(a: *u8, b: *u8): int {
 	return strcmp(a, b)
 }
 
@@ -12,6 +12,7 @@ fn HashMapStrInt_hashf(str: *u8): u32 {
 
 fn main() {
 	hm: HashMapStrInt
+
 	hm.add("ten",    10)
 	hm.add("twenty", 20)
 
@@ -20,4 +21,6 @@ fn main() {
 	ht_foreach_node (node, hm, {
 		printf("%s\t%d\n", node.key, node.val)
 	})
+
+	hm.free()
 }
