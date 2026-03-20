@@ -225,38 +225,31 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 
 		if (expr->expr_binary.op == AST_OP_FIELD) {
 			if (expr->expr_binary.r->kind == AST_METHOD_CALL) {
-				DA(StructMember) mems;
-				if (lt.kind == TYPE_POINTER) {
-					memcpy(&mems, &lt.pointer.base->user->ustruct.members, sizeof(mems));
-				} else if (lt.kind == TYPE_STRUCT){
-					memcpy(&mems, &lt.user->ustruct.members, sizeof(mems));
-				} else throw_error(expr->loc, "struct expected");
+				/* Auto-referencing */
 
-				da_foreach (StructMember, member, &mems) {
+				if (lt.kind == TYPE_STRUCT) {
+					Type *nt = malloc(sizeof(*nt));
+					*nt = lt;
+
+					Type ct = {
+						.kind = TYPE_POINTER,
+						.pointer.base = nt,
+					};
+
+					expr->expr_binary.l = ast_new(
+						.kind = AST_UN_EXP,
+						.expr_unary.op = AST_OP_REF,
+						.expr_unary.v = expr->expr_binary.l,
+						.expr_unary.type = ct,
+					);
+
+					lt = ct;
+				}
+
+				da_foreach (StructMember, member, &lt.pointer.base->user->ustruct.members) {
 					if (member->kind == STMEM_METHOD) {
 						if (strcmp(expr->expr_binary.r->method_call.id,
 								member->as.method.func->func_def.id) == 0) {
-							/* Auto-referencing */
-
-							if (lt.kind == TYPE_STRUCT) {
-								Type *nt = malloc(sizeof(*nt));
-								*nt = lt;
-
-								Type ct = {
-									.kind = TYPE_POINTER,
-									.pointer.base = nt,
-								};
-
-								expr->expr_binary.l = ast_new(
-									.kind = AST_UN_EXP,
-									.expr_unary.op = AST_OP_REF,
-									.expr_unary.v = expr->expr_binary.l,
-									.expr_unary.type = ct,
-								);
-
-								lt = ct;
-							}
-
 							AST_Node *func    = member->as.method.func;
 							AST_Node *metCall = expr->expr_binary.r;
 
@@ -291,8 +284,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 					}
 				}
 
-				throw_error(expr->expr_binary.l->loc,
-						"no such method");
+				throw_error(expr->expr_binary.l->loc, "no such method");
 			} else {
 				/* Auto-dereferencing */
 
@@ -317,8 +309,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 					}
 				}
 
-				throw_error(expr->loc,
-						"no such field");
+				throw_error(expr->loc, "no such field");
 			}
 		}
 
