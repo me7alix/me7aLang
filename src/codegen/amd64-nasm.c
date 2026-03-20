@@ -80,7 +80,7 @@ uint get_type_size(Type type) {
 	}
 }
 
-uint get_struct_alignment(TAC_Operand var) {
+uint get_struct_offset(TAC_Operand var) {
 	if (var.var.fields.count == 0) return 0;
 	uint total = 0;
 
@@ -103,139 +103,143 @@ uint get_struct_alignment(TAC_Operand var) {
 
 void opr_type_to_stack(TAC_Operand t, char *buf) {
 	switch (tac_ir_get_opr_type(t).kind) {
-		case TYPE_STRUCT:
-			sprintf(buf, " ");
-			break;
-		default: {
-			uint reg_row = get_reg_row(tac_ir_get_opr_type(t));
-			sprintf(buf, "%s", (char*[]){"byte", "word", "dword", "qword"}[reg_row]);
-		}
+	case TYPE_STRUCT:
+		sprintf(buf, " ");
+		break;
+	default:
+		uint reg_row = get_reg_row(tac_ir_get_opr_type(t));
+		sprintf(buf, "%s", (char*[]){"byte", "word", "dword", "qword"}[reg_row]);
 	}
+}
+
+void opr_var(TAC_Operand opr) {
+
 }
 
 char *opr_to_nasm(TAC_Operand opr) {
 	static char rbuf[64];
 	switch (opr.kind) {
-		case OPR_SIZEOF: {
-			uint size = get_type_size(opr.size_of.vtype);
-			if (opr.size_of.vtype.kind == TYPE_ARRAY)
-				size = get_type_size(*opr.size_of.vtype.array.elem) * opr.size_of.vtype.array.length;
-			sprintf(rbuf, "%u", size);
-		} break;
+	case OPR_SIZEOF: {
+		uint size = get_type_size(opr.size_of.vtype);
+		if (opr.size_of.vtype.kind == TYPE_ARRAY)
+			size = get_type_size(*opr.size_of.vtype.array.elem) * opr.size_of.vtype.array.length;
+		sprintf(rbuf, "%u", size);
+	} break;
 
-		case OPR_LABEL: {
-			sprintf(rbuf, ".L%u", opr.label_id);
-		} break;
+	case OPR_LABEL: {
+		sprintf(rbuf, ".L%u", opr.label_id);
+	} break;
 
-		case OPR_VAR: {
-			uint field_off = get_struct_alignment(opr);
-			char ts[32]; opr_type_to_stack(opr, ts);
+	case OPR_VAR: {
+		uint field_off = get_struct_offset(opr);
+		char ts[32]; opr_type_to_stack(opr, ts);
 
-			if (opr.var.kind == VAR_STACK) {
+		if (opr.var.kind == VAR_STACK) {
+			uint off = *OffTable_get(&stack_table, opr.var.addr_id);
+			sprintf(rbuf, "%s[rbp - %u]", ts, off - field_off);
+		} else if (opr.var.kind == VAR_ADDR) {
+			if (opr.var.addr_kind == VAR_STACK) {
 				uint off = *OffTable_get(&stack_table, opr.var.addr_id);
-				sprintf(rbuf, "%s [rbp - %u]", ts, off - field_off);
-			} else if (opr.var.kind == VAR_ADDR) {
-				if (opr.var.addr_kind == VAR_STACK) {
-					uint off = *OffTable_get(&stack_table, opr.var.addr_id);
-					sb_appendf(&body, "    mov rax, qword [rbp - %u]\n", off);
-					sprintf(rbuf, "%s [rax + %u]", ts, field_off);
-				} else if (opr.var.addr_kind == VAR_DATA) {
-					sb_appendf(&body, "    lea rax, [rel D%u + %lu]\n", opr.var.addr_id, field_off);
-					sprintf(rbuf, "%s [rax]", ts);
-				} else UNREACHABLE;
-			} else if (opr.var.kind == VAR_DATA) {
-				sprintf(rbuf, "%s [rel D%u + %u]", ts, opr.var.addr_id, field_off);
-			}
-		} break;
+				sb_appendf(&body, "    mov rax, qword[rbp - %u]\n", off);
+				sprintf(rbuf, "%s[rax + %u]", ts, field_off);
+			} else if (opr.var.addr_kind == VAR_DATA) {
+				sb_appendf(&body, "    lea rax, [rel D%u + %lu]\n", opr.var.addr_id, field_off);
+				sprintf(rbuf, "%s[rax]", ts);
+			} else UNREACHABLE;
+		} else if (opr.var.kind == VAR_DATA) {
+			sprintf(rbuf, "%s[rel D%u + %u]", ts, opr.var.addr_id, field_off);
+		}
+	} break;
 
-		case OPR_LITERAL: {
-			switch (opr.literal.type.kind) {
-				case TYPE_FLOAT:
-				case TYPE_F32: {
-					float x = (float)opr.literal.lfloat;
-					uint32_t bits;
-					memcpy(&bits, &x, 4);
-					sb_appendf(&body, "    mov r10d, 0x%08X\n", bits);
-					sb_appendf(&body, "    movd xmm0, r10d\n", bits);
-					sprintf(rbuf, "xmm0");
-				} break;
-				case TYPE_I32:
-				case TYPE_INT:
-					sprintf(rbuf, "%d", (int) opr.literal.lint);
-					break;
-				case TYPE_U32:
-				case TYPE_UINT:
-					sprintf(rbuf, "%u", (uint) opr.literal.lint);
-					break;
-				case TYPE_BOOL:
-				case TYPE_I8:
-					sprintf(rbuf, "%d", (i8) opr.literal.lint);
-					break;
-				case TYPE_U8:
-					sprintf(rbuf, "%d", (u8) opr.literal.lint);
-					break;
-				case TYPE_I16:
-					sprintf(rbuf, "%hd", (i16) opr.literal.lint);
-					break;
-				case TYPE_U16:
-					sprintf(rbuf, "%hu", (u16) opr.literal.lint);
-					break;
-				case TYPE_UPTR:
-				case TYPE_U64:
-					sprintf(rbuf, "%llu", opr.literal.lint);
-					break;
-				case TYPE_ARRAY:
-				case TYPE_POINTER:
-				case TYPE_IPTR:
-				case TYPE_I64:
-					sprintf(rbuf, "%lli", opr.literal.lint);
-					break;
-				default: printf("%d\n", opr.literal.type.kind); UNREACHABLE;
-			}
+	case OPR_LITERAL: {
+		switch (opr.literal.type.kind) {
+		case TYPE_FLOAT:
+		case TYPE_F32: {
+			float x = (float)opr.literal.lfloat;
+			uint32_t bits;
+			memcpy(&bits, &x, 4);
+			sb_appendf(&body, "    mov r10d, 0x%08X\n", bits);
+			sb_appendf(&body, "    movd xmm0, r10d\n", bits);
+			sprintf(rbuf, "xmm0");
 		} break;
+		case TYPE_I32:
+		case TYPE_INT:
+			sprintf(rbuf, "%d", (int) opr.literal.lint);
+			break;
+		case TYPE_U32:
+		case TYPE_UINT:
+			sprintf(rbuf, "%u", (uint) opr.literal.lint);
+			break;
+		case TYPE_BOOL:
+		case TYPE_I8:
+			sprintf(rbuf, "%d", (i8) opr.literal.lint);
+			break;
+		case TYPE_U8:
+			sprintf(rbuf, "%d", (u8) opr.literal.lint);
+			break;
+		case TYPE_I16:
+			sprintf(rbuf, "%hd", (i16) opr.literal.lint);
+			break;
+		case TYPE_U16:
+			sprintf(rbuf, "%hu", (u16) opr.literal.lint);
+			break;
+		case TYPE_UPTR:
+		case TYPE_U64:
+			sprintf(rbuf, "%llu", opr.literal.lint);
+			break;
+		case TYPE_ARRAY:
+		case TYPE_POINTER:
+		case TYPE_IPTR:
+		case TYPE_I64:
+			sprintf(rbuf, "%lli", opr.literal.lint);
+			break;
+		default:
+			printf("%d\n", opr.literal.type.kind); UNREACHABLE;
+		}
+	} break;
 
-		case OPR_FUNC_RET: {
-			switch (opr.func_ret.type.kind) {
-				case TYPE_ARRAY:
-				case TYPE_STRUCT:
-					assert(!"error: passing arrays/structs isn't supported yet\n");
-				default: {
-					uint reg_row = get_reg_row(opr.func_ret.type);
-					sprintf(rbuf, "%s", RAX[reg_row]);
+	case OPR_FUNC_RET: {
+		switch (opr.func_ret.type.kind) {
+		case TYPE_ARRAY:
+		case TYPE_STRUCT:
+			assert(!"error: passing arrays/structs isn't supported yet\n");
+		default:
+			uint reg_row = get_reg_row(opr.func_ret.type);
+			sprintf(rbuf, "%s", RAX[reg_row]);
+		}
+	} break;
+
+	case OPR_FUNC_INP: {
+		char ts[32]; opr_type_to_stack(opr, ts);
+		uint arg_id = opr.func_inp.arg_id;
+		size_t arg_row = get_reg_row(opr.func_inp.type);
+
+		switch (tp) {
+			case TP_NULL: break;
+			case TP_MACOS:
+			case TP_LINUX: {
+				if (arg_id >= sysv_regs_cnt) {
+					uint shadow_space = (arg_id - sysv_regs_cnt) * 8 + 48;
+					sb_appendf(&body, "    mov %s, %s[rbp + %u]\n", R10[arg_row], ts, shadow_space);
+					sprintf(rbuf, "%s", R10[arg_row]);
+				} else {
+					sprintf(rbuf, "%s", sysv_regs[arg_row][arg_id]);
 				}
-			}
-		} break;
-
-		case OPR_FUNC_INP: {
-			char ts[32]; opr_type_to_stack(opr, ts);
-			uint arg_id = opr.func_inp.arg_id;
-			size_t arg_row = get_reg_row(opr.func_inp.type);
-
-			switch (tp) {
-				case TP_NULL: break;
-				case TP_MACOS:
-				case TP_LINUX: {
-					if (arg_id >= sysv_regs_cnt) {
-						uint shadow_space = (arg_id - sysv_regs_cnt) * 8 + 48;
-						sb_appendf(&body, "    mov %s, %s [rbp + %u]\n", R10[arg_row], ts, shadow_space);
-						sprintf(rbuf, "%s", R10[arg_row]);
-					} else {
-						sprintf(rbuf, "%s", sysv_regs[arg_row][arg_id]);
-					}
-				} break;
-				case TP_WINDOWS: {
-					if (arg_id >= win_regs_cnt) {
-						uint shadow_space = (arg_id - win_regs_cnt) * 8 + 48;
-						sb_appendf(&body, "    mov %s, %s [rbp + %u]\n", R10[arg_row], ts, shadow_space);
-						sprintf(rbuf, "%s", R10[arg_row]);
-					} else {
-						sprintf(rbuf, "%s", win_regs[arg_row][arg_id]);
-					}
-				} break;
+			} break;
+			case TP_WINDOWS: {
+				if (arg_id >= win_regs_cnt) {
+					uint shadow_space = (arg_id - win_regs_cnt) * 8 + 48;
+					sb_appendf(&body, "    mov %s, %s[rbp + %u]\n", R10[arg_row], ts, shadow_space);
+					sprintf(rbuf, "%s", R10[arg_row]);
+				} else {
+					sprintf(rbuf, "%s", win_regs[arg_row][arg_id]);
+				}
 			} break;
 		} break;
+	} break;
 
-		default: UNREACHABLE;
+	default:
+		UNREACHABLE;
 	}
 
 	return rbuf;
@@ -286,7 +290,7 @@ void nasm_gen_new_stack_var(TAC_Instruction ci, char *dst, char *arg1, char *arg
 	char ts[32]; opr_type_to_stack(ci.dst, ts);
 	total_offset_add(get_type_size(ci.dst.var.type));
 	OffTable_add(&stack_table, ci.dst.var.addr_id, total_offset);
-	sprintf(dst, "%s [rbp - %u]", ts, total_offset);
+	sprintf(dst, "%s[rbp - %u]", ts, total_offset);
 	reg_alloc(ci, arg1, arg2);
 }
 
@@ -566,7 +570,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				char ts[32]; opr_type_to_stack(ci.dst, ts);
 				total_offset_add(get_type_size(ci.dst.var.type));
 				OffTable_add(&stack_table, ci.dst.var.addr_id, total_offset);
-				size_t field_off = get_struct_alignment(ci.arg1);
+				size_t field_off = get_struct_offset(ci.arg1);
 
 				if (ci.arg1.var.kind == VAR_ADDR) {
 					if (ci.arg1.var.addr_kind == VAR_STACK) {
@@ -636,7 +640,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 							if (i >= sysv_regs_cnt) {
 								sb_appendf(&body, "    mov %s, %s\n", R10[arg_row], opr_to_nasm(ci.args[i]));
 								uint shadow_space = (i - sysv_regs_cnt) * 8 + 32;
-								sb_appendf(&body, "    mov %s [rsp + %u], %s\n", ts, shadow_space, R10[arg_row]);
+								sb_appendf(&body, "    mov %s[rsp + %u], %s\n", ts, shadow_space, R10[arg_row]);
 							} else {
 								sb_appendf(&body, "    mov %s, %s\n", sysv_regs[arg_row][i], opr_to_nasm(ci.args[i]));
 							}
@@ -645,7 +649,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 							if (i >= sysv_regs_cnt) {
 								sb_appendf(&body, "    mov %s, %s\n", R10[arg_row], opr_to_nasm(ci.args[i]));
 								uint shadow_space = (i - win_regs_cnt) * 8 + 32;
-								sb_appendf(&body, "    mov %s [rsp + %u], %s\n", ts, shadow_space, R10[arg_row]);
+								sb_appendf(&body, "    mov %s[rsp + %u], %s\n", ts, shadow_space, R10[arg_row]);
 							} else {
 								sb_appendf(&body, "    mov %s, %s\n", win_regs[arg_row][i], opr_to_nasm(ci.args[i]));
 							}
