@@ -423,7 +423,8 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		return inst.dst;
 	} break;
 
-	default: UNREACHABLE;
+	default:
+		UNREACHABLE;
 	}
 
 	return (TAC_Operand){0};
@@ -478,11 +479,11 @@ void tac_ir_gen_var_mut(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	TAC_OpCode op_eq;
 	bool is_op_eq;
 	switch (cn->var_mut.expr->expr_binary.op) {
-		case AST_OP_ADD_EQ: op_eq = OP_ADD; is_op_eq = true; break;
-		case AST_OP_SUB_EQ: op_eq = OP_SUB; is_op_eq = true; break;
-		case AST_OP_MUL_EQ: op_eq = OP_MUL; is_op_eq = true; break;
-		case AST_OP_DIV_EQ: op_eq = OP_DIV; is_op_eq = true; break;
-		default: is_op_eq = false;
+	case AST_OP_ADD_EQ: op_eq = OP_ADD; is_op_eq = true; break;
+	case AST_OP_SUB_EQ: op_eq = OP_SUB; is_op_eq = true; break;
+	case AST_OP_MUL_EQ: op_eq = OP_MUL; is_op_eq = true; break;
+	case AST_OP_DIV_EQ: op_eq = OP_DIV; is_op_eq = true; break;
+	default: is_op_eq = false;
 	}
 
 	if (is_op_eq) {
@@ -620,187 +621,188 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 	for (size_t i = 0; i < fn->body.stmts.count; i++) {
 		AST_Node *cn = da_get(&fn->body.stmts, i);
 		switch (cn->kind) {
-			case AST_VAR_DEF:     tac_ir_gen_var_def(prog, func, cn);       break;
-			case AST_FUNC_CALL:   tac_ir_gen_func_call(prog, func, cn);     break;
-			case AST_METHOD_CALL: tac_ir_gen_method_call(prog, func, cn);   break;
-			case AST_VAR_MUT:     tac_ir_gen_var_mut(prog, func, cn);       break;
-			case AST_IF_STMT:     tac_ir_gen_if_chain(ctx, prog, func, cn); break;
-			case AST_BODY:        tac_ir_gen_body(ctx, prog, func, cn);     break;
+		case AST_VAR_DEF:     tac_ir_gen_var_def(prog, func, cn);       break;
+		case AST_FUNC_CALL:   tac_ir_gen_func_call(prog, func, cn);     break;
+		case AST_METHOD_CALL: tac_ir_gen_method_call(prog, func, cn);   break;
+		case AST_VAR_MUT:     tac_ir_gen_var_mut(prog, func, cn);       break;
+		case AST_IF_STMT:     tac_ir_gen_if_chain(ctx, prog, func, cn); break;
+		case AST_BODY:        tac_ir_gen_body(ctx, prog, func, cn);     break;
 
-			case AST_FUNC_RET: {
-				if (cn->func_ret.type.kind == TYPE_NULL) {
+		case AST_FUNC_RET: {
+			if (cn->func_ret.type.kind == TYPE_NULL) {
+				da_append(&func->body, ((TAC_Instruction){
+					.op = OP_RETURN,
+					.arg1 = (TAC_Operand) {.kind = OPR_NULL},
+				}));
+				break;
+			}
+
+			IRGenExprCtx ctx = {0};
+			ctx.is_right_of_eq = true;
+
+			TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->func_ret.expr);
+			switch (res.kind) {
+				case OPR_LITERAL: {
 					da_append(&func->body, ((TAC_Instruction){
 						.op = OP_RETURN,
-						.arg1 = (TAC_Operand) {.kind = OPR_NULL},
+						.arg1 = res,
 					}));
-					break;
-				}
+				} break;
 
-				IRGenExprCtx ctx = {0};
-				ctx.is_right_of_eq = true;
+				case OPR_VAR: {
+					da_append(&func->body, ((TAC_Instruction){
+						.op = OP_RETURN,
+						.arg1 = (TAC_Operand) {
+							.kind = OPR_VAR,
+							.var.type = cn->func_ret.type,
+							.var.addr_id = res.var.addr_id,
+						},
+					}));
+				} break;
 
-				TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->func_ret.expr);
-				switch (res.kind) {
-					case OPR_LITERAL: {
-						da_append(&func->body, ((TAC_Instruction){
-							.op = OP_RETURN,
-							.arg1 = res,
-						}));
-					} break;
+				default: UNREACHABLE;
+			}
+		} break;
 
-					case OPR_VAR: {
-						da_append(&func->body, ((TAC_Instruction){
-							.op = OP_RETURN,
-							.arg1 = (TAC_Operand) {
-								.kind = OPR_VAR,
-								.var.type = cn->func_ret.type,
-								.var.addr_id = res.var.addr_id,
-							},
-						}));
-					} break;
+		case AST_LOOP_BREAK:
+			if (ctx->loop_gen <= 0) throw_error(cn->loc, "break outside of a loop");
+			da_append(&func->body, ((TAC_Instruction){
+				.op = OP_JUMP,
+				.dst = (TAC_Operand) {
+					.kind = OPR_LABEL,
+					.label_id = ctx->label_end,
+				},
+			}));
+			break;
 
-					default: UNREACHABLE;
-				}
-			} break;
+		case AST_LOOP_CONTINUE:
+			if (ctx->loop_gen <= 0) throw_error(cn->loc, "continue outside of a loop");
+			if (ctx->for_var_mut) tac_ir_gen_var_mut(prog, func, ctx->for_var_mut);
+			da_append(&func->body, ((TAC_Instruction){
+				.op = OP_JUMP,
+				.dst = (TAC_Operand) {
+					.kind = OPR_LABEL,
+					.label_id = ctx->label_start,
+				},
+			}));
+			break;
 
-			case AST_LOOP_BREAK:
-				if (ctx->loop_gen <= 0) throw_error(cn->loc, "break outside of a loop");
-				da_append(&func->body, ((TAC_Instruction){
-					.op = OP_JUMP,
-					.dst = (TAC_Operand) {
-						.kind = OPR_LABEL,
-						.label_id = ctx->label_end,
-					},
-				}));
-				break;
+		case AST_WHILE_STMT: {
+			ctx->loop_gen++;
 
-			case AST_LOOP_CONTINUE:
-				if (ctx->loop_gen <= 0) throw_error(cn->loc, "continue outside of a loop");
-				if (ctx->for_var_mut) tac_ir_gen_var_mut(prog, func, ctx->for_var_mut);
-				da_append(&func->body, ((TAC_Instruction){
-					.op = OP_JUMP,
-					.dst = (TAC_Operand) {
-						.kind = OPR_LABEL,
-						.label_id = ctx->label_start,
-					},
-				}));
-				break;
+			uint saved_label_start = ctx->label_start;
+			uint saved_label_end = ctx->label_end;
 
-			case AST_WHILE_STMT: {
-				ctx->loop_gen++;
+			ctx->label_start = label_id++;
+			ctx->label_end = label_id++;
 
-				uint saved_label_start = ctx->label_start;
-				uint saved_label_end = ctx->label_end;
+			da_append(&func->body, ((TAC_Instruction){
+				.op = OP_LABEL,
+				.arg1 = (TAC_Operand) {
+					.kind = OPR_LABEL,
+					.label_id = ctx->label_start,
+				},
+			}));
 
-				ctx->label_start = label_id++;
-				ctx->label_end = label_id++;
+			IRGenExprCtx ectx = {0};
+			TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->stmt_while.expr);
 
-				da_append(&func->body, ((TAC_Instruction){
-					.op = OP_LABEL,
-					.arg1 = (TAC_Operand) {
-						.kind = OPR_LABEL,
-						.label_id = ctx->label_start,
-					},
-				}));
+			da_append(&func->body, ((TAC_Instruction){
+				.op = OP_JUMP_IF_NOT,
+				.arg1 = res,
+				.dst = (TAC_Operand) {
+					.kind = OPR_LABEL,
+					.label_id = ctx->label_end,
+				},
+			}));
 
-				IRGenExprCtx ectx = {0};
-				TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->stmt_while.expr);
+			tac_ir_gen_body(ctx, prog, func, cn->stmt_while.body);
 
-				da_append(&func->body, ((TAC_Instruction){
-					.op = OP_JUMP_IF_NOT,
-					.arg1 = res,
-					.dst = (TAC_Operand) {
-						.kind = OPR_LABEL,
-						.label_id = ctx->label_end,
-					},
-				}));
+			da_append(&func->body, ((TAC_Instruction){
+				.op = OP_JUMP,
+				.dst = (TAC_Operand) {
+					.kind = OPR_LABEL,
+					.label_id = ctx->label_start,
+				},
+			}));
 
-				tac_ir_gen_body(ctx, prog, func, cn->stmt_while.body);
+			da_append(&func->body, ((TAC_Instruction){
+				.op = OP_LABEL,
+				.arg1 = (TAC_Operand) {
+					.kind = OPR_LABEL,
+					.label_id = ctx->label_end,
+				},
+			}));
 
-				da_append(&func->body, ((TAC_Instruction){
-					.op = OP_JUMP,
-					.dst = (TAC_Operand) {
-						.kind = OPR_LABEL,
-						.label_id = ctx->label_start,
-					},
-				}));
+			ctx->label_start = saved_label_start;
+			ctx->label_end = saved_label_end;
 
-				da_append(&func->body, ((TAC_Instruction){
-					.op = OP_LABEL,
-					.arg1 = (TAC_Operand) {
-						.kind = OPR_LABEL,
-						.label_id = ctx->label_end,
-					},
-				}));
+			ctx->loop_gen--;
+		} break;
 
-				ctx->label_start = saved_label_start;
-				ctx->label_end = saved_label_end;
-
-				ctx->loop_gen--;
-			} break;
-
-			case AST_FOR_STMT: {
-				ctx->loop_gen++;
-				switch (cn->stmt_for.var->kind) {
-					case AST_VAR_MUT: tac_ir_gen_var_mut(prog, func, cn->stmt_for.var); break;
-					case AST_VAR_DEF: tac_ir_gen_var_def(prog, func, cn->stmt_for.var); break;
-					default: UNREACHABLE;
-				}
-
-				uint saved_label_start = ctx->label_start;
-				uint saved_label_end = ctx->label_end;
-
-				ctx->label_start = label_id++;
-				ctx->label_end = label_id++;
-
-				da_append(&func->body, ((TAC_Instruction){
-					.op = OP_LABEL,
-					.arg1 = (TAC_Operand) {
-						.kind = OPR_LABEL,
-						.label_id = ctx->label_start,
-					},
-				}));
-
-				IRGenExprCtx ectx = {0};
-				TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->stmt_for.expr);
-
-				da_append(&func->body, ((TAC_Instruction){
-					.op = OP_JUMP_IF_NOT,
-					.arg1 = res,
-					.dst = (TAC_Operand) {
-						.kind = OPR_LABEL,
-						.label_id = ctx->label_end,
-					},
-				}));
-
-				ctx->for_var_mut = cn->stmt_for.mut;
-				tac_ir_gen_body(ctx, prog, func, cn->stmt_for.body);
-				tac_ir_gen_var_mut(prog, func, cn->stmt_for.mut);
-
-				da_append(&func->body, ((TAC_Instruction){
-					.op = OP_JUMP,
-					.dst = (TAC_Operand) {
-						.kind = OPR_LABEL,
-						.label_id = ctx->label_start,
-					},
-				}));
-
-				da_append(&func->body, ((TAC_Instruction){
-					.op = OP_LABEL,
-					.arg1 = (TAC_Operand) {
-						.kind = OPR_LABEL,
-						.label_id = ctx->label_end,
-					},
-				}));
-
-				ctx->label_start = saved_label_start;
-				ctx->label_end = saved_label_end;
-
-				ctx->loop_gen--;
-				ctx->for_var_mut = NULL;
-			} break;
-
+		case AST_FOR_STMT: {
+			ctx->loop_gen++;
+			switch (cn->stmt_for.var->kind) {
+			case AST_VAR_MUT: tac_ir_gen_var_mut(prog, func, cn->stmt_for.var); break;
+			case AST_VAR_DEF: tac_ir_gen_var_def(prog, func, cn->stmt_for.var); break;
 			default: UNREACHABLE;
+			}
+
+			uint saved_label_start = ctx->label_start;
+			uint saved_label_end = ctx->label_end;
+
+			ctx->label_start = label_id++;
+			ctx->label_end = label_id++;
+
+			da_append(&func->body, ((TAC_Instruction){
+				.op = OP_LABEL,
+				.arg1 = (TAC_Operand) {
+					.kind = OPR_LABEL,
+					.label_id = ctx->label_start,
+				},
+			}));
+
+			IRGenExprCtx ectx = {0};
+			TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->stmt_for.expr);
+
+			da_append(&func->body, ((TAC_Instruction){
+				.op = OP_JUMP_IF_NOT,
+				.arg1 = res,
+				.dst = (TAC_Operand) {
+					.kind = OPR_LABEL,
+					.label_id = ctx->label_end,
+				},
+			}));
+
+			ctx->for_var_mut = cn->stmt_for.mut;
+			tac_ir_gen_body(ctx, prog, func, cn->stmt_for.body);
+			tac_ir_gen_var_mut(prog, func, cn->stmt_for.mut);
+
+			da_append(&func->body, ((TAC_Instruction){
+				.op = OP_JUMP,
+				.dst = (TAC_Operand) {
+					.kind = OPR_LABEL,
+					.label_id = ctx->label_start,
+				},
+			}));
+
+			da_append(&func->body, ((TAC_Instruction){
+				.op = OP_LABEL,
+				.arg1 = (TAC_Operand) {
+					.kind = OPR_LABEL,
+					.label_id = ctx->label_end,
+				},
+			}));
+
+			ctx->label_start = saved_label_start;
+			ctx->label_end = saved_label_end;
+
+			ctx->loop_gen--;
+			ctx->for_var_mut = NULL;
+		} break;
+
+		default:
+			UNREACHABLE;
 		}
 	}
 }
