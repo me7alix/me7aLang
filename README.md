@@ -1,7 +1,7 @@
 # me7aLang
 
 **me7aLang** (metaLang) is a general-purpose low-level programming language created for educational purposes.
-The compiler is written in **C**, with a small number of dependencies and a simple design focused on clarity and learning.
+The compiler is kind of toyish, written in **C**, with a small number of dependencies and a simple design focused on clarity and learning.
 
 ## Features
 - Written entirely in C
