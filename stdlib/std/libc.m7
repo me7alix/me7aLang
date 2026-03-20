@@ -11,5 +11,6 @@ extern printf(fmt: *u8, ...)
 extern sprintf(buf: *u8, fmt: *u8, ...)
 extern strcmp(a: *u8, b: *u8): int
 extern strcat(a: *u8, b: *u8): *u8
+extern strlen(a: *u8): uptr
 extern scanf(fmt: *u8, ...)
 extern exit(code: int)
