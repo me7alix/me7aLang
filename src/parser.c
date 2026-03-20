@@ -52,25 +52,29 @@ Symbol *parser_symbol_table_get(Parser *p, SymbolType st, char *id) {
 
 Type parser_get_type(Parser *p, AST_Node *n) {
 	switch (n->kind) {
-		case AST_BIN_EXP:     return n->expr_binary.type;
-		case AST_UN_EXP:      return n->expr_unary.type;
-		case AST_LITERAL:     return n->literal.type;
-		case AST_FUNC_CALL:   return n->func_call.type;
-		case AST_METHOD_CALL: return n->method_call.type;
-		case AST_VID:         return parser_symbol_table_get(p, SBL_VAR, n->vid.id)->variable.type;
-		default: UNREACHABLE;
+	case AST_BIN_EXP:     return n->expr_binary.type;
+	case AST_UN_EXP:      return n->expr_unary.type;
+	case AST_LITERAL:     return n->literal.type;
+	case AST_FUNC_CALL:   return n->func_call.type;
+	case AST_METHOD_CALL: return n->method_call.type;
+	case AST_VID:         return parser_symbol_table_get(p, SBL_VAR, n->vid.id)->variable.type;
+	default: UNREACHABLE;
 	}
 }
 
 bool compare_types(Type a, Type b) {
-	if (a.kind != b.kind) return false;
 	if (is_pointer(a) && is_pointer(b)) {
-		if (get_pointer_base(a)->kind != get_pointer_base(b)->kind &&
-			!(get_pointer_base(a)->kind == TYPE_NULL ||
-			get_pointer_base(b)->kind == TYPE_NULL)) {
-			return false;
-		}
+		if (
+			get_pointer_base(a)->kind != get_pointer_base(b)->kind &&
+			!(
+				get_pointer_base(a)->kind == TYPE_NULL ||
+				get_pointer_base(b)->kind == TYPE_NULL
+			)
+		) return false;
+	} else if (a.kind != b.kind) {
+		return false;
 	}
+
 	return true;
 }
 
