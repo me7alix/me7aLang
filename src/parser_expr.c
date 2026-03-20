@@ -176,7 +176,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 		return expr->func_call.type;
 
 	case AST_VID: {
-		Symbol *var = parser_symbol_table_get(p, SBL_VAR, expr->vid);
+		Symbol *var = parser_symbol_table_get(p, SBL_VAR, expr->vid.id);
 		if (!var) throw_error(expr->loc, "no such variable in the scope");
 		return var->variable.type;
 	} break;
@@ -309,7 +309,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 
 				da_foreach (StructMember, member, &lt.user->ustruct.members) {
 					if (member->kind == STMEM_FIELD) {
-						if (strcmp(expr->expr_binary.r->vid,
+						if (strcmp(expr->expr_binary.r->vid.id,
 								member->as.field.id) == 0) {
 							expr->expr_binary.type = member->as.field.type;
 							return member->as.field.type;
@@ -492,10 +492,12 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				da_append(&nodes, parse_func_call(p));
 				p->cur_token--;
 			} else {
+				Symbol *smbl = parser_symbol_table_get(p, SBL_VAR, peek(p).data);
 				da_append(&nodes, ast_new(
 					.kind = AST_VID,
 					.loc = peek(p).loc,
-					.vid = peek(p).data
+					.vid.id = peek(p).data,
+					.vid.uid = smbl ? smbl->variable.uid : 0,
 				));
 			}
 			break;

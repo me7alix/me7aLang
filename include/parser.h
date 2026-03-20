@@ -8,8 +8,10 @@
 #include "lexer.h"
 
 typedef enum {
-	EXPR_PARSING_VAR, EXPR_PARSING_FUNC_CALL,
-	EXPR_PARSING_PAR, EXPR_PARSING_STMT,
+	EXPR_PARSING_VAR,
+	EXPR_PARSING_FUNC_CALL,
+	EXPR_PARSING_PAR,
+	EXPR_PARSING_STMT,
 	EXPR_PARSING_SQBRA,
 } ExprParsingType;
 
@@ -119,6 +121,7 @@ struct AST_Node {
 		} body;
 		struct {
 			char *id;
+			uint uid;
 			Type type;
 			AST_Node *expr;
 		} var_def;
@@ -157,27 +160,31 @@ struct AST_Node {
 		} expr_binary;
 		struct {
 			char *id;
+			uint uid;
 			Type type;
 		} func_def_arg;
 		struct {
 			AST_Node *expr;
 			Type type;
 		} func_ret;
+		struct {
+			char *id;
+			uint uid;
+		} vid;
 		AST_Node *func_ret_exp;
 		Literal literal;
 		Type vtype;
-		char *vid;
 	};
 };
 
 typedef enum {
-	SBL_FUNC_DEF, SBL_VAR,
+	SBL_VAR,
+	SBL_FUNC_DEF,
 	SBL_FUNC_EXTERN,
 	SBL_FUNC_EX_USED,
 } SymbolType;
 
 typedef struct {
-	int nested[16];
 	union {
 		struct {
 			AST_Nodes args;
@@ -191,22 +198,24 @@ typedef struct {
 		} func_extern;
 		struct {
 			Type type;
+			uint uid;
 		} variable;
 	};
 } Symbol;
 
-typedef struct { SymbolType type; char *id; int *nested; } SymbolKey;
+typedef struct { SymbolType type; char *id; } SymbolKey;
 HT_DECL(SymbolTable, SymbolKey, Symbol)
+typedef DA(SymbolTable) SymbolScopeStack;
 
 typedef struct {
 	Token *cur_token;
 	SymbolTable st;
 	UserTypes ut;
-	int nested[16], nptr;
+	SymbolScopeStack sss;
 	AST_Node *program;
 } Parser;
 
-void parser_symbol_table_add(Parser *p, SymbolType st, char *id, Symbol smbl);
+bool parser_symbol_table_add(Parser *p, SymbolType st, char *id, Symbol smbl);
 Symbol *parser_symbol_table_get(Parser *p, SymbolType st, char *id);
 
 Type parser_get_type(Parser *p, AST_Node *n);

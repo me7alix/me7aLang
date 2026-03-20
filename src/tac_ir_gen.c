@@ -12,7 +12,9 @@ uint data_id  = 1;
 uint var_id   = 1;
 uint label_id = 1;
 
-HT_STR(ASTVarTable, TAC_Operand)
+HT_DECL(ASTVarTable, uint, TAC_Operand)
+HT_IMPL_NUM(ASTVarTable, uint, TAC_Operand)
+
 ASTVarTable avt = {0};
 
 Type tac_ir_get_opr_type(TAC_Operand op) {
@@ -133,11 +135,13 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			ctx->last_var = 0;
 			return (TAC_Operand) {
 				.kind = OPR_FIELD,
-				.field_id = en->vid,
+				.field_id = en->vid.id,
 			};
 		} else {
 			ctx->last_var = 0;
-			return *ASTVarTable_get(&avt, en->vid);
+			if (en->vid.uid == 0)
+				throw_error(en->loc, "no such variable in the scope");
+			return *ASTVarTable_get(&avt, en->vid.uid);
 		}
 	} break;
 
@@ -440,14 +444,14 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 			},
 		}));
 
-		ASTVarTable_add(&avt, cn->var_def.id, (TAC_Operand) {
+		ASTVarTable_add(&avt, cn->var_def.uid, (TAC_Operand) {
 			.kind = OPR_VAR,
 			.var.kind = VAR_STACK,
 			.var.type = cn->var_def.type,
 			.var.addr_id = var_id++
 		});
 	} else {
-		ASTVarTable_add(&avt, cn->var_def.id, (TAC_Operand) {
+		ASTVarTable_add(&avt, cn->var_def.uid, (TAC_Operand) {
 			.kind = OPR_VAR,
 			.var.kind = VAR_STACK,
 			.var.type = cn->var_def.type,
@@ -822,7 +826,7 @@ void tac_ir_gen_func(TAC_Program *prog, AST_Node *fn) {
 				.var.addr_id = var_id,
 			},
 		}));
-		ASTVarTable_add(&avt, cn->func_def_arg.id, (TAC_Operand) {
+		ASTVarTable_add(&avt, cn->func_def_arg.uid, (TAC_Operand) {
 			.kind = OPR_VAR,
 			.var.kind = VAR_STACK,
 			.var.type = cn->func_def_arg.type,
@@ -854,18 +858,18 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 		}
 	}
 
-	ht_foreach_node(SymbolTable, n, &p->st) {
+	ht_foreach_node (SymbolTable, n, &da_last(&p->sss)) {
 		if (n->key.type == SBL_FUNC_EXTERN) {
 			da_append(&prog.externs, ((TAC_Extern){
 				.name = n->val.func_extern.extern_smb,
 				.ret_type = n->val.func_extern.type,
 			}));
-		} else if (n->key.type == SBL_VAR && n->key.nested[0] == 0) {
+		} else if (n->key.type == SBL_VAR) {
 			da_append(&prog.globals, ((TAC_GlobalVar){
 				.type = n->val.variable.type,
 				.index = data_id,
 			}));
-			ASTVarTable_add(&avt, n->key.id, (TAC_Operand){
+			ASTVarTable_add(&avt, n->val.variable.uid, (TAC_Operand){
 				.kind = OPR_VAR,
 				.var.kind = VAR_DATA,
 				.var.type = n->val.variable.type,

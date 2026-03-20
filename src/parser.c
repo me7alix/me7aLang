@@ -12,43 +12,42 @@ static Token peek(Parser *p)  { return *p->cur_token;       }
 static Token peek2(Parser *p) { return *(p->cur_token + 1); }
 static Token next(Parser *p)  { return *(p->cur_token++);   }
 
-uint nested_uniq = 1;
-#define nested_push_next(p) (p)->nested[(p)->nptr++] = nested_uniq
-#define nested_push(p) (p)->nested[(p)->nptr++] = nested_uniq++
-#define nested_pop(p) (p)->nested[--(p)->nptr] = 0
-
-bool check_nested(int pn[16], int n[16]) {
-	for (size_t i = 0; n[i] != 0; i++) {
-		if (pn[i] != n[i]) return false;
-	}
-
-	return true;
-}
-
-void set_nested(int pn[16], int n[16]) {
-	memcpy(n, pn, 16 * sizeof(int));
-}
-
 HT_IMPL_STR(UserTypes, UserType*)
 HT_IMPL(SymbolTable, SymbolKey, Symbol)
 
 u32 SymbolTable_hashf(SymbolKey key) {
-	return hash_combine(strhash(key.id), numhash(key.type));
+	return hash_combine(hash_str(key.id), hash_num(key.type));
 }
 
 int SymbolTable_compare(SymbolKey cur_key, SymbolKey key) {
-	if (key.type == SBL_VAR) if (!check_nested(key.nested, cur_key.nested)) return 1;
 	return !(strcmp(key.id, cur_key.id) == 0 && key.type == cur_key.type);
 }
 
-void parser_symbol_table_add(Parser *p, SymbolType st, char *id, Symbol smbl) {
-	int *nested = malloc(sizeof p->nested);
-	set_nested(p->nested, nested);
-	SymbolTable_add(&p->st, (SymbolKey) { st, id, nested }, smbl);
+void parser_push_scope(Parser *p) {
+	da_append(&p->sss, (SymbolTable){0});
+}
+
+void parser_pop_scope(Parser *p) {
+	SymbolTable_free(&da_last(&p->sss));
+	p->sss.count--;
+}
+
+static uint VUID = 1;
+bool parser_symbol_table_add(Parser *p, SymbolType st, char *id, Symbol smbl) {
+	if (SymbolTable_get(&da_last(&p->sss), (SymbolKey) { st, id })) return true;
+	SymbolTable_add(&da_last(&p->sss), (SymbolKey) { st, id }, smbl);
+	return false;
 }
 
 Symbol *parser_symbol_table_get(Parser *p, SymbolType st, char *id) {
-	return SymbolTable_get(&p->st, (SymbolKey) { st, id, p->nested });
+	SymbolKey key = {st, id};
+
+	for (int i = p->sss.count - 1; i >= 0; i--) {
+		Symbol *smbl = SymbolTable_get(&da_get(&p->sss, i), key);
+		if (smbl) return smbl;
+	}
+
+	return NULL;
 }
 
 Type parser_get_type(Parser *p, AST_Node *n) {
@@ -58,7 +57,7 @@ Type parser_get_type(Parser *p, AST_Node *n) {
 		case AST_LITERAL:     return n->literal.type;
 		case AST_FUNC_CALL:   return n->func_call.type;
 		case AST_METHOD_CALL: return n->method_call.type;
-		case AST_VID:         return parser_symbol_table_get(p, SBL_VAR, n->vid)->variable.type;
+		case AST_VID:         return parser_symbol_table_get(p, SBL_VAR, n->vid.id)->variable.type;
 		default: UNREACHABLE;
 	}
 }
@@ -277,6 +276,7 @@ AST_Node *parse_var_def(Parser *p) {
 		.kind = AST_VAR_DEF,
 		.loc = loc,
 		.var_def.id = id,
+		.var_def.uid = VUID++,
 		.var_def.type = type,
 		.var_def.expr = NULL,
 	);
@@ -286,12 +286,10 @@ AST_Node *parse_var_def(Parser *p) {
 		vdn->var_def.expr = parse_expr(p, EXPR_PARSING_VAR, &type);
 	}
 
-	if (parser_symbol_table_get(p, SBL_VAR, vdn->var_def.id))
-		throw_error(vdn->loc, "redifinition of the variable");
-
-	parser_symbol_table_add(p, SBL_VAR, vdn->var_def.id, (Symbol) {
+	if (parser_symbol_table_add(p, SBL_VAR, vdn->var_def.id, (Symbol) {
 		.variable.type = type,
-	});
+		.variable.uid = vdn->var_def.uid,
+	})) throw_error(vdn->loc, "redifinition of the variable");
 
 	return vdn;
 }
@@ -308,6 +306,7 @@ AST_Node *parse_var_assign(Parser *p) {
 		.kind = AST_VAR_DEF,
 		.loc = loc,
 		.var_def.id = id,
+		.var_def.uid = VUID++,
 		.var_def.expr = expr,
 	);
 
@@ -318,18 +317,16 @@ AST_Node *parse_var_assign(Parser *p) {
 	case AST_FUNC_CALL: vdn->var_def.type = expr->func_call.type;   break;
 	case AST_VID:
 		Symbol *s = parser_symbol_table_get(
-			p, SBL_VAR, expr->vid);
+			p, SBL_VAR, expr->vid.id);
 		vdn->var_def.type = s->variable.type;
 		break;
 	default: UNREACHABLE;
 	}
 
-	assert(vdn->var_def.type.kind);
-	Symbol *vds = parser_symbol_table_get(p, SBL_VAR, vdn->var_def.id);
-	if (vds) throw_error(vdn->loc, "redifinition of the variable");
-	parser_symbol_table_add(p, SBL_VAR, vdn->var_def.id, (Symbol) {
+	if (parser_symbol_table_add(p, SBL_VAR, vdn->var_def.id, (Symbol) {
 		.variable.type = vdn->var_def.type,
-	});
+		.variable.uid = vdn->var_def.uid,
+	})) throw_error(vdn->loc, "redifinition of the variable");
 
 	return vdn;
 }
@@ -367,7 +364,7 @@ AST_Node *parse_func_return(Parser *p, AST_Node *func) {
 	return ret;
 }
 
-AST_Node *parse_body(Parser *p, AST_Node *func);
+AST_Node *parse_body(Parser *p, AST_Node *func, bool skip);
 
 AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 	AST_Node *r = ast_new(
@@ -382,7 +379,7 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 		throw_error(r->stmt_while.expr->loc, "bool expected");
 	next(p);
 
-	r->stmt_if.body = parse_body(p, func);
+	r->stmt_if.body = parse_body(p, func, false);
 
 	if (peek2(p).kind == TOK_ELSE_SYM) {
 		next(p);
@@ -394,7 +391,7 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 				.kind = AST_ELSE_STMT,
 				.loc = next(p).loc,
 			);
-			r->stmt_if.next->stmt_else.body = parse_body(p, func);
+			r->stmt_if.next->stmt_else.body = parse_body(p, func, false);
 		}
 	} else r->stmt_if.next = NULL;
 
@@ -410,7 +407,7 @@ AST_Node *parse_while_stmt(Parser *p, AST_Node *func) {
 		throw_error(r->stmt_while.expr->loc, "bool expected");
 
 	next(p);
-	r->stmt_while.body = parse_body(p, func);
+	r->stmt_while.body = parse_body(p, func, false);
 
 	return r;
 }
@@ -420,10 +417,9 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 		.kind = AST_FOR_STMT,
 		.loc = peek(p).loc,
 	);
-
 	next(p);
 
-	nested_push_next(p);
+	parser_push_scope(p);
 
 	if (peek2(p).kind == TOK_COL) {
 		r->stmt_for.var = parse_var_def(p);
@@ -442,14 +438,15 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 	r->stmt_for.mut = parse_var_mut(p, EXPR_PARSING_STMT);
 	next(p);
 
-	nested_pop(p);
+	r->stmt_for.body = parse_body(p, func, true);
 
-	r->stmt_for.body = parse_body(p, func);
+	parser_pop_scope(p);
 	return r;
 }
 
-AST_Node *parse_body(Parser *p, AST_Node *func) {
-	nested_push(p);
+AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
+	if (!skip)
+		parser_push_scope(p);
 
 	AST_Node *body = ast_new(.kind = AST_BODY);
 	expect_token(peek(p), TOK_OBRA);
@@ -461,7 +458,7 @@ AST_Node *parse_body(Parser *p, AST_Node *func) {
 		case TOK_CBRA: goto ex;
 
 		case TOK_OBRA:
-			da_append(&body->body.stmts, parse_body(p, func));
+			da_append(&body->body.stmts, parse_body(p, func, false));
 			break;
 
 		case TOK_ID: {
@@ -492,7 +489,7 @@ AST_Node *parse_body(Parser *p, AST_Node *func) {
 
 		case TOK_BLOCK:
 			next(p);
-			da_append(&body->body.stmts, parse_body(p, func));
+			da_append(&body->body.stmts, parse_body(p, func, false));
 			break;
 
 		case TOK_IF_SYM:    da_append(&body->body.stmts, parse_if_stmt(p, func));     break;
@@ -506,40 +503,41 @@ AST_Node *parse_body(Parser *p, AST_Node *func) {
 	}
 
 ex:
-	nested_pop(p);
+	if (!skip)
+		parser_pop_scope(p);
 	return body;
 }
 
 void parse_func_args(Parser *p, AST_Nodes *fargs) {
 	while (peek(p).kind != TOK_CPAR) {
 		switch (peek(p).kind) {
-			case TOK_COM: break;
-			case TOK_ID: {
-				expect_token(peek2(p), TOK_COL);
-				AST_Node *arg = ast_new(
-					.kind = AST_FUNC_DEF_ARG,
-					.func_def_arg.id = peek(p).data
-				);
+		case TOK_COM: break;
+		case TOK_ID: {
+			expect_token(peek2(p), TOK_COL);
+			AST_Node *arg = ast_new(
+				.loc = peek(p).loc,
+				.kind = AST_FUNC_DEF_ARG,
+				.func_def_arg.id = peek(p).data,
+				.func_def_arg.uid = VUID++,
+			);
 
-				next(p);
-				arg->func_def_arg.type = *parse_type(p);
-				da_append(fargs, arg);
+			next(p);
+			arg->func_def_arg.type = *parse_type(p);
+			da_append(fargs, arg);
 
-				nested_push_next(p);
-				parser_symbol_table_add(p, SBL_VAR, arg->func_def_arg.id, (Symbol) {
-					.variable.type = arg->func_def_arg.type,
-				});
-				nested_pop(p);
-			} break;
+			if (parser_symbol_table_add(p, SBL_VAR, arg->func_def_arg.id, (Symbol) {
+				.variable.type = arg->func_def_arg.type,
+				.variable.uid = arg->func_def_arg.uid,
+			})) throw_error(arg->loc, "redifinition of the variable");
+		} break;
 
-			case TOK_ANY: {
-				AST_Node *arg = ast_new(.kind = AST_FUNC_DEF_ARG_ANY);
-				da_append(fargs, arg);
-			} break;
+		case TOK_ANY:
+			AST_Node *arg = ast_new(.kind = AST_FUNC_DEF_ARG_ANY);
+			da_append(fargs, arg);
+			break;
 
-			default: {
-				expect_token(peek(p), p->cur_token->kind);
-			} break;
+		default:
+			expect_token(peek(p), p->cur_token->kind);
 		}
 
 		next(p);
@@ -563,14 +561,15 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 
 	next(p);
 	expect_token(next(p), TOK_OPAR);
+	
+	parser_push_scope(p);
 
 	if (self) {
 		da_append(&fdn->func_def.args, self);
-		nested_push_next(p);
 		parser_symbol_table_add(p, SBL_VAR, self->func_def_arg.id, (Symbol) {
 			.variable.type = self->func_def_arg.type,
+			.variable.uid = self->func_def_arg.uid,
 		});
-		nested_pop(p);
 	}
 
 	parse_func_args(p, &fdn->func_def.args);
@@ -583,8 +582,8 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 	}
 
 	if (self) {
-		fdn->func_def.body = parse_body(p, fdn);
-		nested_uniq++;
+		fdn->func_def.body = parse_body(p, fdn, true);
+		parser_pop_scope(p);
 		return fdn;
 	}
 
@@ -597,8 +596,8 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 		da_append(&fds.func_def.args, da_get(&fdn->func_def.args, i));
 
 	Symbol *seu = parser_symbol_table_get(p, SBL_FUNC_EX_USED, fdn->func_def.id);
-	Symbol *se  = parser_symbol_table_get(p, SBL_FUNC_EXTERN, fdn->func_def.id);
-	Symbol *sf  = parser_symbol_table_get(p, SBL_FUNC_DEF, fdn->func_def.id);
+	Symbol *se  = parser_symbol_table_get(p, SBL_FUNC_EXTERN,  fdn->func_def.id);
+	Symbol *sf  = parser_symbol_table_get(p, SBL_FUNC_DEF,     fdn->func_def.id);
 
 	if (se || seu) throw_error(fdn->loc, "the symbol is already in use");
 	else if (sf) {
@@ -618,14 +617,21 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 		sf->func_def.is_def = true;
 	} else {
 		if (peek(p).kind == TOK_SEMI) {
+			parser_pop_scope(p);
 			fds.func_def.is_def = false;
 			parser_symbol_table_add(p, SBL_FUNC_DEF, fdn->func_def.id, fds);
 			return NULL;
-		} else parser_symbol_table_add(p, SBL_FUNC_DEF, fdn->func_def.id, fds);
+		} else {
+			fdn->func_def.body = parse_body(p, fdn, true);	
+			parser_pop_scope(p);
+			parser_symbol_table_add(p, SBL_FUNC_DEF, fdn->func_def.id, fds);
+			return fdn;
+		}
 	}
 
-	fdn->func_def.body = parse_body(p, fdn);
-	nested_uniq++;
+	fdn->func_def.body = parse_body(p, fdn, true);	
+	parser_pop_scope(p);
+
 	return fdn;
 }
 
@@ -647,7 +653,9 @@ void parse_extern(Parser *p) {
 	next(p);
 	expect_token(next(p), TOK_OPAR);
 
+	parser_push_scope(p);
 	parse_func_args(p, &fes.func_extern.args);
+	parser_pop_scope(p);
 
 	if (peek(p).kind == TOK_COL) {
 		fes.func_extern.type = *parse_type(p);
@@ -656,8 +664,8 @@ void parse_extern(Parser *p) {
 		fes.func_extern.type = (Type) {.kind = TYPE_NULL};
 	}
 
-	Symbol *sf  = parser_symbol_table_get(p, SBL_FUNC_DEF, id);
-	Symbol *se  = parser_symbol_table_get(p, SBL_FUNC_EXTERN, id);
+	Symbol *sf  = parser_symbol_table_get(p, SBL_FUNC_DEF,     id);
+	Symbol *se  = parser_symbol_table_get(p, SBL_FUNC_EXTERN,  id);
 	Symbol *seu = parser_symbol_table_get(p, SBL_FUNC_EX_USED, id);
 
 	if (sf || se || seu)
@@ -666,7 +674,6 @@ void parse_extern(Parser *p) {
 	parser_symbol_table_add(p, SBL_FUNC_EXTERN, id, fes);
 	parser_symbol_table_add(p, SBL_FUNC_EX_USED, extern_smb, (Symbol){0});
 	expect_token(peek(p), TOK_SEMI);
-	nested_uniq++;
 }
 
 void parse_struct(Parser *p) {
@@ -690,6 +697,7 @@ void parse_struct(Parser *p) {
 				AST_Node *self = ast_new(
 					.kind = AST_FUNC_DEF_ARG,
 					.func_def_arg.id = "self",
+					.func_def_arg.uid = VUID++,
 					.func_def_arg.type = (Type){
 						.kind = TYPE_POINTER,
 						.pointer.base = ut,
@@ -726,6 +734,8 @@ Parser parser_parse(Token *tokens) {
 	AST_Node *prog = ast_new(.kind = AST_PROG);
 	p.program = prog;
 	p.cur_token = tokens;
+
+	parser_push_scope(&p);
 
 	while (peek(&p).kind != TOK_EOF) {
 		switch (peek(&p).kind) {

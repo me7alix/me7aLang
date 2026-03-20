@@ -92,7 +92,7 @@ u32 ImportedTable_hashf(char *str) {
 	if (realpath(str, real_path) == NULL)
 		strncpy(real_path, str, sizeof(real_path)-1);
 #endif
-	return strhash(real_path);;
+	return hash_str(real_path);;
 }
 
 int ImportedTable_compare(char *cur_str, char *str) {
