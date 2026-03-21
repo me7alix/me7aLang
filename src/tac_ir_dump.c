@@ -8,87 +8,96 @@
 char *tac_ir_dump_opr_type(TAC_Operand op) {
 	Type type = tac_ir_get_opr_type(op);
 	switch (type.kind) {
-		case TYPE_INT:    return "int";
-		case TYPE_UINT:   return "uint";
-		case TYPE_I32:    return "i32";
-		case TYPE_I64:    return "i64";
-		case TYPE_U64:    return "u64";
-		case TYPE_I16:    return "i16";
-		case TYPE_U16:    return "u16";
-		case TYPE_I8:     return "i8";
-		case TYPE_U8:     return "u8";
-		case TYPE_BOOL:   return "bool";
-		case TYPE_UPTR:   return "uptr";
-		case TYPE_IPTR:   return "iptr";
-		case TYPE_POINTER:
-		case TYPE_ARRAY:  return "ptr";
-		case TYPE_STRUCT:
-			char *ns = malloc(256);
-			sprintf(ns, "struct<%s>", type.user->id);
-			return ns;
-		default:          return "ERR";
+	case TYPE_INT:    return "int";
+	case TYPE_UINT:   return "uint";
+	case TYPE_I32:    return "i32";
+	case TYPE_I64:    return "i64";
+	case TYPE_U64:    return "u64";
+	case TYPE_I16:    return "i16";
+	case TYPE_U16:    return "u16";
+	case TYPE_I8:     return "i8";
+	case TYPE_U8:     return "u8";
+	case TYPE_BOOL:   return "bool";
+	case TYPE_UPTR:   return "uptr";
+	case TYPE_IPTR:   return "iptr";
+	case TYPE_POINTER:
+	case TYPE_ARRAY:  return "ptr";
+	case TYPE_STRUCT:
+		char *ns = malloc(256);
+		sprintf(ns, "struct<%s>", type.user->id);
+		return ns;
+	default:
+		return "ERR";
 	}
 }
 
 void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 	switch (opr.kind) {
-		case OPR_NULL:     sprintf(buf, "NULL"); break;
-		case OPR_SIZEOF:   sprintf(buf, "sizeof:%s", tac_ir_dump_opr_type(opr)); break;
-		case OPR_FUNC_INP: sprintf(buf, "FI(%u):%d", opr.func_inp.arg_id, opr.func_inp.type.kind); break;
-		case OPR_FUNC_RET: sprintf(buf, "FR:%s", tac_ir_dump_opr_type(opr)); break;
-		case OPR_NAME:     sprintf(buf, "\"%s\"", opr.name); break;
-		case OPR_LABEL:    sprintf(buf, ".L%u", opr.label_id);  break;
-		case OPR_FIELD:    sprintf(buf, ">%s", opr.field_id);  break;
+	case OPR_FUNC_INP: sprintf(buf, "FI(%u):%d", opr.func_inp.arg_id,
+							                     opr.func_inp.type.kind);    break;
+	case OPR_SIZEOF:   sprintf(buf, "sizeof:%s", tac_ir_dump_opr_type(opr)); break;
+	case OPR_FUNC_RET: sprintf(buf, "FR:%s",     tac_ir_dump_opr_type(opr)); break;
+	case OPR_NAME:     sprintf(buf, "\"%s\"",    opr.name);                  break;
+	case OPR_LABEL:    sprintf(buf, ".L%u",      opr.label_id);              break;
+	case OPR_FIELD:    sprintf(buf, ">%s",       opr.field_id);              break;	
+	case OPR_NULL:     sprintf(buf, "NULL");                                 break;
 
-		case OPR_VAR: {
-			switch (opr.var.kind) {
-				case VAR_STACK:
-					sprintf(buf, "(%u):%s", opr.var.addr_id, tac_ir_dump_opr_type(opr));
-					break;
-				case VAR_ADDR:
-					sprintf(buf, "[%u]:%s", opr.var.addr_id, tac_ir_dump_opr_type(opr));
-					break;
-				case VAR_DATA:
-					sprintf(buf, "{%u}:%s", opr.var.addr_id, tac_ir_dump_opr_type(opr));
-					break;
+	case OPR_VAR: {
+		switch (opr.var.kind) {
+		case VAR_STACK:
+			sprintf(buf, "(%u)", opr.var.addr_id);
+			break;
+		case VAR_ADDR:
+			int id = opr.var.addr_id;
+			switch (opr.var.addr_kind) {
+			case VAR_STACK: sprintf(buf, "[(%u)]", id); break;
+			case VAR_DATA:  sprintf(buf, "[{%u}]", id); break;
+			case VAR_ADDR:  sprintf(buf, "[[%u]]", id); break;
+			} break;
+		case VAR_DATA:
+			sprintf(buf, "{%u}", opr.var.addr_id);
+			break;
+		}
+
+		char scnd[256];
+		if (opr.var.fields.count > 0) {
+			strcpy(scnd, buf);
+
+			StringBuilder fields = {0};
+			da_foreach (char*, field, &opr.var.fields) {
+				sb_appendf(&fields, ".%s", *field);
 			}
 
-			if (opr.var.fields.count > 0) {
-				char scnd[256];
-				strcpy(scnd, buf);
+			sprintf(buf, "%s%s", scnd, fields.items);
+		}
 
-				StringBuilder fields = {0};
-				da_foreach (char*, field, &opr.var.fields) {
-					sb_appendf(&fields, ".%s", *field);
-				}
+		strcpy(scnd, buf);
+		sprintf(buf, "%s:%s", scnd, tac_ir_dump_opr_type(opr));
+	} break;
 
-				sprintf(buf, "%s|%s", scnd, fields.items);
-			}
-		} break;
-
-		case OPR_LITERAL: {
-			switch (opr.literal.type.kind) {
-				case TYPE_I32:
-				case TYPE_INT:
-					sprintf(buf, "%d:%s", (i32) opr.literal.lint, tac_ir_dump_opr_type(opr));
-					break;
-				case TYPE_I8:
-				case TYPE_BOOL:
-					sprintf(buf, "%d:%s", (i8) opr.literal.lint, tac_ir_dump_opr_type(opr));
-					break;
-				case TYPE_POINTER:
-				case TYPE_UPTR:
-				case TYPE_IPTR:
-				case TYPE_I64:
-					sprintf(buf, "%lli:%s", opr.literal.lint, tac_ir_dump_opr_type(opr));
-					break;
-				case TYPE_F32:
-					sprintf(buf, "%f:%s", (float) opr.literal.lfloat, tac_ir_dump_opr_type(opr));
-					break;
-				default: sprintf(buf, "ERR");
-					break;
-			}
-		} break;
+	case OPR_LITERAL: {
+		switch (opr.literal.type.kind) {
+		case TYPE_I32:
+		case TYPE_INT:
+			sprintf(buf, "%d:%s", (i32) opr.literal.lint, tac_ir_dump_opr_type(opr));
+			break;
+		case TYPE_I8:
+		case TYPE_BOOL:
+			sprintf(buf, "%d:%s", (i8) opr.literal.lint, tac_ir_dump_opr_type(opr));
+			break;
+		case TYPE_POINTER:
+		case TYPE_UPTR:
+		case TYPE_IPTR:
+		case TYPE_I64:
+			sprintf(buf, "%lli:%s", opr.literal.lint, tac_ir_dump_opr_type(opr));
+			break;
+		case TYPE_F32:
+			sprintf(buf, "%f:%s", (float) opr.literal.lfloat, tac_ir_dump_opr_type(opr));
+			break;
+		default:
+			sprintf(buf, "ERR");
+		}
+	} break;
 	}
 }
 
@@ -119,7 +128,7 @@ void tac_ir_dump_inst(TAC_Instruction inst, char *res) {
 		case OP_JUMP:        sprintf(res, "    jmp %s", dst);                              break;
 		case OP_CAST:        sprintf(res, "    var%s = cast %s", dst, arg1);               break;
 		case OP_NEG:         sprintf(res, "    var%s = -%s", dst, arg1);                   break;
-		case OP_LABEL:       sprintf(res, "%s", arg1);                                     break;
+		case OP_LABEL:       sprintf(res, "%s:", arg1);                                    break;
 		case OP_SUB:         sprintf(res, "    var%s = %s %s %s", dst, arg1, "-", arg2);   break;
 		case OP_MUL:         sprintf(res, "    var%s = %s %s %s", dst, arg1, "*", arg2);   break;
 		case OP_DEREF:       sprintf(res, "    var%s = deref %s", dst, arg1);              break;

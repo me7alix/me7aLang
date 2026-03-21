@@ -6,7 +6,7 @@
 
 #include "../include/tac_ir.h"
 #include "../include/parser.h"
-#include "tac_ir_gen_calc.c"
+#include "tac_ir_calc.c"
 
 uint data_id  = 1;
 uint var_id   = 1;
@@ -65,7 +65,23 @@ void tac_ir_gen_func_call(TAC_Program *prog, TAC_Func *func, AST_Node *cn);
 void tac_ir_gen_method_call(TAC_Program *prog, TAC_Func *func, AST_Node *cn);
 
 TAC_Operand tac_ir_gen_deref(IRGenExprCtx *ctx, TAC_Func *func, Type type, TAC_Operand var) {
-	TAC_Operand ret = (TAC_Operand) {
+	if (var.var.kind == VAR_ADDR) {
+		TAC_Instruction inst = {
+			.op = OP_DEREF,
+			.arg1 = var,
+			.dst = (TAC_Operand) {
+				.kind = OPR_VAR,
+				.var.kind = VAR_STACK,
+				.var.type = type,
+				.var.addr_id = var_id++,
+			}
+		};
+
+		da_append(&func->body, inst);
+		return inst.dst;
+	}
+
+	TAC_Operand ret = {
 		.kind = OPR_VAR,
 		.var.kind = VAR_ADDR,
 		.var.type = type,
@@ -77,7 +93,7 @@ TAC_Operand tac_ir_gen_deref(IRGenExprCtx *ctx, TAC_Func *func, Type type, TAC_O
 		ctx->last_var = 0;
 		return ret;
 	} else {
-		da_append(&func->body, ((TAC_Instruction){
+		TAC_Instruction asn = {
 			.op = OP_ASSIGN,
 			.arg1 = ret,
 			.dst = (TAC_Operand) {
@@ -85,8 +101,9 @@ TAC_Operand tac_ir_gen_deref(IRGenExprCtx *ctx, TAC_Func *func, Type type, TAC_O
 				.var.type = type,
 				.var.addr_id = var_id++,
 			}
-		}));
+		};
 
+		da_append(&func->body, asn);
 		return da_last(&func->body).dst;
 	}
 }

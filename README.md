@@ -58,5 +58,5 @@ Check the [examples](./examples) directory to see what’s currently implemented
 This project is released under the MIT License.
 
 ## Bugs
-- **Pointer arithmetic** (on the level of TAC IR generating): ptr += 1 is not like ptr = ptr + 1
-- **Pointer to pointer etc operands** (on the level of codegen): `user: **User = ...; (*user).name <- throws unreachable`
+- [OPEN] **Pointer arithmetic** (on the level of TAC IR generating): ptr += 1 is not like ptr = ptr + 1
+- [CLOSED] **Pointer to pointer etc operands** (on the level of codegen): `user: **User = ...; (*user).name <- throws unreachable`
