@@ -98,6 +98,7 @@ struct AST_Node {
 	union {
 		struct {
 			char *id;
+			bool is_static;
 			AST_Nodes args;
 			Type type;
 			AST_Node *body;

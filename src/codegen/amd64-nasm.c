@@ -293,7 +293,8 @@ void nasm_gen_new_stack_var(TAC_Instruction ci, char *dst, char *arg1, char *arg
 void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 	if (func.body.count == 0) return;
 
-	sb_appendf(code, "global %s\n", func.name);
+	if (!func.is_static)
+		sb_appendf(code, "global %s\n", func.name);
 	sb_appendf(code, "%s%s:\n", (tp == TP_MACOS ? "_" : ""), func.name);
 
 	sb_appendf(code, "  push rbp\n");

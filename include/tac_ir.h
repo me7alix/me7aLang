@@ -89,6 +89,7 @@ typedef struct {
 
 typedef struct {
 	char *name;
+	bool is_static;
 	Type ret_type;
 	DA(TAC_FuncArg) args;
 	DA(TAC_Instruction) body;

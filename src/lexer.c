@@ -82,242 +82,243 @@ Lexer lexer_lex(char *file, char *code) {
 	while (*l.cur_char != '\0') {
 		l.cur_loc.line_char = l.cur_char;
 		switch (*l.cur_char) {
-			case ' ': case '\t': break;
-			case '{': add_token(&l, TOK_OBRA,  "{"); break;
-			case '}': add_token(&l, TOK_CBRA,  "}"); break;
-			case '(': add_token(&l, TOK_OPAR,  "("); break;
-			case ')': add_token(&l, TOK_CPAR,  ")"); break;
-			case ';': add_token(&l, TOK_SEMI,  ";"); break;
-			case ',': add_token(&l, TOK_COM,   ","); break;
-			case '[': add_token(&l, TOK_OSQBRA,"["); break;
-			case ']': add_token(&l, TOK_CSQBRA,"]"); break;
-			case '%': add_token(&l, TOK_PS,    "%"); break;
-			case '^': add_token(&l, TOK_XOR,   "^"); break;
-			case '~': add_token(&l, TOK_TILDA, "~"); break;
+		case ' ': case '\t': break;
+		case '{': add_token(&l, TOK_OBRA,  "{"); break;
+		case '}': add_token(&l, TOK_CBRA,  "}"); break;
+		case '(': add_token(&l, TOK_OPAR,  "("); break;
+		case ')': add_token(&l, TOK_CPAR,  ")"); break;
+		case ';': add_token(&l, TOK_SEMI,  ";"); break;
+		case ',': add_token(&l, TOK_COM,   ","); break;
+		case '[': add_token(&l, TOK_OSQBRA,"["); break;
+		case ']': add_token(&l, TOK_CSQBRA,"]"); break;
+		case '%': add_token(&l, TOK_PS,    "%"); break;
+		case '^': add_token(&l, TOK_XOR,   "^"); break;
+		case '~': add_token(&l, TOK_TILDA, "~"); break;
 
-			case '#': {
-				if (l.cur_char[1] == '#') {
-					add_token(&l, TOK_ID_CONCAT, "##");
+		case '#': {
+			if (l.cur_char[1] == '#') {
+				add_token(&l, TOK_ID_CONCAT, "##");
+				l.cur_char++;
+			} else add_token(&l, TOK_TO_STR, "#");
+		} break;
+
+		case '.': {
+			if (l.cur_char[1] == '.' && l.cur_char[2] == '.') {
+				add_token(&l, TOK_ANY,   "...");
+				l.cur_char += 2;
+			} else add_token(&l, TOK_DOT,   ".");
+		} break;
+
+		case '+': {
+			if (l.cur_char[1] == '=') {
+				add_token(&l, TOK_PLUS_EQ, "+=");
+				l.cur_char++;
+			} else add_token(&l, TOK_PLUS, "+");
+		} break;
+
+		case '-': {
+			if (l.cur_char[1] == '=') {
+				add_token(&l, TOK_MINUS_EQ, "-=");
+				l.cur_char++;
+			} else add_token(&l, TOK_MINUS, "-");
+		} break;
+
+		case '*': {
+			if (l.cur_char[1] == '=') {
+				add_token(&l, TOK_STAR_EQ, "*=");
+				l.cur_char++;
+			} else add_token(&l, TOK_STAR, "*");
+		} break;
+
+		case '/': {
+			if (l.cur_char[1] == '/') {
+				while (l.cur_char[1] != '\n')
 					l.cur_char++;
-				} else add_token(&l, TOK_TO_STR, "#");
-			} break;
+			} else if (l.cur_char[1] == '=') {
+				add_token(&l, TOK_SLASH_EQ, "/=");
+				l.cur_char++;
+			} else add_token(&l, TOK_SLASH, "/");
+		} break;
 
-			case '.': {
-				if (l.cur_char[1] == '.' && l.cur_char[2] == '.') {
-					add_token(&l, TOK_ANY,   "...");
-					l.cur_char += 2;
-				} else add_token(&l, TOK_DOT,   ".");
-			} break;
+		case '!': {
+			if (l.cur_char[1] == '=') {
+				add_token(&l, TOK_NOT_EQ, "!=");
+				l.cur_char++;
+			} else {
+				add_token(&l, TOK_EXC, "!");
+			}
+		} break;
 
-			case '+': {
-				if (l.cur_char[1] == '=') {
-					add_token(&l, TOK_PLUS_EQ, "+=");
+		case '&': {
+			if (l.cur_char[1] == '&') {
+				add_token(&l, TOK_AND, "&&");
+				l.cur_char++;
+			} else {
+				add_token(&l, TOK_AMP, "&");
+			}
+		} break;
+
+		case '|': {
+			if (l.cur_char[1] == '|') {
+				add_token(&l, TOK_OR, "||");
+				l.cur_char++;
+			} else {
+				add_token(&l, TOK_PIPE, "|");
+			}
+		} break;
+
+		case '>': {
+			if (l.cur_char[1] == '=') {
+				add_token(&l, TOK_GREAT_EQ, ">=");
+				l.cur_char++;
+			} else if (l.cur_char[1] == '>') {
+				add_token(&l, TOK_RIGHT_SHIFT, ">>");
+				l.cur_char++;
+			} else {
+				add_token(&l, TOK_GREAT, ">");
+			}
+		} break;
+
+		case '<': {
+			if (l.cur_char[1] == '=') {
+				add_token(&l, TOK_LESS_EQ, "<=");
+				l.cur_char++;
+			} else if (l.cur_char[1] == '<') {
+				add_token(&l, TOK_LEFT_SHIFT, "<<");
+				l.cur_char++;
+			} else {
+				add_token(&l, TOK_LESS, "<");
+			}
+		} break;
+
+		case '=': {
+			if (l.cur_char[1] == '=') {
+				add_token(&l, TOK_EQ_EQ, "==");
+				l.cur_char++;
+			} else {
+				add_token(&l, TOK_EQ, "=");
+			}
+		} break;
+
+		case '\r':
+		case '\n': {
+			switch (da_last(&l.tokens).kind) {
+				case TOK_OPAR: case TOK_DOT:
+				case TOK_SEMI: case TOK_CBRA:
+				case TOK_OBRA: case TOK_COM: break;
+				default: add_token(&l, TOK_SEMI, ";");
+			}
+
+			if (l.cur_char[0] == '\r' && l.cur_char[1] == '\n')
+				l.cur_char++;
+
+			l.cur_loc.line_num++;
+			l.cur_loc.line_start = l.cur_char + 1;
+		} break;
+
+		case ':': {
+			if (l.cur_char[1] == '=') {
+				add_token(&l, TOK_ASSIGN, ":=");
+				l.cur_char++;
+			} else {
+				add_token(&l, TOK_COL, ":");
+			}
+		} break;
+
+		default:
+			if (isdigit(*l.cur_char)) {
+				char *start = l.cur_char;
+				bool isFloat = 0;
+				while (true) {
+					if (*l.cur_char == '.')
+						isFloat = 1;
+					if (!(isdigit(l.cur_char[1]) ||
+						isalpha(l.cur_char[1]) ||
+						l.cur_char[1] == '.')) break;
 					l.cur_char++;
-				} else add_token(&l, TOK_PLUS, "+");
-			} break;
-
-			case '-': {
-				if (l.cur_char[1] == '=') {
-					add_token(&l, TOK_MINUS_EQ, "-=");
-					l.cur_char++;
-				} else add_token(&l, TOK_MINUS, "-");
-			} break;
-
-			case '*': {
-				if (l.cur_char[1] == '=') {
-					add_token(&l, TOK_STAR_EQ, "*=");
-					l.cur_char++;
-				} else add_token(&l, TOK_STAR, "*");
-			} break;
-
-			case '/': {
-				if (l.cur_char[1] == '/') {
-					while (l.cur_char[1] != '\n')
-						l.cur_char++;
-				} else if (l.cur_char[1] == '=') {
-					add_token(&l, TOK_SLASH_EQ, "/=");
-					l.cur_char++;
-				} else add_token(&l, TOK_SLASH, "/");
-			} break;
-
-			case '!': {
-				if (l.cur_char[1] == '=') {
-					add_token(&l, TOK_NOT_EQ, "!=");
-					l.cur_char++;
-				} else {
-					add_token(&l, TOK_EXC, "!");
-				}
-			} break;
-
-			case '&': {
-				if (l.cur_char[1] == '&') {
-					add_token(&l, TOK_AND, "&&");
-					l.cur_char++;
-				} else {
-					add_token(&l, TOK_AMP, "&");
-				}
-			} break;
-
-			case '|': {
-				if (l.cur_char[1] == '|') {
-					add_token(&l, TOK_OR, "||");
-					l.cur_char++;
-				} else {
-					add_token(&l, TOK_PIPE, "|");
-				}
-			} break;
-
-			case '>': {
-				if (l.cur_char[1] == '=') {
-					add_token(&l, TOK_GREAT_EQ, ">=");
-					l.cur_char++;
-				} else if (l.cur_char[1] == '>') {
-					add_token(&l, TOK_RIGHT_SHIFT, ">>");
-					l.cur_char++;
-				} else {
-					add_token(&l, TOK_GREAT, ">");
-				}
-			} break;
-
-			case '<': {
-				if (l.cur_char[1] == '=') {
-					add_token(&l, TOK_LESS_EQ, "<=");
-					l.cur_char++;
-				} else if (l.cur_char[1] == '<') {
-					add_token(&l, TOK_LEFT_SHIFT, "<<");
-					l.cur_char++;
-				} else {
-					add_token(&l, TOK_LESS, "<");
-				}
-			} break;
-
-			case '=': {
-				if (l.cur_char[1] == '=') {
-					add_token(&l, TOK_EQ_EQ, "==");
-					l.cur_char++;
-				} else {
-					add_token(&l, TOK_EQ, "=");
-				}
-			} break;
-
-			case '\r':
-			case '\n': {
-				switch (da_last(&l.tokens).kind) {
-					case TOK_OPAR: case TOK_DOT:
-					case TOK_SEMI: case TOK_CBRA:
-					case TOK_OBRA: case TOK_COM: break;
-					default: add_token(&l, TOK_SEMI, ";");
-				}
-
-				if (l.cur_char[0] == '\r' && l.cur_char[1] == '\n')
-					l.cur_char++;
-
-				l.cur_loc.line_num++;
-				l.cur_loc.line_start = l.cur_char + 1;
-			} break;
-
-			case ':': {
-				if (l.cur_char[1] == '=') {
-					add_token(&l, TOK_ASSIGN, ":=");
-					l.cur_char++;
-				} else {
-					add_token(&l, TOK_COL, ":");
-				}
-			} break;
-
-			default: {
-				if (isdigit(*l.cur_char)) {
-					char *start = l.cur_char;
-					bool isFloat = 0;
-					while (true) {
-						if (*l.cur_char == '.')
-							isFloat = 1;
-						if (!(isdigit(l.cur_char[1]) ||
-							isalpha(l.cur_char[1]) ||
-							l.cur_char[1] == '.')) break;
-						l.cur_char++;
-					}
-
-					size_t len = l.cur_char - start + 1;
-					char *num = malloc(sizeof(char) * (len+1));
-					memcpy(num, start, len); num[len] = '\0';
-					if (isFloat) add_token(&l, TOK_FLOAT, num);
-					else add_token(&l, TOK_INT, num);
 				}
 
-				else if (*(l.cur_char) == '"') {
-					StringBuilder sb = {0};
-					l.cur_char++;
+				size_t len = l.cur_char - start + 1;
+				char *num = malloc(sizeof(char) * (len+1));
+				memcpy(num, start, len); num[len] = '\0';
+				if (isFloat) add_token(&l, TOK_FLOAT, num);
+				else add_token(&l, TOK_INT, num);
+			}
 
-					while (!(l.cur_char[0] == '\"' && l.cur_char[-1] != '\\')) {
-						if (l.cur_char[0] == '\\') {
-							switch (l.cur_char[1]) {
-								case '\\': sb_append(&sb, '\\'); break;
-								case '0':  sb_append(&sb, '\0'); break;
-								case 'n':  sb_append(&sb, '\n'); break;
-								case 't':  sb_append(&sb, '\t'); break;
-								case 'r':  sb_append(&sb, '\r'); break;
-								case '\"': sb_append(&sb, '\"'); break;
-								default: throw_error(l.cur_loc, "wrong character");
-							}
-							l.cur_char++;
-						} else if (l.cur_char[0] == '\0') {
-							throw_error(l.cur_loc, "unclosed string");
-						} else {
-							sb_append(&sb, l.cur_char[0]);
-						}
+			else if (*(l.cur_char) == '"') {
+				StringBuilder sb = {0};
+				l.cur_char++;
 
-						l.cur_char++;
-					}
-
-					sb_append(&sb, '\0');
-					add_token(&l, TOK_STRING, sb.items);
-				}
-
-				else if (*l.cur_char == '\'') {
-					l.cur_char++;
-					if (*l.cur_char == '\\') {
-						l.cur_char++;
-						switch (*l.cur_char) {
-							case '0':  add_token(&l, TOK_CHAR, "\0"); break;
-							case 'n':  add_token(&l, TOK_CHAR, "\n"); break;
-							case 'r':  add_token(&l, TOK_CHAR, "\r"); break;
-							case 't':  add_token(&l, TOK_CHAR, "\t"); break;
-							case '\\': add_token(&l, TOK_CHAR, "\\"); break;
-							case '\'': add_token(&l, TOK_CHAR, "'");  break;
+				while (!(l.cur_char[0] == '\"' && l.cur_char[-1] != '\\')) {
+					if (l.cur_char[0] == '\\') {
+						switch (l.cur_char[1]) {
+							case '\\': sb_append(&sb, '\\'); break;
+							case '0':  sb_append(&sb, '\0'); break;
+							case 'n':  sb_append(&sb, '\n'); break;
+							case 't':  sb_append(&sb, '\t'); break;
+							case 'r':  sb_append(&sb, '\r'); break;
+							case '\"': sb_append(&sb, '\"'); break;
 							default: throw_error(l.cur_loc, "wrong character");
 						}
-					} else add_token(&l, TOK_CHAR, l.cur_char);
+						l.cur_char++;
+					} else if (l.cur_char[0] == '\0') {
+						throw_error(l.cur_loc, "unclosed string");
+					} else {
+						sb_append(&sb, l.cur_char[0]);
+					}
 
 					l.cur_char++;
-					if (*l.cur_char != '\'') {
-						throw_error(l.cur_loc, "' expected");
-					}
 				}
 
-				else if   (is_tok(&l, "for",      TOK_FOR_SYM, l.cur_char)) {
-				} else if (is_tok(&l, "while",    TOK_WHILE_SYM, l.cur_char)) {
-				} else if (is_tok(&l, "if",       TOK_IF_SYM, l.cur_char)) {
-				} else if (is_tok(&l, "else",     TOK_ELSE_SYM, l.cur_char)) {
-				} else if (is_tok(&l, "struct",   TOK_STRUCT, l.cur_char)) {
-				} else if (is_tok(&l, "extern",   TOK_EXTERN, l.cur_char)) {
-				} else if (is_tok(&l, "true",     TOK_TRUE, l.cur_char)) {
-				} else if (is_tok(&l, "false",    TOK_FALSE, l.cur_char)) {
-				} else if (is_tok(&l, "break",    TOK_BREAK, l.cur_char)) {
-				} else if (is_tok(&l, "continue", TOK_CONTINUE, l.cur_char)) {
-				} else if (is_tok(&l, "null",     TOK_NULL, l.cur_char)) {
-				} else if (is_tok(&l, "sizeof",   TOK_SIZEOF, l.cur_char)) {
-				} else if (is_tok(&l, "return",   TOK_RET, l.cur_char)) {
-				} else if (is_tok(&l, "import",   TOK_IMPORT, l.cur_char)) {
-				} else if (is_tok(&l, "fn",       TOK_FUNC, l.cur_char)) {
-				} else if (is_tok(&l, "block",    TOK_BLOCK, l.cur_char)) {
-				} else if (is_tok(&l, "def",      TOK_MACRO_OBJ, l.cur_char)) {
-				} else if (is_tok(&l, "macro",    TOK_MACRO_FUNC, l.cur_char)) {}
+				sb_append(&sb, '\0');
+				add_token(&l, TOK_STRING, sb.items);
+			}
 
-				else if (isalpha(*l.cur_char) || *l.cur_char == '_')
-					add_token(&l, TOK_ID, get_id(&l));
-				else throw_error(l.cur_loc, "unknown token");
-			} break;
+			else if (*l.cur_char == '\'') {
+				l.cur_char++;
+				if (*l.cur_char == '\\') {
+					l.cur_char++;
+					switch (*l.cur_char) {
+						case '0':  add_token(&l, TOK_CHAR, "\0"); break;
+						case 'n':  add_token(&l, TOK_CHAR, "\n"); break;
+						case 'r':  add_token(&l, TOK_CHAR, "\r"); break;
+						case 't':  add_token(&l, TOK_CHAR, "\t"); break;
+						case '\\': add_token(&l, TOK_CHAR, "\\"); break;
+						case '\'': add_token(&l, TOK_CHAR, "'");  break;
+						default: throw_error(l.cur_loc, "wrong character");
+					}
+				} else add_token(&l, TOK_CHAR, l.cur_char);
+
+				l.cur_char++;
+				if (*l.cur_char != '\'') {
+					throw_error(l.cur_loc, "' expected");
+				}
+			}
+
+			else if   (is_tok(&l, "for",      TOK_FOR_SYM,    l.cur_char)) {
+			} else if (is_tok(&l, "while",    TOK_WHILE_SYM,  l.cur_char)) {
+			} else if (is_tok(&l, "if",       TOK_IF_SYM,     l.cur_char)) {
+			} else if (is_tok(&l, "else",     TOK_ELSE_SYM,   l.cur_char)) {
+			} else if (is_tok(&l, "struct",   TOK_STRUCT,     l.cur_char)) {
+			} else if (is_tok(&l, "impl",     TOK_IMPL,       l.cur_char)) {
+			} else if (is_tok(&l, "extern",   TOK_EXTERN,     l.cur_char)) {
+			} else if (is_tok(&l, "true",     TOK_TRUE,       l.cur_char)) {
+			} else if (is_tok(&l, "false",    TOK_FALSE,      l.cur_char)) {
+			} else if (is_tok(&l, "break",    TOK_BREAK,      l.cur_char)) {
+			} else if (is_tok(&l, "continue", TOK_CONTINUE,   l.cur_char)) {
+			} else if (is_tok(&l, "null",     TOK_NULL,       l.cur_char)) {
+			} else if (is_tok(&l, "sizeof",   TOK_SIZEOF,     l.cur_char)) {
+			} else if (is_tok(&l, "return",   TOK_RET,        l.cur_char)) {
+			} else if (is_tok(&l, "import",   TOK_IMPORT,     l.cur_char)) {
+			} else if (is_tok(&l, "fn",       TOK_FUNC,       l.cur_char)) {
+			} else if (is_tok(&l, "static",   TOK_STATIC,     l.cur_char)) {
+			} else if (is_tok(&l, "block",    TOK_BLOCK,      l.cur_char)) {
+			} else if (is_tok(&l, "def",      TOK_MACRO_OBJ,  l.cur_char)) {
+			} else if (is_tok(&l, "macro",    TOK_MACRO_FUNC, l.cur_char)) {}
+
+			else if (isalpha(*l.cur_char) || *l.cur_char == '_')
+				add_token(&l, TOK_ID, get_id(&l));
+			else throw_error(l.cur_loc, "unknown token");
 		}
 
 		l.cur_char++;

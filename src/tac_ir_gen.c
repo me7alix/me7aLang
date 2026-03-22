@@ -827,6 +827,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 void tac_ir_gen_func(TAC_Program *prog, AST_Node *fn) {
 	TAC_Func func = {
 		.name = fn->func_def.id,
+		.is_static = fn->func_def.is_static,
 		.ret_type = fn->func_def.type
 	};
 
@@ -866,9 +867,10 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 		UserType *ut = kv->val;
 		if (ut->kind == TYPE_STRUCT) {
 			da_foreach(StructMember, member, &ut->ustruct.members) {
-				if (member->kind == STMEM_METHOD) {
-					char *id = member->as.method.func->func_def.id;
+				if (member->kind == STMEM_METHOD)
+				if (member->as.method.func->func_def.body != NULL) {
 					char *name = malloc(256);
+					char *id = member->as.method.func->func_def.id;
 					sprintf(name, "method_%s_%s", ut->id, id);
 					member->as.method.func->func_def.id = name;
 					tac_ir_gen_func(&prog, member->as.method.func);

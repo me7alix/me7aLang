@@ -551,17 +551,22 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 }
 
 AST_Node *parse_function(Parser *p, AST_Node *self) {
-	next(p);
+	bool is_static = false;
+	if (next(p).kind == TOK_STATIC) {
+		is_static = true;
+		expect_token(next(p), TOK_FUNC);
+	}
+
 	AST_Node *fdn = ast_new(
 		.kind = AST_FUNC_DEF,
 		.loc = peek(p).loc,
-		.func_def.id = peek(p).data
+		.func_def.id = peek(p).data,
+		.func_def.is_static = is_static,
 	);
 
 	char *pref = "method";
-	if (strncmp(pref, fdn->func_def.id, strlen(pref)) == 0) {
+	if (strncmp(pref, fdn->func_def.id, strlen(pref)) == 0)
 		throw_error(fdn->loc, "`method` prefix is reserved, you cannot use it");
-	}
 
 	next(p);
 	expect_token(next(p), TOK_OPAR);
@@ -586,7 +591,8 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 	}
 
 	if (self) {
-		fdn->func_def.body = parse_body(p, fdn, true);
+		if (peek(p).kind != TOK_SEMI)
+			fdn->func_def.body = parse_body(p, fdn, true);
 		parser_pop_scope(p);
 		return fdn;
 	}
@@ -680,8 +686,34 @@ void parse_extern(Parser *p) {
 	expect_token(peek(p), TOK_SEMI);
 }
 
+void parse_method(Parser *p, UserType *st) {
+	Type *ut = type_new(
+		.kind = TYPE_STRUCT,
+		.user = st
+	);
+
+	AST_Node *self = ast_new(
+		.kind = AST_FUNC_DEF_ARG,
+		.func_def_arg.id = "self",
+		.func_def_arg.uid = VUID++,
+		.func_def_arg.type = (Type){
+			.kind = TYPE_POINTER,
+			.pointer.base = ut,
+		},
+	);
+
+	AST_Node *func = parse_function(p, self);
+	da_append(&st->ustruct.members, ((StructMember){
+		.kind = STMEM_METHOD,
+		.as.method.func = func,
+	}));
+}
+
 void parse_struct(Parser *p) {
 	next(p);
+
+	if (UserTypes_get(&p->ut, peek(p).data))
+		throw_error(peek(p).loc, "redefinition of the struct");
 
 	UserType *st = malloc(sizeof(*st));
 	*st = (UserType){
@@ -694,37 +726,50 @@ void parse_struct(Parser *p) {
 	expect_token(next(p), TOK_OBRA);
 	while (peek(p).kind != TOK_CBRA) {
 		switch (peek(p).kind) {
-			case TOK_FUNC: {
-				Type *ut = malloc(sizeof(*ut));
-				*ut = (Type){.kind = TYPE_STRUCT, .user = st};
+		case TOK_STATIC:
+		case TOK_FUNC:
+			parse_method(p, st);
+			break;
 
-				AST_Node *self = ast_new(
-					.kind = AST_FUNC_DEF_ARG,
-					.func_def_arg.id = "self",
-					.func_def_arg.uid = VUID++,
-					.func_def_arg.type = (Type){
-						.kind = TYPE_POINTER,
-						.pointer.base = ut,
-					},
-				);
+		case TOK_ID: {
+			char *id = next(p).data;
+			Type type = *parse_type(p);
 
-				AST_Node *func = parse_function(p, self);
-				da_append(&st->ustruct.members, ((StructMember){
-					.kind = STMEM_METHOD,
-					.as.method.func = func,
-				}));
-			} break;
+			da_append(&st->ustruct.members, ((StructMember){
+				.kind = STMEM_FIELD,
+				.as.field.type = type,
+				.as.field.id = id,
+			}));
+		} break;
 
-			case TOK_ID: {
-				char *id = next(p).data;
-				Type type = *parse_type(p);
+		default:
+			throw_error(peek(p).loc, "unexpected token");
+		}
 
-				da_append(&st->ustruct.members, ((StructMember){
-					.kind = STMEM_FIELD,
-					.as.field.type = type,
-					.as.field.id = id,
-				}));
-			} break;
+		next(p);
+		if (peek(p).kind == TOK_SEMI)
+			next(p);
+	}
+}
+
+void parse_impl(Parser *p) {
+	next(p);
+
+	Location snl = peek(p).loc;
+	UserType **stc = UserTypes_get(&p->ut, next(p).data);
+	if (!stc) throw_error(snl, "no such struct or union");
+	UserType *st = *stc;
+
+	expect_token(next(p), TOK_OBRA);
+	while (peek(p).kind != TOK_CBRA) {
+		switch (peek(p).kind) {
+		case TOK_STATIC:
+		case TOK_FUNC:
+			parse_method(p, st);
+			break;
+
+		default:
+			throw_error(peek(p).loc, "unexpected token");
 		}
 
 		next(p);
@@ -743,21 +788,11 @@ Parser parser_parse(Token *tokens) {
 
 	while (peek(&p).kind != TOK_EOF) {
 		switch (peek(&p).kind) {
-		case TOK_SEMI:
-			break;
-
-		case TOK_STRUCT:
-			parse_struct(&p);
-			break;
-
-		case TOK_EXTERN:
-			parse_extern(&p);
-			break;
-
-		case TOK_IMPORT:
-			next(&p);
-			next(&p);
-			break;
+		case TOK_SEMI:                       break;
+		case TOK_STRUCT: parse_struct(&p);   break;
+		case TOK_IMPL:   parse_impl(&p);     break;
+		case TOK_EXTERN: parse_extern(&p);   break;
+		case TOK_IMPORT: next(&p); next(&p); break;
 
 		case TOK_MACRO_OBJ:
 			while (peek(&p).kind != TOK_SEMI)
@@ -785,6 +820,7 @@ Parser parser_parse(Token *tokens) {
 			}
 			break;
 
+		case TOK_STATIC:
 		case TOK_FUNC: {
 			AST_Node *func = parse_function(&p, NULL);
 			if (func) da_append(&prog->program.stmts, func);
