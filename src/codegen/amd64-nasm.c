@@ -571,8 +571,10 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			OffTable_add(&stack_table, ci.dst.var.addr_id, total_offset);
 
 			if (ci.dst.var.type.kind != TYPE_STRUCT) {
-				sb_appendf(&body, "  mov rax, %s\n", opr_to_nasm(ci.arg1));
-				sb_appendf(&body, "  mov %s, rax\n", opr_to_nasm(ci.dst));
+				reg_alloc(ci, arg1, arg2);
+				sb_appendf(&body, "  mov rax, %s\n",     opr_to_nasm(ci.arg1));
+				sb_appendf(&body, "  mov %s, %s[rax]\n", arg1, ts);
+				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst), arg1);
 			} else {
 				sb_appendf(&body, "  mov rsi, %s\n", opr_to_nasm(ci.arg1));
 				sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst));
