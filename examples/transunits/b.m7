@@ -1,0 +1,5 @@
+import "std/libc.m7"
+
+fn print_hello() {
+	printf("Hello")
+}

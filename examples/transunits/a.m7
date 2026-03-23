@@ -1,0 +1,8 @@
+import "std/libc.m7"
+
+fn print_hello()
+
+fn main() {
+	print_hello()
+	printf(" World!\n")
+}
