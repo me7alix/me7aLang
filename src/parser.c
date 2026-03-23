@@ -679,7 +679,7 @@ void parse_extern(Parser *p) {
 	Symbol *seu = parser_symbol_table_get(p, SBL_FUNC_EX_USED, id);
 
 	if (sf || se || seu)
-		throw_error(loc, "the symbol is already in use used");
+		throw_error(loc, "the symbol is already in use");
 
 	parser_symbol_table_add(p, SBL_FUNC_EXTERN, id, fes);
 	parser_symbol_table_add(p, SBL_FUNC_EX_USED, extern_smb, (Symbol){0});
