@@ -3,27 +3,47 @@ import "std/libc.m7"
 macro da_foreach(vn, da) {
 	for vn := da.items; (vn - (da).items):uptr < (da).count; vn = vn + 1 }
 
-macro DeclDynArray(N, T) {
+macro DynArr(N, T) {
+	DynArrDecl(N, T)
+	DynArrImpl(N, T)
+}
+
+macro DynArrDecl(N, T) {
 	struct N {
 		items:    *T
 		count:    uptr
 		capacity: uptr
 
-		fn reserve(expected_capacity: uptr) {
-			if expected_capacity > self.capacity {
+		fn reserve(cap: uptr)
+		fn append(item: T)
+		fn set(index: uptr, item: T)
+		fn get(index: uptr): T
+		fn reset()
+		fn first(): T
+		fn last(): T
+		fn remove_unordered(index: uptr)
+		fn remove_ordered(index: uptr)
+		fn free()
+	}
+}
+
+macro DynArrImpl(N, T) {
+	impl N {
+		fn reserve(cap: uptr) {
+			if cap > self.capacity {
 				new_capacity: uptr = 256
 				if self.capacity != 0 {
 					new_capacity = self.capacity
 				}
 
-				while expected_capacity > new_capacity {
+				while cap > new_capacity {
 					new_capacity *= 2
 				}
 
 				self.capacity = new_capacity
 				self.items = realloc(
 					self.items,
-					new_capacity * sizeof(*self.items),
+					new_capacity * sizeof:T,
 				)
 			}
 		}
@@ -75,5 +95,5 @@ macro DeclDynArray(N, T) {
 			self.count = 0
 			self.capacity = 0
 		}
-	}	
+	}
 }

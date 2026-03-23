@@ -1,17 +1,9 @@
 import "std/hashmap.m7"
 
-DeclHashMap(HashMapStrInt, *u8, int)
-
-fn HashMapStrInt_compare(a: *u8, b: *u8): int {
-	return strcmp(a, b)
-}
-
-fn HashMapStrInt_hashf(str: *u8): u32 {
-	return hash_str(str);
-}
+HashMapStr(HM_StrInt, int)
 
 fn main() {
-	hm: HashMapStrInt
+	hm: HM_StrInt
 
 	hm.add("ten",    10)
 	hm.add("twenty", 20)

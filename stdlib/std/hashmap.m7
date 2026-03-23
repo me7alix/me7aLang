@@ -6,7 +6,7 @@ macro ht_foreach_node(nodevar, ht, body) {
 	}
 }
 
-fn hash_str(p: *u8): u32 {
+static fn hash_str(p: *u8): u32 {
     h: u32 = 1144290428
 
     while *p != 0 {
@@ -18,14 +18,19 @@ fn hash_str(p: *u8): u32 {
     return h
 }
 
-fn hash_combine(h1: u32, h2: u32): u32 {
+static fn hash_combine(h1: u32, h2: u32): u32 {
     return h1 ^ (h2 + 581019932:u32 + (h1 << 3) + (h1 >> 2))
 }
 
 macro hash_num(num) {
     ((1462847356:u32 * num:u32 + 1550508858:u32):u32)}
 
-macro DeclHashMap(HT, KT, VT) {
+macro HashMap(HT, KT, VT) {
+	HashMapDecl(HT, KT, VT)
+	HashMapImpl(HT, KT, VT)
+}
+
+macro HashMapDecl(HT, KT, VT) {
 	fn HT##_hashf(key: KT): u32
 	fn HT##_compare(a: KT, b: KT): int
 
@@ -35,11 +40,15 @@ macro DeclHashMap(HT, KT, VT) {
 		next: *HT##_node
     }
 
-    struct HT {
+	struct HT {
         arr:      **HT##_node
         count:    uptr
         capacity: uptr
+	}
+}
 
+macro HashMapImpl(HT, KT, VT) {
+    impl HT {
 		fn add(key: KT, val: VT) {
 			if self.capacity == 0 {
 				self.capacity = 256
@@ -154,4 +163,37 @@ macro DeclHashMap(HT, KT, VT) {
 			self.count = 0
 		}
     }	
+}
+
+macro HashMapStrDecl(HT, VT) {
+	HashMapDecl(HT, *u8, VT)
+}
+
+macro HashMapStrImpl(HT, VT) {
+	HashMapImpl(HT, *u8, VT)
+
+	fn HT##_compare(a: *u8, b: *u8): int {
+		return strcmp(a, b)
+	}
+
+	fn HT##_hashf(str: *u8): u32 {
+		return hash_str(str);
+	}
+}
+
+macro HashMapStr(HT, VT) {
+	HashMapStrDecl(HT, VT)
+	HashMapStrImpl(HT, VT)
+}
+
+macro HashMapNumImpl(HT, KT, VT) {
+	HashMapImpl(HT, KT, VT)
+
+	fn HT##_compare(a: KT, b: KT): int {
+		return a != b;
+	}
+
+	fn HT##_hashf(val: KT): u32 {
+		return hash_num(val);
+	}
 }

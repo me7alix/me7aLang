@@ -1,6 +1,6 @@
 import "std/dynarr.m7"
 
-DeclDynArray(Numbers, int)
+DynArr(Numbers, int)
 
 fn main() {
 	nums: Numbers
