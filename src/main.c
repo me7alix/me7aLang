@@ -71,6 +71,7 @@ int write_to_file(const char *filename, const char *text) {
 	return 0;
 }
 
+char buf[512];
 #define systemf(...) \
 	do { \
 		sprintf(buf, __VA_ARGS__); \
@@ -89,23 +90,57 @@ void print_usage() {
 		"  -ir  Save IR output\n");
 }
 
+bool is_src_file(char *str) {
+	size_t strl = strlen(str);
+	for (int rp = strl - 1; rp >= 0; rp--) {
+		if (str[rp] == '.') {
+			if (strcmp(str + rp + 1, "m7") == 0) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+static void get_folder(char *dst, const char *file) {
+	const char *slash = strrchr(file, '/');
+	if (!slash) slash = strrchr(file, '\\');
+	if (slash) {
+		size_t len = slash - file;
+		memcpy(dst, file, len);
+		dst[len] = '\0';
+	} else sprintf(dst, "./");
+}
+
+static void get_file(char *dst, const char *file) {
+	const char *slash = strrchr(file, '/');
+	if (!slash) slash = strrchr(file, '\\');
+	if (slash) {
+		size_t len = strlen(file) - (slash - file + 1);
+		memcpy(dst, slash + 1, len);
+		dst[len] = '\0';
+	} else sprintf(dst, file);
+}
+
 int main(int argc, char **argv) {
 	if (tp == TP_NULL) {
 		fprintf(stderr, "Unsupported platform\n");
 		return 1;
 	}
 
-	char *input_file;
 	Imports imports = {0};
-	da_append(&imports, "");
+	da_append(&imports, ""); // reserved
 	da_append(&imports, ".");
 
-	char *output_bin = "a.out";
+	DA(char*) src_files = {0};
+	DA(char*) obj_files = {0};
+
+	char *output_bin       = "a.out";
 	char *link_dynamically = "";
-	char *obj_files = "";
-	bool compile_to_obj = false;
-	bool save_asm_output = false;
-	bool save_ir_output = false;
+	bool compile_to_obj    = false;
+	bool save_asm_output   = false;
+	bool save_ir_output    = false;
 
 	if (argc == 1) {
 		print_usage();
@@ -120,13 +155,6 @@ int main(int argc, char **argv) {
 			}
 
 			output_bin = argv[++i];
-		} else if (strcmp(argv[i], "-obj") == 0) {
-			if (i >= argc) {
-				fprintf(stderr, "invalid -obj argument\n");
-				return 1;
-			}
-
-			obj_files = argv[++i];
 		} else if (strcmp(argv[i], "-ld") == 0) {
 			if (i >= argc) {
 				fprintf(stderr, "invalid -ld argument\n");
@@ -158,65 +186,97 @@ int main(int argc, char **argv) {
 				return 1;
 			}
 
-			input_file = argv[i];
+			if (is_src_file(argv[i])) {
+				da_append(&src_files, argv[i]);
+			} else {
+				da_append(&obj_files, argv[i]);
+			}
 		}
 	}
 
-	char buf[512];
-	char output_file[256];
-
-	char *ep_code = read_file(input_file);
-	if (!ep_code) {
-		fprintf(stderr, "error: no such file %s\n", input_file);
-		return 1;
+	DA(char*) srcs = {0};
+	da_foreach (char*, src_file, &src_files) {
+		char build_folder[2048];
+		get_folder(build_folder, output_bin);
+		char src_file_name[2048];
+		get_file(src_file_name, *src_file);
+		StringBuilder sb = {0};
+		sb_appendf(&sb, "%s/%s", build_folder, src_file_name);
+		da_append(&srcs, sb.items);
 	}
 
-	Lexer entry_point = lexer_lex(input_file, ep_code);
+	for (size_t i = 0; i < srcs.count; i++) {
+		char output_file[2048];
+		char *src_file = src_files.items[i];
 
-	PreprocCtx preprocCtx = {
-		.imports = &imports,
-		.lexer = entry_point,
-	};
+		char *ep_code = read_file(src_file);
+		if (!ep_code) {
+			fprintf(stderr, "error: no such file %s\n", src_file);
+			return 1;
+		}
 
-	preprocessor(&preprocCtx, false);
-	entry_point = preprocCtx.lexer;
+		Lexer entry_point = lexer_lex(src_file, ep_code);
+		PreprocCtx preprocCtx = {.imports = &imports, .lexer = entry_point};
+		preprocessor(&preprocCtx, false);
+		entry_point = preprocCtx.lexer;
 
-	Parser parser = parser_parse(entry_point.tokens.items);
-	TAC_Program prog = tac_ir_gen_prog(&parser);
-	if (save_ir_output) {
-		sprintf(buf, "%s.ir", output_bin);
-		tac_ir_dump_prog(&prog, buf);
+		Parser parser = parser_parse(entry_point.tokens.items);
+		TAC_Program prog = tac_ir_gen_prog(&parser);
+		if (save_ir_output) {
+			sprintf(buf, "%s.ir", srcs.items[i]);
+			tac_ir_dump_prog(&prog, buf);
+		}
+
+		char *cg = nasm_gen_prog(&prog, tp);
+		sprintf(output_file, "%s.asm", srcs.items[i]);
+		write_to_file(output_file, cg);
+
+		systemf(
+			"nasm -f %s %s",
+			tp == TP_WINDOWS ? "win64"   :
+			tp == TP_LINUX   ? "elf64"   :
+			tp == TP_MACOS   ? "macho64" : "",
+			output_file);
 	}
 
-	char *cg = nasm_gen_prog(&prog, tp);
-	sprintf(output_file, "%s.asm", output_bin);
-	write_to_file(output_file, cg);
-
-	systemf(
-		"nasm -f %s %s",
-		tp == TP_WINDOWS ? "win64"   :
-		tp == TP_LINUX   ? "elf64"   :
-		tp == TP_MACOS   ? "macho64" : "",
-		output_file);
+	char *obj_ext =
+		tp == TP_WINDOWS ? "obj" :
+		tp == TP_LINUX   ? "o"   :
+		tp == TP_MACOS   ? "o"   : "";
 
 	if (!compile_to_obj) {
+		StringBuilder cmd = {0};
+		sb_appendf(&cmd, "gcc -no-pie -o \"%s\"", output_bin);
+
+		da_foreach (char*, src, &srcs)
+			sb_appendf(&cmd, " %s.%s", *src, obj_ext);
+
+		da_foreach (char*, obj_file, &obj_files)
+			sb_appendf(&cmd, " %s", *obj_file);
+
+		sb_appendf(&cmd, " %s", link_dynamically);
+		system(cmd.items);
+
 		switch (tp) {
-			case TP_NULL: break;
-			case TP_MACOS:
-			case TP_LINUX: {
-				systemf(
-					"gcc -no-pie -o \"%s\" %s.o %s %s",
-					output_bin, output_bin, obj_files, link_dynamically);
-				systemf("rm %s.o", output_bin);
-				if (!save_asm_output) systemf("rm %s", output_file);
-			} break;
-			case TP_WINDOWS: {
-				systemf(
-					"gcc -no-pie -o \"%s\" %s.obj %s %s",
-					output_bin, output_bin, obj_files, link_dynamically);
-				systemf("del /F /Q %s.obj", output_bin);
-				if (!save_asm_output) systemf("del /F /Q %s", output_file);
-			} break;
+		case TP_MACOS:
+		case TP_LINUX:
+			da_foreach (char*, src, &srcs)
+				systemf("rm %s.o", *src);
+			if (!save_asm_output)
+				da_foreach (char*, src, &srcs)
+					systemf("rm %s.asm", *src);
+			break;
+
+		case TP_WINDOWS:
+			da_foreach (char*, src, &srcs)
+				systemf("del /F /Q %s.obj", *src);
+
+			if (!save_asm_output)
+				da_foreach (char*, src, &srcs)
+					systemf("del /F /Q %s.asm", *src);
+			break;
+
+		default:;
 		}
 	}
 
