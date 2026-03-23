@@ -391,7 +391,10 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 
 	case AST_UN_EXP: {
 		if (en->expr_unary.op == AST_OP_SIZEOF) {
+			size_t savedCnt = func->body.count;
 			TAC_Operand arg = tac_ir_gen_expr(ctx, prog, func, en->expr_unary.v);
+			func->body.count = savedCnt;
+
 			ctx->last_var = 0;
 			return (TAC_Operand) {
 				.kind = OPR_SIZEOF,
@@ -880,12 +883,22 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 	}
 
 	ht_foreach_node (SymbolTable, n, &da_last(&p->sss)) {
-		if (n->key.type == SBL_FUNC_EXTERN) {
+		switch (n->key.type) {
+		case SBL_FUNC_EXTERN:
 			da_append(&prog.externs, ((TAC_Extern){
-				.name = n->val.func_extern.extern_smb,
+				.name     = n->val.func_extern.extern_smb,
 				.ret_type = n->val.func_extern.type,
 			}));
-		} else if (n->key.type == SBL_VAR) {
+			break;
+		case SBL_FUNC_DEF:
+			if (!n->val.func_def.is_def) {
+				da_append(&prog.externs, ((TAC_Extern){
+					.name     = n->key.id,
+					.ret_type = n->val.func_def.type,
+				}));
+			}
+			break;
+		case SBL_VAR:
 			da_append(&prog.globals, ((TAC_GlobalVar){
 				.type = n->val.variable.type,
 				.index = data_id,
