@@ -6,28 +6,10 @@
 #include "../thirdparty/cplus.h"
 #include "../include/preprocessor.h"
 
-typedef DA(Token) Tokens;
+HT_IMPL(ImportedTable, char*, bool)
+HT_IMPL_STR(MacroTable, Macro)
 
-typedef struct {
-	enum {
-		MACRO_OBJ,
-		MACRO_FUNC,
-	} kind;
-
-	union {
-		struct {
-			DA(char*) args;
-			Tokens body;
-		} func;
-
-		struct {
-			Tokens body;
-		} obj;
-	} as;
-} Macro;
-
-HT(ImportedTable, char*, bool)
-HT_STR(MacroTable, Macro)
+StringBuilder path = {0};
 
 static Token peek(PreprocCtx *p) {
 	return da_get(&p->lexer.tokens, p->cur_tok);
@@ -53,10 +35,6 @@ static void insert(PreprocCtx *p, Token tok) {
 void remove_tok(PreprocCtx *p) {
 	da_remove_ordered(&p->lexer.tokens, p->cur_tok);
 }
-
-ImportedTable it   = {0};
-MacroTable    mt   = {0};
-StringBuilder path = {0};
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -99,16 +77,16 @@ int ImportedTable_compare(char *cur_str, char *str) {
 	return pathcmp(cur_str, str);
 }
 
-Lexer get_lexer(Imports *imports, char *file, bool *isImported) {
+Lexer get_lexer(PreprocCtx *p, char *file, bool *isImported) {
 	*isImported = false;
 
-	da_foreach(char*, imp, imports) {
+	da_foreach(char*, imp, p->imports) {
 		sb_reset(&path);
 		sb_appendf(&path, "%s/%s", *imp, file);
 
 		char *code = read_file(path.items);
 		if (code) {
-			if (ImportedTable_get(&it, path.items)) {
+			if (ImportedTable_get(&p->it, path.items)) {
 				*isImported = true;
 				return (Lexer){0};
 			}
@@ -119,7 +97,6 @@ Lexer get_lexer(Imports *imports, char *file, bool *isImported) {
 
 	return (Lexer){0};
 }
-
 
 void get_folder(char *dst, const char *file) {
 	const char *slash = strrchr(file, '/');
@@ -163,7 +140,7 @@ void resolve_bras(PreprocCtx *p, Tokens *arg) {
 }
 
 bool insert_macro(PreprocCtx *p) {
-	Macro *macro = MacroTable_get(&mt, peek(p).data);
+	Macro *macro = MacroTable_get(&p->mt, peek(p).data);
 	if (!macro) return false;
 	remove_tok(p);
 
@@ -257,7 +234,7 @@ void preprocessor(PreprocCtx *p, bool skip) {
 		char *cur_folder = malloc(256);
 		get_folder(cur_folder, p->lexer.cur_loc.file);
 		da_get(p->imports, 0) = cur_folder;
-		ImportedTable_add(&it, p->lexer.cur_loc.file, true);
+		ImportedTable_add(&p->it, p->lexer.cur_loc.file, true);
 	}
 
 	while (peek(p).kind != TOK_EOF) {
@@ -268,7 +245,7 @@ void preprocessor(PreprocCtx *p, bool skip) {
 				throw_error(peek(p).loc, "filepath expected");
 
 			bool isImported;
-			Lexer importedLex = get_lexer(p->imports, peek(p).data, &isImported);
+			Lexer importedLex = get_lexer(p, peek(p).data, &isImported);
 			if (!importedLex.tokens.items && !isImported)
 				throw_error(peek(p).loc, "no such file");
 			next(p);
@@ -279,14 +256,17 @@ void preprocessor(PreprocCtx *p, bool skip) {
 
 			if (!isImported) {
 				char *savedCurFolder = p->imports->items[0];
-				PreprocCtx nctx = {
-					.imports = p->imports,
-					.lexer = importedLex,
-				};
+				Lexer savedLexer = p->lexer;
+				size_t savedCurTok = p->cur_tok;
 
-				preprocessor(&nctx, false);
-				importedLex = nctx.lexer;
+				p->lexer = importedLex;
+				p->cur_tok = 0;
+				preprocessor(p, false);
+				importedLex = p->lexer;
+
 				p->imports->items[0] = savedCurFolder;
+				p->lexer = savedLexer;
+				p->cur_tok = savedCurTok;
 
 				for (size_t j = 0; j < importedLex.tokens.count - 1; j++) {
 					insert(p, da_get(&importedLex.tokens, j));
@@ -338,7 +318,7 @@ void preprocessor(PreprocCtx *p, bool skip) {
 				}
 			}
 
-			MacroTable_add(&mt, id, macro);
+			MacroTable_add(&p->mt, id, macro);
 		} break;
 
 		case TOK_MACRO_OBJ: {
@@ -354,7 +334,7 @@ void preprocessor(PreprocCtx *p, bool skip) {
 				next(p);
 			}
 
-			MacroTable_add(&mt, id, macro);
+			MacroTable_add(&p->mt, id, macro);
 		} break;
 
 		case TOK_ID:
