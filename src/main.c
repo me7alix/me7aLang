@@ -80,12 +80,11 @@ char buf[512];
 
 void print_usage() {
 	printf(
-		"Usage: [options] file\n"
+		"Usage: [options] files\n"
 		"Options:\n"
 		"  -o   Output file path\n"
 		"  -c   Compile to object file\n"
-		"  -obj Object files\n"
-		"  -ld  Link dynamicly\n"
+		"  -lf  Linker flags\n"
 		"  -asm Save assembler output\n"
 		"  -ir  Save IR output\n");
 }
@@ -155,9 +154,9 @@ int main(int argc, char **argv) {
 			}
 
 			output_bin = argv[++i];
-		} else if (strcmp(argv[i], "-ld") == 0) {
+		} else if (strcmp(argv[i], "-lf") == 0) {
 			if (i >= argc) {
-				fprintf(stderr, "invalid -ld argument\n");
+				fprintf(stderr, "invalid -lf argument\n");
 				return 1;
 			}
 
