@@ -23,7 +23,8 @@ static fn hash_combine(h1: u32, h2: u32): u32 {
 }
 
 macro hash_num(num) {
-    ((1462847356:u32 * num:u32 + 1550508858:u32):u32)}
+    ((1462847356:u32 * num:u32 + 1550508858:u32):u32) \
+}
 
 macro HashMap(HT, KT, VT) {
 	HashMapDecl(HT, KT, VT)

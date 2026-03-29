@@ -16,11 +16,9 @@ char *get_id(Lexer *l) {
 	l->cur_char--;
 
 	size_t len = l->cur_char - start + 1;
-
 	char *word = malloc(sizeof(char) * (len+1));
 	memcpy(word, start, len);
 	word[len] = '\0';
-
 	return word;
 }
 
@@ -32,7 +30,7 @@ void add_token(Lexer *l, TokenKind type, char *data) {
 	}));
 }
 
-bool is_tok(Lexer *l, char *tok, TokenKind type, char *str) {
+bool is_keyword(Lexer *l, char *tok, TokenKind type, char *str) {
 	for (size_t i = 0; i < strlen(tok); i++) {
 		if (tok[i] != str[i]) return false;
 	}
@@ -48,31 +46,6 @@ bool is_tok(Lexer *l, char *tok, TokenKind type, char *str) {
 	return true;
 }
 
-void throw_error(Location loc, char *error) {
-	size_t lines_num = loc.line_num + 1;
-	size_t chars_num = loc.line_char-loc.line_start + 1;
-	printf("%s:%zu:%zu: %s\n", loc.file, lines_num, chars_num, error);
-
-	loc.line_char = loc.line_start;
-	char error_pointer[128];
-	size_t cnt = 0;
-
-	while (*loc.line_char != '\n' && *loc.line_char != '\0'){
-		printf("%c", *loc.line_char);
-		if (cnt < chars_num - 1) {
-			if (*loc.line_char != '\t') error_pointer[cnt++] = ' ';
-			else                        error_pointer[cnt++] = '\t';
-		}
-		loc.line_char++;
-	}
-
-	printf("\n");
-	error_pointer[cnt++] = '^';
-	error_pointer[cnt] = '\0';
-	printf("%s\n", error_pointer);
-	exit(1);
-}
-
 Lexer lexer_lex(char *file, char *code) {
 	Lexer l = {0};
 	l.cur_loc.file = file;
@@ -82,7 +55,7 @@ Lexer lexer_lex(char *file, char *code) {
 	while (*l.cur_char != '\0') {
 		l.cur_loc.line_char = l.cur_char;
 		switch (*l.cur_char) {
-		case ' ': case '\t': break;
+		case ' ': case '\\': case '\t':          break;
 		case '{': add_token(&l, TOK_OBRA,  "{"); break;
 		case '}': add_token(&l, TOK_CBRA,  "}"); break;
 		case '(': add_token(&l, TOK_OPAR,  "("); break;
@@ -202,11 +175,16 @@ Lexer lexer_lex(char *file, char *code) {
 
 		case '\r':
 		case '\n': {
-			switch (da_last(&l.tokens).kind) {
+			if (l.tokens.count > 0) {
+				switch (da_last(&l.tokens).kind) {
 				case TOK_OPAR: case TOK_DOT:
 				case TOK_SEMI: case TOK_CBRA:
 				case TOK_OBRA: case TOK_COM: break;
-				default: add_token(&l, TOK_SEMI, ";");
+				default:
+					if (l.cur_char[-1] != '\\') {
+						add_token(&l, TOK_SEMI, ";");
+					}
+				}
 			}
 
 			if (l.cur_char[0] == '\r' && l.cur_char[1] == '\n')
@@ -295,26 +273,26 @@ Lexer lexer_lex(char *file, char *code) {
 				}
 			}
 
-			else if   (is_tok(&l, "for",      TOK_FOR_SYM,    l.cur_char)) {
-			} else if (is_tok(&l, "while",    TOK_WHILE_SYM,  l.cur_char)) {
-			} else if (is_tok(&l, "if",       TOK_IF_SYM,     l.cur_char)) {
-			} else if (is_tok(&l, "else",     TOK_ELSE_SYM,   l.cur_char)) {
-			} else if (is_tok(&l, "struct",   TOK_STRUCT,     l.cur_char)) {
-			} else if (is_tok(&l, "impl",     TOK_IMPL,       l.cur_char)) {
-			} else if (is_tok(&l, "extern",   TOK_EXTERN,     l.cur_char)) {
-			} else if (is_tok(&l, "true",     TOK_TRUE,       l.cur_char)) {
-			} else if (is_tok(&l, "false",    TOK_FALSE,      l.cur_char)) {
-			} else if (is_tok(&l, "break",    TOK_BREAK,      l.cur_char)) {
-			} else if (is_tok(&l, "continue", TOK_CONTINUE,   l.cur_char)) {
-			} else if (is_tok(&l, "null",     TOK_NULL,       l.cur_char)) {
-			} else if (is_tok(&l, "sizeof",   TOK_SIZEOF,     l.cur_char)) {
-			} else if (is_tok(&l, "return",   TOK_RET,        l.cur_char)) {
-			} else if (is_tok(&l, "import",   TOK_IMPORT,     l.cur_char)) {
-			} else if (is_tok(&l, "fn",       TOK_FUNC,       l.cur_char)) {
-			} else if (is_tok(&l, "static",   TOK_STATIC,     l.cur_char)) {
-			} else if (is_tok(&l, "block",    TOK_BLOCK,      l.cur_char)) {
-			} else if (is_tok(&l, "def",      TOK_MACRO_OBJ,  l.cur_char)) {
-			} else if (is_tok(&l, "macro",    TOK_MACRO_FUNC, l.cur_char)) {}
+			else if   (is_keyword(&l, "for",      TOK_FOR_SYM,    l.cur_char)) {
+			} else if (is_keyword(&l, "while",    TOK_WHILE_SYM,  l.cur_char)) {
+			} else if (is_keyword(&l, "if",       TOK_IF_SYM,     l.cur_char)) {
+			} else if (is_keyword(&l, "else",     TOK_ELSE_SYM,   l.cur_char)) {
+			} else if (is_keyword(&l, "struct",   TOK_STRUCT,     l.cur_char)) {
+			} else if (is_keyword(&l, "impl",     TOK_IMPL,       l.cur_char)) {
+			} else if (is_keyword(&l, "extern",   TOK_EXTERN,     l.cur_char)) {
+			} else if (is_keyword(&l, "true",     TOK_TRUE,       l.cur_char)) {
+			} else if (is_keyword(&l, "false",    TOK_FALSE,      l.cur_char)) {
+			} else if (is_keyword(&l, "break",    TOK_BREAK,      l.cur_char)) {
+			} else if (is_keyword(&l, "continue", TOK_CONTINUE,   l.cur_char)) {
+			} else if (is_keyword(&l, "null",     TOK_NULL,       l.cur_char)) {
+			} else if (is_keyword(&l, "sizeof",   TOK_SIZEOF,     l.cur_char)) {
+			} else if (is_keyword(&l, "return",   TOK_RET,        l.cur_char)) {
+			} else if (is_keyword(&l, "import",   TOK_IMPORT,     l.cur_char)) {
+			} else if (is_keyword(&l, "fn",       TOK_FUNC,       l.cur_char)) {
+			} else if (is_keyword(&l, "static",   TOK_STATIC,     l.cur_char)) {
+			} else if (is_keyword(&l, "block",    TOK_BLOCK,      l.cur_char)) {
+			} else if (is_keyword(&l, "def",      TOK_MACRO_OBJ,  l.cur_char)) {
+			} else if (is_keyword(&l, "macro",    TOK_MACRO_FUNC, l.cur_char)) {}
 
 			else if (isalpha(*l.cur_char) || *l.cur_char == '_')
 				add_token(&l, TOK_ID, get_id(&l));

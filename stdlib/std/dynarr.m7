@@ -1,7 +1,8 @@
 import "std/libc.m7"
 
 macro da_foreach(vn, da) {
-	for vn := da.items; (vn - (da).items):uptr < (da).count; vn = vn + 1 }
+	for vn := da.items; (vn - (da).items):uptr < (da).count; vn = vn + 1 \
+}
 
 macro DynArr(N, T) {
 	DynArrDecl(N, T)
