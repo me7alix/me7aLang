@@ -515,7 +515,6 @@ ex:
 void parse_func_args(Parser *p, AST_Nodes *fargs) {
 	while (peek(p).kind != TOK_CPAR) {
 		switch (peek(p).kind) {
-		case TOK_COM: break;
 		case TOK_ID: {
 			expect_token(peek2(p), TOK_COL);
 			AST_Node *arg = ast_new(
@@ -533,18 +532,26 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 				.variable.type = arg->func_def_arg.type,
 				.variable.uid = arg->func_def_arg.uid,
 			})) throw_error(arg->loc, "redifinition of the variable");
+
+			if (peek2(p).kind == TOK_COM)
+				expect_token(peek2(p), TOK_COM);
+			next(p);
 		} break;
 
 		case TOK_ANY:
 			AST_Node *arg = ast_new(.kind = AST_FUNC_DEF_ARG_ANY);
 			da_append(fargs, arg);
+			if (peek2(p).kind == TOK_COM)
+				expect_token(peek2(p), TOK_COM);
+			next(p);
 			break;
 
 		default:
-			expect_token(peek(p), p->cur_token->kind);
+			throw_error(peek(p).loc, "unexpected token");
 		}
 
-		next(p);
+		if (peek(p).kind != TOK_CPAR)
+			next(p);
 	}
 
 	next(p);

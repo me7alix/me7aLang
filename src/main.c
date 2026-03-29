@@ -294,7 +294,6 @@ int main(int argc, char **argv) {
 		case TP_WINDOWS:
 			da_foreach (char*, src, &srcs)
 				systemf("del /F /Q %s.obj", *src);
-
 			if (!save_asm_output)
 				da_foreach (char*, src, &srcs)
 					systemf("del /F /Q %s.asm", *src);
