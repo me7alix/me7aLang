@@ -268,6 +268,21 @@ int main(int argc, char **argv) {
 		tp == TP_LINUX   ? "o"   :
 		tp == TP_MACOS   ? "o"   : "";
 
+	if (!save_asm_output) {
+		switch (tp) {
+		case TP_MACOS:
+		case TP_LINUX:
+			da_foreach (char*, src, &srcs) {
+				systemf("rm %s.asm", *src);
+			} break;
+
+		case TP_WINDOWS:
+			da_foreach (char*, src, &srcs) {
+				systemf("del /F /Q %s.asm", *src);
+			}
+		}
+	}
+
 	if (!compile_to_obj) {
 		StringBuilder cmd = {0};
 		sb_appendf(&cmd, "gcc -no-pie -o \"%s\"", output_bin);
@@ -284,22 +299,14 @@ int main(int argc, char **argv) {
 		switch (tp) {
 		case TP_MACOS:
 		case TP_LINUX:
-			da_foreach (char*, src, &srcs)
+			da_foreach (char*, src, &srcs) {
 				systemf("rm %s.o", *src);
-			if (!save_asm_output)
-				da_foreach (char*, src, &srcs)
-					systemf("rm %s.asm", *src);
-			break;
+			} break;
 
 		case TP_WINDOWS:
-			da_foreach (char*, src, &srcs)
+			da_foreach (char*, src, &srcs) {
 				systemf("del /F /Q %s.obj", *src);
-			if (!save_asm_output)
-				da_foreach (char*, src, &srcs)
-					systemf("del /F /Q %s.asm", *src);
-			break;
-
-		default:;
+			}
 		}
 	}
 
