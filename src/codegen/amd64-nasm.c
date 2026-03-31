@@ -69,16 +69,18 @@ size_t get_reg_row(Type t) {
 
 uint get_type_size(Type type) {
 	switch (type.kind) {
-		default: return 1 << get_reg_row(type);
-		case TYPE_STRUCT: {
-			uint total = 0;
-			da_foreach (StructMember, member, &type.user->ustruct.members) {
-				if (member->kind == STMEM_FIELD) {
-					total += get_type_size(member->as.field.type);
-				}
+	case TYPE_STRUCT:
+		uint total = 0;
+		da_foreach (StructMember, member, &type.user->ustruct.members) {
+			if (member->kind == STMEM_FIELD) {
+				total += get_type_size(member->as.field.type);
 			}
-			return total;
-		} break;
+		}
+
+		return total;
+
+	default:
+		return 1 << get_reg_row(type);
 	}
 }
 
@@ -141,8 +143,7 @@ char *opr_to_nasm(TAC_Operand opr) {
 				sb_appendf(&body, "  mov rax, qword[rbp - %u]\n", off);
 				sprintf(rbuf, "%s[rax + %u]", ts, field_off);
 			} else if (opr.var.addr_kind == VAR_DATA) {
-				sb_appendf(&body, "  lea rax, [rel D%u + %lu]\n", opr.var.addr_id, field_off);
-				sprintf(rbuf, "%s[rax]", ts);
+				sprintf(rbuf, "%s[rel D%u + %lu]", ts, opr.var.addr_id, field_off);
 			} else UNREACHABLE;
 		} else if (opr.var.kind == VAR_DATA) {
 			sprintf(rbuf, "%s[rel D%u + %u]", ts, opr.var.addr_id, field_off);
@@ -213,27 +214,24 @@ char *opr_to_nasm(TAC_Operand opr) {
 		size_t arg_row = get_reg_row(opr.func_inp.type);
 
 		switch (tp) {
-			case TP_NULL: break;
-			case TP_MACOS:
-			case TP_LINUX: {
-				if (arg_id >= sysv_regs_cnt) {
-					uint shadow_space = (arg_id - sysv_regs_cnt) * 8 + 48;
-					sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", R10[arg_row], ts, shadow_space);
-					sprintf(rbuf, "%s", R10[arg_row]);
-				} else {
-					sprintf(rbuf, "%s", sysv_regs[arg_row][arg_id]);
-				}
+		case TP_MACOS:
+		case TP_LINUX:
+			if (arg_id >= sysv_regs_cnt) {
+				uint shadow_space = (arg_id - sysv_regs_cnt) * 8 + 48;
+				sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", R10[arg_row], ts, shadow_space);
+				sprintf(rbuf, "%s", R10[arg_row]);
+			} else {
+				sprintf(rbuf, "%s", sysv_regs[arg_row][arg_id]);
 			} break;
-			case TP_WINDOWS: {
-				if (arg_id >= win_regs_cnt) {
-					uint shadow_space = (arg_id - win_regs_cnt) * 8 + 48;
-					sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", R10[arg_row], ts, shadow_space);
-					sprintf(rbuf, "%s", R10[arg_row]);
-				} else {
-					sprintf(rbuf, "%s", win_regs[arg_row][arg_id]);
-				}
-			} break;
-		} break;
+		case TP_WINDOWS:
+			if (arg_id >= win_regs_cnt) {
+				uint shadow_space = (arg_id - win_regs_cnt) * 8 + 48;
+				sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", R10[arg_row], ts, shadow_space);
+				sprintf(rbuf, "%s", R10[arg_row]);
+			} else {
+				sprintf(rbuf, "%s", win_regs[arg_row][arg_id]);
+			}
+		}
 	} break;
 
 	default:
@@ -247,15 +245,14 @@ void type_to_reg(TAC_Operand opr, char *arg1, char *arg2) {
 	Type opr_type = tac_ir_get_opr_type(opr);
 
 	switch (opr_type.kind) {
-		case TYPE_F32:
-		case TYPE_FLOAT:
-			sprintf(arg1, "xmm0");
-			sprintf(arg2, "xmm1");
-			break;
-		default: {
-			sprintf(arg1, "%s", R10[get_reg_row(opr_type)]);
-			sprintf(arg2, "%s", R11[get_reg_row(opr_type)]);
-		}
+	case TYPE_F32:
+	case TYPE_FLOAT:
+		sprintf(arg1, "xmm0");
+		sprintf(arg2, "xmm1");
+		break;
+	default:
+		sprintf(arg1, "%s", R10[get_reg_row(opr_type)]);
+		sprintf(arg2, "%s", R11[get_reg_row(opr_type)]);
 	}
 }
 
@@ -652,26 +649,23 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				size_t arg_row = get_reg_row(tac_ir_get_opr_type(ci.args[i]));
 
 				switch (tp) {
-					case TP_NULL: break;
-					case TP_MACOS:
-					case TP_LINUX: {
-						if (i >= sysv_regs_cnt) {
-							sb_appendf(&body, "  mov %s, %s\n", R10[arg_row], opr_to_nasm(ci.args[i]));
-							uint shadow_space = (i - sysv_regs_cnt) * 8 + 32;
-							sb_appendf(&body, "  mov %s[rsp + %u], %s\n", ts, shadow_space, R10[arg_row]);
-						} else {
-							sb_appendf(&body, "  mov %s, %s\n", sysv_regs[arg_row][i], opr_to_nasm(ci.args[i]));
-						}
+				case TP_MACOS:
+				case TP_LINUX:
+					if (i >= sysv_regs_cnt) {
+						sb_appendf(&body, "  mov %s, %s\n", R10[arg_row], opr_to_nasm(ci.args[i]));
+						uint shadow_space = (i - sysv_regs_cnt) * 8 + 32;
+						sb_appendf(&body, "  mov %s[rsp + %u], %s\n", ts, shadow_space, R10[arg_row]);
+					} else {
+						sb_appendf(&body, "  mov %s, %s\n", sysv_regs[arg_row][i], opr_to_nasm(ci.args[i]));
 					} break;
-					case TP_WINDOWS: {
-						if (i >= sysv_regs_cnt) {
-							sb_appendf(&body, "  mov %s, %s\n", R10[arg_row], opr_to_nasm(ci.args[i]));
-							uint shadow_space = (i - win_regs_cnt) * 8 + 32;
-							sb_appendf(&body, "  mov %s[rsp + %u], %s\n", ts, shadow_space, R10[arg_row]);
-						} else {
-							sb_appendf(&body, "  mov %s, %s\n", win_regs[arg_row][i], opr_to_nasm(ci.args[i]));
-						}
-					} break;
+				case TP_WINDOWS:
+					if (i >= sysv_regs_cnt) {
+						sb_appendf(&body, "  mov %s, %s\n", R10[arg_row], opr_to_nasm(ci.args[i]));
+						uint shadow_space = (i - win_regs_cnt) * 8 + 32;
+						sb_appendf(&body, "  mov %s[rsp + %u], %s\n", ts, shadow_space, R10[arg_row]);
+					} else {
+						sb_appendf(&body, "  mov %s, %s\n", win_regs[arg_row][i], opr_to_nasm(ci.args[i]));
+					}
 				}
 			}
 
