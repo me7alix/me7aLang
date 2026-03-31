@@ -97,6 +97,14 @@ static bool compare_types(Type a, Type b) {
 			!(get_pointer_base(a)->kind == TYPE_NULL ||
 			get_pointer_base(b)->kind == TYPE_NULL)
 		) return false;
+	} else if (a.kind == TYPE_FUNCTION && b.kind == TYPE_FUNCTION) {
+		if (!compare_types(*a.func.ret, *b.func.ret)) return false;
+		if (a.func.args.count != b.func.args.count)   return false;
+		for (size_t i = 0; i < a.func.args.count; i++) {
+			if (!compare_types(a.func.args.items[i], b.func.args.items[i])) {
+				return false;
+			}
+		}
 	} else if (a.kind != b.kind) {
 		return false;
 	}

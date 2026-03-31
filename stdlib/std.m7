@@ -1,0 +1,13 @@
+import "std/libc.m7"
+
+macro new(T) { calloc(1, sizeof:T): *T }
+
+macro do_while(expr, body) {
+    while true {
+        block body
+
+        if !(expr) {
+            break
+        }
+    }
+}

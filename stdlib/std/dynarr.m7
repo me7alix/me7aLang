@@ -4,6 +4,13 @@ macro da_foreach(vn, da) {
 	for vn := da.items; (vn - (da).items):uptr < (da).count; vn = vn + 1 \
 }
 
+macro da_copy(dst, src) {
+	dst.reserve(src.count)
+	da_foreach (item, src) {
+		dst.append(item)
+	}
+}
+
 macro DynArr(N, T) {
 	DynArrDecl(N, T)
 	DynArrImpl(N, T)

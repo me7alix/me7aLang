@@ -209,7 +209,7 @@ AST_Node *parse_method_call(Parser *p) {
 		.loc = peek(p).loc,
 		.method_call.id = next(p).data,
 	);
-	
+
 	// the first argument of any method is reserved for "self"
 	da_append(&metCall->method_call.args, NULL);
 
@@ -233,8 +233,8 @@ AST_Node *parse_func_call(Parser *p) {
 
 	Symbol *fcf = smbt_get(p, SBL_FUNC_DEF,    fcn->func_call.id);
 	Symbol *fce = smbt_get(p, SBL_FUNC_EXTERN, fcn->func_call.id);
-	Symbol *vfp = smbt_get(p, SBL_VAR,         fcn->func_call.id);
-	if (!fcf && !fce && !vfp) throw_error(fcn->loc, "calling an undeclared function");
+	//Symbol *vfp = smbt_get(p, SBL_VAR,         fcn->func_call.id);
+	if (!fcf && !fce) throw_error(fcn->loc, "calling an undeclared function");
 
 	AST_Nodes fargs;
 	if (fcf) {
@@ -244,9 +244,7 @@ AST_Node *parse_func_call(Parser *p) {
 		fcn->func_call.type = fce->func_extern.type;
 		fcn->func_call.id = fce->func_extern.extern_smb;
 		fargs = fce->func_extern.args;
-	} else if (vfp) {
-		
-	}
+	} // else if (vfp) {}
 
 	size_t arg_cnt = 0;
 	bool met_any = false;
@@ -594,7 +592,7 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 
 	next(p);
 	expect(next(p), TOK_OPAR);
-	
+
 	push_scope(p);
 
 	if (self) {
@@ -656,14 +654,14 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 			smbt_add(p, SBL_FUNC_DEF, fdn->func_def.id, fds);
 			return NULL;
 		} else {
-			fdn->func_def.body = parse_body(p, fdn, true);	
+			fdn->func_def.body = parse_body(p, fdn, true);
 			pop_scope(p);
 			smbt_add(p, SBL_FUNC_DEF, fdn->func_def.id, fds);
 			return fdn;
 		}
 	}
 
-	fdn->func_def.body = parse_body(p, fdn, true);	
+	fdn->func_def.body = parse_body(p, fdn, true);
 	pop_scope(p);
 
 	return fdn;
@@ -727,6 +725,39 @@ void parse_method(Parser *p, UserType *st) {
 	);
 
 	AST_Node *func = parse_function(p, self);
+	da_foreach (StructMember, member, &st->ustruct.members) {
+		if (member->kind == STMEM_METHOD) {
+			AST_Node *memb = member->as.method.func;
+
+			if (strcmp(memb->func_def.id, func->func_def.id) != 0)
+				continue;
+
+			if (memb->func_def.body)
+				throw_error(func->loc, "redefinition of method");
+
+			if (!compare_types(memb->func_def.type, func->func_def.type))
+				throw_error(func->loc,
+					"return type mismatch between declaration and definition"
+				);
+
+			for (size_t i = 0; i < memb->func_def.args.count; i++) {
+				Type a = memb->func_def.args.items[i]->func_def_arg.type;
+				Type b = func->func_def.args.items[i]->func_def_arg.type;
+
+				if (!compare_types(a, b))
+					throw_error(func->loc,
+						"argument type mismatch "
+						"between declaration and definition"
+					);
+			}
+
+			da_remove_ordered(
+				&st->ustruct.members,
+				(size_t)(member - st->ustruct.members.items));
+			member -= 1;
+		}
+	}
+
 	da_append(&st->ustruct.members, ((StructMember){
 		.kind = STMEM_METHOD,
 		.as.method.func = func,
