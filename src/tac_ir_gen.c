@@ -212,16 +212,16 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 	} break;
 
 	case AST_BIN_EXP: {
-		bool is_op_field = en->expr_binary.op == AST_OP_FIELD;
-		if (en->expr_binary.r->kind == AST_METHOD_CALL) {
+		bool is_op_field = en->ebin.op == AST_OP_FIELD;
+		if (en->ebin.r->kind == AST_METHOD_CALL) {
 			if (is_op_field) ctx->is_field_gen = true;
-			return tac_ir_gen_expr(ctx, prog, func, en->expr_binary.r);
+			return tac_ir_gen_expr(ctx, prog, func, en->ebin.r);
 		}
 
 		if (is_op_field) ctx->is_field_gen = false;
-		TAC_Operand l = tac_ir_gen_expr(ctx, prog, func, en->expr_binary.l);
+		TAC_Operand l = tac_ir_gen_expr(ctx, prog, func, en->ebin.l);
 		if (is_op_field) ctx->is_field_gen = true;
-		TAC_Operand r = tac_ir_gen_expr(ctx, prog, func, en->expr_binary.r);
+		TAC_Operand r = tac_ir_gen_expr(ctx, prog, func, en->ebin.r);
 
 		if (is_op_field) {
 			ctx->is_field_gen = false;
@@ -234,16 +234,16 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			return ret;
 
 		Type exp_type;
-		switch (en->expr_binary.op) {
+		switch (en->ebin.op) {
 		case AST_OP_FIELD:
 		case AST_OP_ARR:
 			exp_type = (Type) {
 				.kind = TYPE_POINTER,
-				.pointer.base = &en->expr_binary.type
+				.pointer.base = &en->ebin.type
 			};
 			break;
 		default:
-			exp_type = en->expr_binary.type;
+			exp_type = en->ebin.type;
 		}
 
 		TAC_Instruction inst = {
@@ -257,7 +257,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			},
 		};
 
-		switch (en->expr_binary.op) {
+		switch (en->ebin.op) {
 		case AST_OP_ADD:      inst.op = OP_ADD;      break;
 		case AST_OP_SUB:      inst.op = OP_SUB;      break;
 		case AST_OP_MUL:      inst.op = OP_MUL;      break;
@@ -282,7 +282,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 
 		/* Pointers arithmetic */
 
-		int expr_ast_op = en->expr_binary.op;
+		int expr_ast_op = en->ebin.op;
 
 		if (
 			expr_ast_op == AST_OP_ADD ||
@@ -331,7 +331,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 					if      (is_pointer(rt)) inst.arg1 = sf.dst;
 					else if (is_pointer(lt)) inst.arg2 = sf.dst;
 
-					if (en->expr_binary.op == AST_OP_ARR) {
+					if (en->ebin.op == AST_OP_ARR) {
 						inst.op = OP_ADD;
 						da_append(&func->body, inst);
 						return tac_ir_gen_deref(ctx, func, *exp_type.pointer.base, inst.dst);
@@ -390,23 +390,23 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 	} break;
 
 	case AST_UN_EXP: {
-		if (en->expr_unary.op == AST_OP_SIZEOF) {
+		if (en->eun.op == AST_OP_SIZEOF) {
 			size_t savedCnt = func->body.count;
-			TAC_Operand arg = tac_ir_gen_expr(ctx, prog, func, en->expr_unary.v);
+			TAC_Operand arg = tac_ir_gen_expr(ctx, prog, func, en->eun.v);
 			func->body.count = savedCnt;
 
 			ctx->last_var = 0;
 			return (TAC_Operand) {
 				.kind = OPR_SIZEOF,
-				.size_of.type = en->expr_unary.type,
+				.size_of.type = en->eun.type,
 				.size_of.vtype = tac_ir_get_opr_type(arg),
 			};
-		} else if (en->expr_unary.op == AST_OP_DEREF) {
-			TAC_Operand arg = tac_ir_gen_expr(ctx, prog, func, en->expr_unary.v);
-			return tac_ir_gen_deref(ctx, func, en->expr_unary.type, arg);
+		} else if (en->eun.op == AST_OP_DEREF) {
+			TAC_Operand arg = tac_ir_gen_expr(ctx, prog, func, en->eun.v);
+			return tac_ir_gen_deref(ctx, func, en->eun.type, arg);
 		}
 
-		TAC_Operand arg = tac_ir_gen_expr(ctx, prog, func, en->expr_unary.v);
+		TAC_Operand arg = tac_ir_gen_expr(ctx, prog, func, en->eun.v);
 
 		TAC_Operand ret;
 		if (tac_ir_opr_calc(en, arg, (TAC_Operand){0}, &ret)) {
@@ -417,12 +417,12 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			.arg1 = arg,
 			.dst = (TAC_Operand){
 				.kind = OPR_VAR,
-				.var.type = en->expr_unary.type,
+				.var.type = en->eun.type,
 				.var.addr_id = var_id++,
 			},
 		};
 
-		switch (en->expr_unary.op) {
+		switch (en->eun.op) {
 		case AST_OP_CAST:   inst.op = OP_CAST;   break;
 		case AST_OP_NOT:    inst.op = OP_NOT;    break;
 		case AST_OP_NEG:    inst.op = OP_NEG;    break;
@@ -485,20 +485,20 @@ void tac_ir_gen_var_mut(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	IRGenExprCtx ctx = {0};
 
 	if (cn->var_mut.expr->kind == AST_BIN_EXP &&
-			cn->var_mut.expr->expr_binary.op == AST_OP_FIELD) {
+			cn->var_mut.expr->ebin.op == AST_OP_FIELD) {
 		ctx.is_met_call_gen = true;
 		tac_ir_gen_expr(&ctx, prog, func, cn->var_mut.expr);
 		return;
 	}
 
 	ctx.is_right_of_eq = false;
-	TAC_Operand dst = tac_ir_gen_expr(&ctx, prog, func, cn->var_mut.expr->expr_binary.l);
+	TAC_Operand dst = tac_ir_gen_expr(&ctx, prog, func, cn->var_mut.expr->ebin.l);
 	ctx.is_right_of_eq = true;
-	TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->var_mut.expr->expr_binary.r);
+	TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->var_mut.expr->ebin.r);
 
 	TAC_OpCode op_eq;
 	bool is_op_eq;
-	switch (cn->var_mut.expr->expr_binary.op) {
+	switch (cn->var_mut.expr->ebin.op) {
 	case AST_OP_ADD_EQ: op_eq = OP_ADD; is_op_eq = true; break;
 	case AST_OP_SUB_EQ: op_eq = OP_SUB; is_op_eq = true; break;
 	case AST_OP_MUL_EQ: op_eq = OP_MUL; is_op_eq = true; break;
@@ -698,6 +698,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 		case AST_LOOP_CONTINUE:
 			if (ctx->loop_gen <= 0) throw_error(cn->loc, "continue outside of a loop");
 			if (ctx->for_var_mut) tac_ir_gen_var_mut(prog, func, ctx->for_var_mut);
+
 			da_append(&func->body, ((TAC_Instruction){
 				.op = OP_JUMP,
 				.dst = (TAC_Operand) {
@@ -869,14 +870,21 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 	ht_foreach_node(UserTypes, kv, &p->ut) {
 		UserType *ut = kv->val;
 		if (ut->kind == TYPE_STRUCT) {
-			da_foreach(StructMember, member, &ut->ustruct.members) {
-				if (member->kind == STMEM_METHOD)
-				if (member->as.method.func->func_def.body != NULL) {
-					char *name = malloc(256);
+			da_foreach (StructMember, member, &ut->ustruct.members) {
+				if (member->kind == STMEM_METHOD) {
+					char *name = malloc(1 << 12);
 					char *id = member->as.method.func->func_def.id;
 					sprintf(name, "method_%s_%s", ut->id, id);
-					member->as.method.func->func_def.id = name;
-					tac_ir_gen_func(&prog, member->as.method.func);
+
+					if (member->as.method.func->func_def.body != NULL) {
+						member->as.method.func->func_def.id = name;
+						tac_ir_gen_func(&prog, member->as.method.func);
+					} else {
+						da_append(&prog.externs, ((TAC_Extern){
+							.name     = name,
+							.ret_type = member->as.method.func->func_def.type,
+						}));
+					}
 				}
 			}
 		}
@@ -916,10 +924,11 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 	for (size_t i = 0; i < pn->program.stmts.count; i++) {
 		AST_Node *cn = da_get(&pn->program.stmts, i);
 		switch (cn->kind) {
-			case AST_FUNC_DEF:
-				tac_ir_gen_func(&prog, cn);
-				break;
-			default: UNREACHABLE;
+		case AST_FUNC_DEF:
+			tac_ir_gen_func(&prog, cn);
+			break;
+		default:
+			UNREACHABLE;
 		}
 	}
 

@@ -33,9 +33,17 @@ struct Type {
 	TypeKind kind;
 
 	union {
-		struct { Type *base; } pointer;
-		struct { Type *elem; size_t length; } array;
-		struct { Type **params; size_t param_count; Type *ret; } func;
+		struct {
+			Type *base;
+		} pointer;
+		struct {
+			Type *elem;
+			size_t length;
+		} array;
+		struct {
+			DA(Type) args;
+			Type *ret;
+		} func;
 		UserType *user;
 	};
 };
@@ -80,6 +88,20 @@ static Type *type_alloc(Type type) {
 	Type *nt = malloc(sizeof(*nt));
 	*nt = type;
 	return nt;
+}
+
+static bool compare_types(Type a, Type b) {
+	if (is_pointer(a) && is_pointer(b)) {
+		if (
+			get_pointer_base(a)->kind != get_pointer_base(b)->kind &&
+			!(get_pointer_base(a)->kind == TYPE_NULL ||
+			get_pointer_base(b)->kind == TYPE_NULL)
+		) return false;
+	} else if (a.kind != b.kind) {
+		return false;
+	}
+
+	return true;
 }
 
 #endif //TYPE_H

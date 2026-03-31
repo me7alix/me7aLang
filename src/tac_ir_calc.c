@@ -10,7 +10,7 @@ bool tac_ir_opr_calc(AST_Node *en, TAC_Operand l, TAC_Operand r, TAC_Operand *re
 		if (l.literal.type.kind != r.literal.type.kind)
 			return false;
 
-		int op = en->expr_binary.op;
+		int op = en->ebin.op;
 		i64 lv = l.literal.lint;
 		i64 rv = r.literal.lint;
 
@@ -29,7 +29,7 @@ bool tac_ir_opr_calc(AST_Node *en, TAC_Operand l, TAC_Operand r, TAC_Operand *re
 		if (!(l.kind == OPR_LITERAL))
 			return false;
 
-		int op = en->expr_binary.op;
+		int op = en->ebin.op;
 		i64 lv = l.literal.lint;
 
 		switch (op) {

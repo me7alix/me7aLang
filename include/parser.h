@@ -153,12 +153,12 @@ struct AST_Node {
 			AST_ExprOp op;
 			Type type;
 			AST_Node *v;
-		} expr_unary;
+		} eun;
 		struct {
 			AST_ExprOp op;
 			Type type;
 			AST_Node *l, *r;
-		} expr_binary;
+		} ebin;
 		struct {
 			char *id;
 			uint uid;
@@ -169,6 +169,11 @@ struct AST_Node {
 			Type type;
 		} func_ret;
 		struct {
+			enum {
+				ID_VAR,
+				ID_FUNC,
+			} kind;
+
 			char *id;
 			uint uid;
 		} vid;
@@ -185,23 +190,21 @@ typedef enum {
 	SBL_FUNC_EX_USED,
 } SymbolType;
 
-typedef struct {
-	union {
-		struct {
-			AST_Nodes args;
-			Type type;
-			bool is_def;
-		} func_def;
-		struct {
-			AST_Nodes args;
-			Type type;
-			char *extern_smb;
-		} func_extern;
-		struct {
-			Type type;
-			uint uid;
-		} variable;
-	};
+typedef union {
+	struct {
+		AST_Nodes args;
+		Type type;
+		bool is_def;
+	} func_def;
+	struct {
+		AST_Nodes args;
+		Type type;
+		char *extern_smb;
+	} func_extern;
+	struct {
+		Type type;
+		uint uid;
+	} variable;
 } Symbol;
 
 typedef struct { SymbolType type; char *id; } SymbolKey;
@@ -216,29 +219,30 @@ typedef struct {
 	AST_Node *program;
 } Parser;
 
-bool parser_symbol_table_add(Parser *p, SymbolType st, char *id, Symbol smbl);
-Symbol *parser_symbol_table_get(Parser *p, SymbolType st, char *id);
-
 Type parser_get_type(Parser *p, AST_Node *n);
 Type *parse_type(Parser *parser);
-Type parser_get_type(Parser *p, AST_Node *n);
-bool compare_types(Type a, Type b);
 
-long long parse_int(char *data);
-Symbol *st_get(SymbolTable *st, const char *id);
-
-#define expect_token(tok, kind) \
-	expect_token_f(tok, kind, #kind)
-void expect_token_f(Token token, TokenKind type, char *ts);
+#define expect(tok, kind) expect_f(tok, kind, #kind)
+void expect_f(Token token, TokenKind type, char *ts);
 
 Parser parser_parse(Token *tokens);
 void parser_free(Parser parser);
+
 AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart);
 AST_Node *parse_func_call(Parser *parser);
 AST_Node *parse_method_call(Parser *parser);
-AST_Node *ast_alloc(AST_Node node);
 
-#define UNREACHABLE do { fprintf(stderr, "%s:%d: unreachable\n", __FILE__, __LINE__); exit(1); } while(0)
+AST_Node *ast_alloc(AST_Node node);
 #define ast_new(...) ast_alloc((AST_Node){__VA_ARGS__})
+
+#define UNREACHABLE \
+	do { \
+		fprintf( \
+			stderr, \
+			"%s:%d: unreachable\n", \
+			__FILE__, __LINE__ \
+		); \
+		exit(1); \
+	} while(0)
 
 #endif
