@@ -24,7 +24,7 @@ TargetPlatform tp = TP_NULL;
 void throw_error(Location loc, char *error) {
 	size_t lines_num = loc.line_num + 1;
 	size_t chars_num = loc.line_char-loc.line_start + 1;
-	printf("%s:%zu:%zu: %s\n", loc.file, lines_num, chars_num, error);
+	fprintf(stderr, "%s:%zu:%zu: %s\n", loc.file, lines_num, chars_num, error);
 
 	loc.line_char = loc.line_start;
 	char error_pointer[128];
@@ -156,6 +156,13 @@ int main(int argc, char **argv) {
 	Imports imports = {0};
 	da_append(&imports, ""); // reserved
 	da_append(&imports, ".");
+
+	const char *home = getenv("METALANG_HOME");
+	if (home) {
+		StringBuilder std = {0};
+		sb_appendf(&std, "%s/stdlib", home);
+		da_append(&imports, std.items);
+	}
 
 	DA(char*) src_files = {0};
 	DA(char*) obj_files = {0};

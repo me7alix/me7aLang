@@ -43,9 +43,16 @@ make release -B
 ./build/fib
 ```
 
+4. Add the environment variable `METALANG_HOME` with the path to the compiler
+Now you don't have to provide the standard library path manually:
+```bash
+./build/release/m7c -o ./build/fib ./examples/fib.m7
+./build/fib
+```
+
 ## Examples
 ```
-import "std/libc.m7"
+import "std.m7"
 
 fn main() {
     printf("Hello, World!\n")
@@ -60,3 +67,4 @@ This project is released under the MIT License.
 ## Bugs
 - [OPEN] **Pointer arithmetic** (on the level of TAC IR generating): ptr += 1 is not like ptr = ptr + 1
 - [CLOSED] **Pointer to pointer etc operands** (on the level of codegen): `user: **User = ...; (*user).name <- throws unreachable`
+- [OPEN] **Tokens file path** (on the level of preprocessor): error messages often show incorrect path
