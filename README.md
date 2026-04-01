@@ -43,8 +43,7 @@ make release -B
 ./build/fib
 ```
 
-4. Add the environment variable `METALANG_HOME` with the path to the compiler
-Now you don't have to provide the standard library path manually:
+4. Add the environment variable `METALANG_HOME` with the path to the compiler. Now you don't have to provide the standard library path manually:
 ```bash
 ./build/release/m7c -o ./build/fib ./examples/fib.m7
 ./build/fib
