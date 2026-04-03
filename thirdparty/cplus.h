@@ -53,6 +53,13 @@
 #define ARR_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
 #endif
 
+#define new(T, ...) ((T*)new_impl(sizeof(T), &(T){__VA_ARGS__}))
+static inline void* new_impl(size_t size, void *init) {
+    void* p = malloc(size);
+    if (p) memcpy(p, init, size);
+    return p;
+}
+
 #ifndef CP_INT_DEFINED
     typedef unsigned int uint;
     #ifdef CP_USE_INT /* optional for any system that might not have stdint.h */

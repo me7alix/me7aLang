@@ -93,6 +93,9 @@ Lexer lexer_lex(char *file, char *code) {
 			if (l.cur_char[1] == '=') {
 				add_token(&l, TOK_MINUS_EQ, "-=");
 				l.cur_char++;
+			} else if (l.cur_char[1] == '>') {
+				add_token(&l, TOK_ARROW, "->");
+				l.cur_char++;
 			} else add_token(&l, TOK_MINUS, "-");
 		} break;
 
@@ -168,18 +171,20 @@ Lexer lexer_lex(char *file, char *code) {
 			if (l.cur_char[1] == '=') {
 				add_token(&l, TOK_EQ_EQ, "==");
 				l.cur_char++;
-			} else {
-				add_token(&l, TOK_EQ, "=");
-			}
+			} else if (l.cur_char[1] == '>') {
+				add_token(&l, TOK_ARROW_EQ, "=>");
+				l.cur_char++;
+			} else add_token(&l, TOK_EQ, "=");
 		} break;
 
 		case '\r':
 		case '\n': {
 			if (l.tokens.count > 0) {
 				switch (da_last(&l.tokens).kind) {
-				case TOK_OPAR: case TOK_DOT:
-				case TOK_SEMI: case TOK_CBRA:
-				case TOK_OBRA: case TOK_COM: break;
+				case TOK_OPAR:  case TOK_DOT:
+				case TOK_SEMI:  case TOK_CBRA:
+				case TOK_OBRA:  case TOK_COM:
+				case TOK_ARROW: case TOK_ARROW_EQ: break;
 				default:
 					if (l.cur_char[-1] != '\\') {
 						add_token(&l, TOK_SEMI, ";");
@@ -230,14 +235,13 @@ Lexer lexer_lex(char *file, char *code) {
 				while (!(l.cur_char[0] == '\"' && l.cur_char[-1] != '\\')) {
 					if (l.cur_char[0] == '\\') {
 						switch (l.cur_char[1]) {
-							case '\\': sb_append(&sb, '\\'); break;
-							case '0':  sb_append(&sb, '\0'); break;
-							case 'n':  sb_append(&sb, '\n'); break;
-							case 't':  sb_append(&sb, '\t'); break;
-							case 'r':  sb_append(&sb, '\r'); break;
-							case '\"': sb_append(&sb, '\"'); break;
-							default: throw_error(l.cur_loc, "wrong character");
-						}
+						case '\\': sb_append(&sb, '\\'); break;
+						case '0':  sb_append(&sb, '\0'); break;
+						case 'n':  sb_append(&sb, '\n'); break;
+						case 't':  sb_append(&sb, '\t'); break;
+						case 'r':  sb_append(&sb, '\r'); break;
+						case '\"': sb_append(&sb, '\"'); break;
+						default: throw_error(l.cur_loc, "wrong character");}
 						l.cur_char++;
 					} else if (l.cur_char[0] == '\0') {
 						throw_error(l.cur_loc, "unclosed string");
@@ -257,14 +261,13 @@ Lexer lexer_lex(char *file, char *code) {
 				if (*l.cur_char == '\\') {
 					l.cur_char++;
 					switch (*l.cur_char) {
-						case '0':  add_token(&l, TOK_CHAR, "\0"); break;
-						case 'n':  add_token(&l, TOK_CHAR, "\n"); break;
-						case 'r':  add_token(&l, TOK_CHAR, "\r"); break;
-						case 't':  add_token(&l, TOK_CHAR, "\t"); break;
-						case '\\': add_token(&l, TOK_CHAR, "\\"); break;
-						case '\'': add_token(&l, TOK_CHAR, "'");  break;
-						default: throw_error(l.cur_loc, "wrong character");
-					}
+					case '0':  add_token(&l, TOK_CHAR, "\0"); break;
+					case 'n':  add_token(&l, TOK_CHAR, "\n"); break;
+					case 'r':  add_token(&l, TOK_CHAR, "\r"); break;
+					case 't':  add_token(&l, TOK_CHAR, "\t"); break;
+					case '\\': add_token(&l, TOK_CHAR, "\\"); break;
+					case '\'': add_token(&l, TOK_CHAR, "'");  break;
+					default: throw_error(l.cur_loc, "wrong character");}
 				} else add_token(&l, TOK_CHAR, l.cur_char);
 
 				l.cur_char++;

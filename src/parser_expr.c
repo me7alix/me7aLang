@@ -493,7 +493,12 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				break;
 			}
 		} else if (type == EXPR_PARSING_STMT) {
-			if (peek(p).kind == TOK_OBRA) {
+			if (
+				peek(p).kind == TOK_OBRA  ||
+				peek(p).kind == TOK_ARROW ||
+				peek(p).kind == TOK_ARROW_EQ
+			) {
+
 				p->cur_token--;
 				break;
 			}

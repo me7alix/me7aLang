@@ -660,32 +660,33 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 			IRGenExprCtx ctx = {0};
 			ctx.is_right_of_eq = true;
 
-			TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->func_ret.expr);
+			TAC_Operand res =
+				tac_ir_gen_expr(&ctx, prog, func, cn->func_ret.expr);
+
 			switch (res.kind) {
-				case OPR_LITERAL: {
-					da_append(&func->body, ((TAC_Instruction){
-						.op = OP_RETURN,
-						.arg1 = res,
-					}));
-				} break;
-
-				case OPR_VAR: {
-					da_append(&func->body, ((TAC_Instruction){
-						.op = OP_RETURN,
-						.arg1 = (TAC_Operand) {
-							.kind = OPR_VAR,
-							.var.type = cn->func_ret.type,
-							.var.addr_id = res.var.addr_id,
-						},
-					}));
-				} break;
-
-				default: UNREACHABLE;
+			case OPR_LITERAL:
+				da_append(&func->body, ((TAC_Instruction){
+					.op = OP_RETURN,
+					.arg1 = res,
+				}));
+				break;
+			case OPR_VAR:
+				da_append(&func->body, ((TAC_Instruction){
+					.op = OP_RETURN,
+					.arg1 = (TAC_Operand) {
+						.kind = OPR_VAR,
+						.var.type = cn->func_ret.type,
+						.var.addr_id = res.var.addr_id,
+					},
+				}));
+				break;
+			default:
+				UNREACHABLE;
 			}
 		} break;
 
 		case AST_LOOP_BREAK:
-			if (ctx->loop_gen <= 0) throw_error(cn->loc, "break outside of a loop");
+			if (ctx->loop_gen <= 0) throw_error(cn->loc, "break outside of loop");
 			da_append(&func->body, ((TAC_Instruction){
 				.op = OP_JUMP,
 				.dst = (TAC_Operand) {
@@ -696,7 +697,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 			break;
 
 		case AST_LOOP_CONTINUE:
-			if (ctx->loop_gen <= 0) throw_error(cn->loc, "continue outside of a loop");
+			if (ctx->loop_gen <= 0) throw_error(cn->loc, "continue outside of loop");
 			if (ctx->for_var_mut) tac_ir_gen_var_mut(prog, func, ctx->for_var_mut);
 
 			da_append(&func->body, ((TAC_Instruction){

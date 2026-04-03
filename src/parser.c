@@ -377,7 +377,7 @@ AST_Node *parse_func_return(Parser *p, AST_Node *func) {
 	} else {
 		ret->func_ret.expr = parse_expr(p, EXPR_PARSING_VAR, NULL);
 		if (!compare_types(parser_get_type(p, ret->func_ret.expr), ret->func_ret.type))
-			throw_error(ret->func_ret.expr->loc, "wrong type");
+			throw_error(ret->func_ret.expr->loc, "types mismatching");
 	}
 
 	return ret;
@@ -464,30 +464,51 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 }
 
 AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
-	if (!skip)
-		push_scope(p);
+	if (!skip) push_scope(p);
+
+	bool is_arrow    = false;
+	bool is_arrow_eq = false;
+	if (peek(p).kind == TOK_ARROW)    is_arrow    = true;
+	if (peek(p).kind == TOK_ARROW_EQ) is_arrow_eq = true;
 
 	AST_Node *body = ast_new(.kind = AST_BODY);
-	expect(peek(p), TOK_OBRA);
+	if (!is_arrow && !is_arrow_eq)
+		expect(peek(p), TOK_OBRA);
 	next(p);
+
+	if (is_arrow_eq) {
+		Type ft = func->func_def.type;
+		AST_Node *en = parse_expr(p, EXPR_PARSING_VAR, &ft);
+		Type et = parser_get_type(p, en);
+		if (!compare_types(ft, et))
+			throw_error(en->loc, "types mismatching");
+
+		da_append(&body->body.stmts,
+			new(AST_Node,
+				.kind = AST_FUNC_RET,
+				.func_ret.expr = en,
+				.func_ret.type = et,
+			)
+		);
+
+		goto done;
+	}
 
 	while (true) {
 		switch (peek(p).kind) {
+		case TOK_CBRA: goto done;
 		case TOK_SEMI: break;
-		case TOK_CBRA: goto ex;
 
 		case TOK_OBRA:
 			da_append(&body->body.stmts, parse_body(p, func, false));
 			break;
 
 		case TOK_ID: {
-			if (peek2(p).kind == TOK_COL)
-				da_append(&body->body.stmts, parse_var_def(p));
-			else if (peek2(p).kind == TOK_ASSIGN)
-				da_append(&body->body.stmts, parse_var_assign(p));
-			else if (peek2(p).kind == TOK_OPAR)
-				da_append(&body->body.stmts, parse_func_call(p));
-			else da_append(&body->body.stmts, parse_var_mut(p, EXPR_PARSING_VAR));
+			switch (peek2(p).kind) {
+			case TOK_COL:    da_append(&body->body.stmts, parse_var_def(p));    break;
+			case TOK_ASSIGN: da_append(&body->body.stmts, parse_var_assign(p)); break;
+			case TOK_OPAR:   da_append(&body->body.stmts, parse_func_call(p));  break;
+			default:         da_append(&body->body.stmts, parse_var_mut(p, EXPR_PARSING_VAR));}
 		} break;
 
 		case TOK_BREAK:
@@ -518,12 +539,12 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 		default: da_append(&body->body.stmts, parse_var_mut(p, EXPR_PARSING_VAR));    break;
 		}
 
+		if (is_arrow) goto done;
 		next(p);
 	}
 
-ex:
-	if (!skip)
-		pop_scope(p);
+done:
+	if (!skip) pop_scope(p);
 	return body;
 }
 

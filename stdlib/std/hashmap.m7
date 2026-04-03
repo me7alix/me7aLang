@@ -1,9 +1,8 @@
 import "std/libc.m7"
 
-macro ht_foreach_node(nodevar, ht, body) {
-    for _ht_idx: uptr = 0; (ht).capacity > 0 && _ht_idx < (ht).capacity; _ht_idx += 1 {
-		for nodevar := (ht).arr[_ht_idx]; nodevar != null; nodevar = nodevar.next body
-	}
+macro ht_foreach_node(nodevar, ht) {
+    for _ht_idx: uptr = 0; (ht).capacity > 0 && _ht_idx < (ht).capacity; _ht_idx += 1 ->
+		for nodevar := (ht).arr[_ht_idx]; nodevar != null; nodevar = nodevar.next \
 }
 
 static fn hash_str(p: *u8): u32 {
