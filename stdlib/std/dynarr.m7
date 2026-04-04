@@ -1,13 +1,13 @@
 import "std/libc.m7"
 
 macro da_foreach(vn, da) {
-	for vn := da.items; (vn - (da).items):uptr < (da).count; vn = vn + 1 \
+	for vn := (da).items; (vn - (da).items):uptr < (da).count; vn = vn + 1 \
 }
 
 macro da_copy(dst, src) {
-	dst.reserve(src.count)
-	da_foreach (item, src) {
-		dst.append(item)
+	(dst).reserve((src).count)
+	da_foreach (item, (src)) {
+		(dst).append(*item)
 	}
 }
 
