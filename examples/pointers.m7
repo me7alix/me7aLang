@@ -1,8 +1,7 @@
 import "std/libc.m7"
 
-fn change_fifth(arr: *int) {
+fn change_fifth(arr: *int) ->
 	*(arr + 4) = 111
-}
 
 fn main() {
 	arr1: [10]int
