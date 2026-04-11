@@ -12,7 +12,7 @@ HT_IMPL_STR(MacroTable, Macro)
 StringBuilder path = {0};
 
 static Token peek(PreprocCtx *p) {
-	return da_get(&p->lexer.tokens, p->cur_tok);
+	return da_get(&p->lexer->tokens, p->cur_tok);
 }
 
 static Token peek2(PreprocCtx *p) {
@@ -29,11 +29,11 @@ static Token next(PreprocCtx *p) {
 }
 
 static void insert(PreprocCtx *p, Token tok) {
-	da_insert(&p->lexer.tokens, p->cur_tok, tok);
+	da_insert(&p->lexer->tokens, p->cur_tok, tok);
 }
 
 void remove_tok(PreprocCtx *p) {
-	da_remove_ordered(&p->lexer.tokens, p->cur_tok);
+	da_remove_ordered(&p->lexer->tokens, p->cur_tok);
 }
 
 #if defined(_WIN32)
@@ -77,7 +77,7 @@ int ImportedTable_compare(char *cur_str, char *str) {
 	return pathcmp(cur_str, str);
 }
 
-Lexer get_lexer(PreprocCtx *p, char *file, bool *isImported) {
+Lexer *get_lexer(PreprocCtx *p, char *file, bool *isImported) {
 	*isImported = false;
 
 	da_foreach(char*, imp, p->imports) {
@@ -88,14 +88,16 @@ Lexer get_lexer(PreprocCtx *p, char *file, bool *isImported) {
 		if (code) {
 			if (ImportedTable_get(&p->it, path.items)) {
 				*isImported = true;
-				return (Lexer){0};
+				return NULL;
 			}
 
-			return lexer_lex(path.items, code);
+			Lexer *newLexer = new(Lexer);
+			*newLexer = lexer_lex(path.items, code);
+			return newLexer;
 		}
 	}
 
-	return (Lexer){0};
+	return NULL;
 }
 
 void get_folder(char *dst, const char *file) {
@@ -141,6 +143,7 @@ void resolve_bras(PreprocCtx *p, Tokens *arg) {
 
 bool insert_macro(PreprocCtx *p) {
 	Macro *macro = MacroTable_get(&p->mt, peek(p).data);
+	Location savedLoc = peek(p).loc;
 	if (!macro) return false;
 	remove_tok(p);
 
@@ -188,7 +191,7 @@ bool insert_macro(PreprocCtx *p) {
 
 		size_t toDelete = p->cur_tok - savedInd;
 		for (size_t i = 0; i < toDelete; i++) {
-			da_remove_ordered(&p->lexer.tokens, savedInd);
+			da_remove_ordered(&p->lexer->tokens, savedInd);
 			p->cur_tok--;
 		}
 
@@ -201,7 +204,6 @@ bool insert_macro(PreprocCtx *p) {
 
 					if (strcmp(arg, tok->data) == 0) {
 						da_foreach (Token, argTok, &da_get(&args, j)) {
-							argTok->loc = tok->loc;
 							insert(p, *argTok);
 							next(p);
 						}
@@ -210,17 +212,20 @@ bool insert_macro(PreprocCtx *p) {
 					}
 				}
 
-				insert(p, *tok);
+				Token itk = *tok;
+				itk.loc = savedLoc;
+				insert(p, itk);
 				next(p);
 				found:;
 			} else {
-				insert(p, *tok);
+				Token itk = *tok;
+				itk.loc = savedLoc;
+				insert(p, itk);
 				next(p);
 			}
 		}
 
 		p->cur_tok = savedInd;
-
 		preprocessor(p, true);
 		p->cur_tok--;
 		da_free(&args);
@@ -232,9 +237,9 @@ bool insert_macro(PreprocCtx *p) {
 void preprocessor(PreprocCtx *p, bool skip) {
 	if (!skip) {
 		char *cur_folder = malloc(256);
-		get_folder(cur_folder, p->lexer.cur_loc.file);
+		get_folder(cur_folder, p->lexer->cur_loc.file);
 		da_get(p->imports, 0) = cur_folder;
-		ImportedTable_add(&p->it, p->lexer.cur_loc.file, true);
+		ImportedTable_add(&p->it, p->lexer->cur_loc.file, true);
 	}
 
 	while (peek(p).kind != TOK_EOF) {
@@ -245,8 +250,8 @@ void preprocessor(PreprocCtx *p, bool skip) {
 				throw_error(peek(p).loc, "filepath expected");
 
 			bool isImported;
-			Lexer importedLex = get_lexer(p, peek(p).data, &isImported);
-			if (!importedLex.tokens.items && !isImported)
+			Lexer *impLexer = get_lexer(p, peek(p).data, &isImported);
+			if (!impLexer && !isImported)
 				throw_error(peek(p).loc, "no such file");
 			next(p);
 
@@ -256,20 +261,20 @@ void preprocessor(PreprocCtx *p, bool skip) {
 
 			if (!isImported) {
 				char *savedCurFolder = p->imports->items[0];
-				Lexer savedLexer = p->lexer;
+				Lexer *savedLexer = p->lexer;
 				size_t savedCurTok = p->cur_tok;
 
-				p->lexer = importedLex;
+				p->lexer = impLexer;
 				p->cur_tok = 0;
 				preprocessor(p, false);
-				importedLex = p->lexer;
+				impLexer = p->lexer;
 
 				p->imports->items[0] = savedCurFolder;
 				p->lexer = savedLexer;
 				p->cur_tok = savedCurTok;
 
-				for (size_t j = 0; j < importedLex.tokens.count - 1; j++) {
-					insert(p, da_get(&importedLex.tokens, j));
+				for (size_t j = 0; j < impLexer->tokens.count - 1; j++) {
+					insert(p, da_get(&impLexer->tokens, j));
 					next(p);
 				}
 			}

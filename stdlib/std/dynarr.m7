@@ -7,7 +7,7 @@ macro da_foreach(vn, da) {
 macro da_copy(dst, src) {
 	(dst).reserve((src).count)
 	da_foreach (item, (src)) {
-		(dst).append(*item)
+		(dst).append(*(item))
 	}
 }
 

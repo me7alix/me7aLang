@@ -247,9 +247,13 @@ int main(int argc, char **argv) {
 		}
 
 		Lexer entry_point = lexer_lex(src_file, ep_code);
-		PreprocCtx preprocCtx = {.imports = &imports, .lexer = entry_point};
+		PreprocCtx preprocCtx = {
+			.imports = &imports,
+			.lexer = &entry_point
+		};
+
 		preprocessor(&preprocCtx, false);
-		entry_point = preprocCtx.lexer;
+		entry_point = *preprocCtx.lexer;
 
 		Parser parser = parser_parse(entry_point.tokens.items);
 		TAC_Program prog = tac_ir_gen_prog(&parser);

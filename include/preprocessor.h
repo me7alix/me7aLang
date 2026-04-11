@@ -32,7 +32,7 @@ typedef struct {
 	ImportedTable it;
 	MacroTable mt;
 	Imports *imports;
-	Lexer lexer;
+	Lexer *lexer;
 	size_t cur_tok;	
 } PreprocCtx;
 

@@ -20,7 +20,9 @@ struct Person {
 
 	fn print() {
 		printf(
-			"Name: %s\n" "Salary: %d\n",
+			"Name: %s\n" \
+			"Salary: %d\n",
+
 			self.name,
 			self.salary,
 		)
