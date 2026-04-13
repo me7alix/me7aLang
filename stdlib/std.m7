@@ -1,5 +1,6 @@
 import "std/libc.m7"
 
+macro arr_len(arr) { (sizeof(arr) / sizeof(*(arr))) }
 macro new(T) { calloc(1, sizeof:T): *T }
 
 macro do_while(expr, body) {
