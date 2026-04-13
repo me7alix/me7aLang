@@ -737,7 +737,7 @@ char *nasm_gen_prog(TAC_Program *prog, TargetPlatform tp) {
 
 					size_t lit_size = strlen(g->data.str) + 1;
 					for (size_t i = 0; i < lit_size; i++) {
-						sb_appendf(&code, "%#x", g->data.str[i]);
+						sb_appendf(&code, "%#x", (u8) g->data.str[i]);
 						if (i != lit_size - 1) sb_appendf(&code, ", ");
 					}
 

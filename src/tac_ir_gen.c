@@ -480,7 +480,6 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 			.var.addr_id = var_id++
 		});
 	} else {
-		printf("%zu\n", cn->var_def.uid);
 		ASTVarTable_add(&avt, cn->var_def.uid, (TAC_Operand) {
 			.kind = OPR_VAR,
 			.var.kind = VAR_STACK,

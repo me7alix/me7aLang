@@ -495,8 +495,6 @@ AST_Node *parse_array(Parser *p, Type *vart) {
 			throw_error(alc, "unexpected token");
 	}
 
-	//printf("%zu\n%zu\n%p\n", array.count, array.capacity, array.items);
-
 	al->array = array;
 	return al;
 }
