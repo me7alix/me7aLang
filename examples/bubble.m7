@@ -1,4 +1,4 @@
-import "std/libc.m7"
+import "std.m7"
 
 fn bubble_sort(arr: *int, cnt: uptr) {
 	while true {
@@ -17,21 +17,14 @@ fn bubble_sort(arr: *int, cnt: uptr) {
 	}
 }
 
+arr: []int = {
+	20, 2, 0, 23,
+	8, 153,  110,
+	2410, 56, 78,
+};
+
 fn main() {
-	arr: [10]int
-	arr[0] = 20
-	arr[1] = 2
-	arr[2] = 0
-	arr[3] = 23
-	arr[4] = 8
-	arr[5] = 15
-	arr[6] = 110
-	arr[7] = 2410
-	arr[8] = 56
-	arr[9] = 78
-
-	bubble_sort(arr, 10)
-
+	bubble_sort(arr, arr_len(arr))
 	for i: uptr = 0; i < 10; i+=1 ->
 		printf("%zi: %d\n", i, arr[i])
 }
