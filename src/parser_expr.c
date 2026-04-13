@@ -106,6 +106,9 @@ Type get_func_type(SymbolType kind, Symbol *func) {
 
 // Generates AST using precedence climbing algorithm
 AST_Node *expr_expand(AST_Nodes *nodes) {
+	if (nodes->count == 0) return NULL;
+	Location loc = da_get(nodes, 0)->loc;
+
 	size_t countBefore = nodes->count;
 	if (nodes->count == 1) {
 		bool error = false;
@@ -124,8 +127,13 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 		if (nodes->count == 1) break;
 		AST_Node *node = da_get(nodes, i);
 
-		bool isBinOp = node->kind == AST_BIN_EXP && !(node->ebin.l && node->ebin.r);
-		bool isUnOp = node->kind == AST_UN_EXP && !node->eun.v;
+		bool isBinOp =
+			node->kind == AST_BIN_EXP &&
+			!(node->ebin.l && node->ebin.r);
+
+		bool isUnOp =
+			node->kind == AST_UN_EXP &&
+			!node->eun.v;
 
 		if (!isBinOp && !isUnOp) {
 			bool isLeft = false;
@@ -133,28 +141,16 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 
 			if (i != 0) {
 				switch (da_get(nodes, i-1)->kind) {
-				case AST_BIN_EXP:
-					lp = op_prec(da_get(nodes, i-1)->ebin.op, true);
-					break;
-				case AST_UN_EXP:
-					lp = op_prec(da_get(nodes, i-1)->eun.op, true);
-					break;
-				default:
-					throw_error(da_get(nodes, i-1)->loc, "wrong expression");
-				}
+				case AST_BIN_EXP: lp = op_prec(da_get(nodes, i-1)->ebin.op, true); break;
+				case AST_UN_EXP:  lp = op_prec(da_get(nodes, i-1)->eun.op,  true); break;
+				default: throw_error(da_get(nodes, i-1)->loc, "wrong expression"); }
 			}
 
 			if (i != nodes->count-1) {
 				switch (da_get(nodes, i+1)->kind) {
-				case AST_BIN_EXP:
-					rp = op_prec(da_get(nodes, i+1)->ebin.op, false);
-					break;
-				case AST_UN_EXP:
-					rp = op_prec(da_get(nodes, i+1)->eun.op, false);
-					break;
-				default:
-					throw_error(da_get(nodes, i+1)->loc, "wrong expression");
-				}
+				case AST_BIN_EXP: rp = op_prec(da_get(nodes, i+1)->ebin.op, false); break;
+				case AST_UN_EXP:  rp = op_prec(da_get(nodes, i+1)->eun.op,  false); break;
+				default: throw_error(da_get(nodes, i+1)->loc, "wrong expression");  }
 			}
 
 			if (lp > rp) isLeft = true;
@@ -179,7 +175,7 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 	}
 
 	if (nodes->count == countBefore)
-		throw_error(da_get(nodes, 0)->loc, "wrong expression");
+		throw_error(loc, "wrong expression");
 	return expr_expand(nodes);
 }
 
@@ -200,6 +196,15 @@ bool type_is_int(Type t) {
 // Calculates and checks types, sometimes changes AST
 Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 	switch (expr->kind) {
+	case AST_ARRAY:
+		da_foreach (AST_Node*, n, &expr->array) {
+			Type nt = expr_analysis(p, *n, get_pointer_base(*vart));
+			if (!compare_types(*get_pointer_base(*vart), nt)) {
+				throw_error((*n)->loc, "types mismatching");
+			}
+		}
+		return *vart;
+
 	case AST_FUNC_CALL:
 		return expr->func_call.type;
 
@@ -463,6 +468,39 @@ AST_ExprOp get_un_op(Token tok) {
 	};
 }
 
+AST_Node *parse_array(Parser *p, Type *vart) {
+	Location alc = next(p).loc;
+	AST_Nodes array = {0};
+	AST_Node *al = ast_new(
+		.kind = AST_ARRAY,
+		.loc = alc,
+	);
+
+	if (!is_pointer(*vart))
+		throw_error(alc, "types mismatching");
+
+	while (peek(p).kind != TOK_CBRA) {
+		Type base_type = *get_pointer_base(*vart);
+		AST_Node *expr = parse_expr(p,
+			EXPR_PARSING_ARRAY,
+			&base_type
+		);
+
+		da_append(&array, expr);
+		next(p);
+
+		if (peek(p).kind == TOK_COM)
+			next(p);
+		else if (peek(p).kind != TOK_CBRA)
+			throw_error(alc, "unexpected token");
+	}
+
+	//printf("%zu\n%zu\n%p\n", array.count, array.capacity, array.items);
+
+	al->array = array;
+	return al;
+}
+
 AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 	AST_Nodes nodes = {0};
 
@@ -498,7 +536,14 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				peek(p).kind == TOK_ARROW ||
 				peek(p).kind == TOK_ARROW_EQ
 			) {
-
+				p->cur_token--;
+				break;
+			}
+		} else if (type == EXPR_PARSING_ARRAY) {
+			if (
+				peek(p).kind == TOK_COM ||
+				peek(p).kind == TOK_CBRA
+			) {
 				p->cur_token--;
 				break;
 			}
@@ -509,7 +554,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			if (peek2(p).kind == TOK_OPAR) {
 				if (nodes.count > 0) {
 					if (
-						da_last(&nodes)->kind            == AST_BIN_EXP  &&
+						da_last(&nodes)->kind    == AST_BIN_EXP  &&
 						da_last(&nodes)->ebin.op == AST_OP_FIELD
 					) {
 						da_append(&nodes, parse_method_call(p));
@@ -548,6 +593,10 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				.literal.kind = LIT_BOOL,
 				.literal.lint = 1,
 			));
+			break;
+
+		case TOK_OBRA:
+			da_append(&nodes, parse_array(p, vart));
 			break;
 
 		case TOK_FALSE:
@@ -717,7 +766,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 	}
 
 	AST_Node *expr = expr_expand(&nodes);
-	expr_analysis(p, expr, vart);
+	if (expr) expr_analysis(p, expr, vart);
 	da_free(&nodes);
 	return expr;
 }

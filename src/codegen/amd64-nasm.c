@@ -193,7 +193,7 @@ char *opr_to_nasm(TAC_Operand opr) {
 			sprintf(rbuf, "%lli", opr.literal.lint);
 			break;
 		default:
-			printf("%d\n", opr.literal.type.kind); UNREACHABLE;
+			UNREACHABLE;
 		}
 	} break;
 
@@ -705,20 +705,62 @@ char *nasm_gen_prog(TAC_Program *prog, TargetPlatform tp) {
 
 	sb_appendf(&code, "section .data\n");
 	uint uniq_data_off = 0;
-	da_foreach(TAC_GlobalVar, g, &prog->globals) {
-		if (g->type.kind == TYPE_ARRAY) {
+
+	da_foreach (TAC_GlobalVar, g, &prog->globals) {
+		if (g->type.kind == TYPE_ARRAY && g->is_none) {
 			uint arr_size = get_type_size(*g->type.array.elem) * g->type.array.length;
-			if (g->data) {
-				sb_appendf(&code, "  U%u db ", uniq_data_off);
-				for (size_t i = 0; i < g->type.array.length; i++) {
-					sb_appendf(&code, "%#x", g->data[i]);
-					if (i != g->type.array.length - 1) sb_appendf(&code, ", ");
-				}
-				sb_appendf(&code, "\n");
-			} else sb_appendf(&code, "  U%u times %u db 0\n", uniq_data_off, arr_size);
+			sb_appendf(&code, "  U%u times %u db 0\n", uniq_data_off, arr_size);
 			sb_appendf(&code, "  align 8\n");
 			sb_appendf(&code, "  D%u dq U%u\n", g->index, uniq_data_off++);
-		} else sb_appendf(&code, "  D%u times %u db 0\n", g->index, get_type_size(g->type));
+		} else {
+			if (g->is_none) {
+				sb_appendf(&code, "  D%u times %u db 0\n", g->index, get_type_size(g->type));
+			} else {
+				if (g->data.kind == LIT_ARR) {
+					sb_appendf(&code, "  U%u db ", uniq_data_off);
+
+					size_t lit_size = g->data.array.count;
+					for (size_t i = 0; i < lit_size; i++) {
+						size_t type_size = get_type_size(g->data.array.items[i].type);
+						for (size_t j = 0; j < type_size; j++) {
+							sb_appendf(&code, "%#x", (u8) g->data.array.items[i].bytes[j]);
+							if (j != type_size - 1) sb_appendf(&code, ", ");
+						}
+						if (i != lit_size - 1) sb_appendf(&code, ", ");
+					}
+
+					sb_appendf(&code, "\n");
+					sb_appendf(&code, "  align 8\n");
+					sb_appendf(&code, "  D%u dq U%u\n", g->index, uniq_data_off++);
+				} else if (g->data.kind == LIT_STR) {
+					sb_appendf(&code, "  U%u db ", uniq_data_off);
+
+					size_t lit_size = strlen(g->data.str) + 1;
+					for (size_t i = 0; i < lit_size; i++) {
+						sb_appendf(&code, "%#x", g->data.str[i]);
+						if (i != lit_size - 1) sb_appendf(&code, ", ");
+					}
+
+					sb_appendf(&code, "\n");
+					sb_appendf(&code, "  align 8\n");
+					sb_appendf(&code, "  D%u dq U%u\n", g->index, uniq_data_off++);
+				} else {
+					sb_appendf(&code,
+						"  D%u %s ", g->index,
+						(char*[]){"db", "dw", "dd", "dq"}
+						[get_reg_row(g->type)]);
+
+					switch (g->data.kind) {
+					case LIT_INT:   sb_appendf(&code, "%lli", g->data.lint);   break;
+					case LIT_FLOAT: sb_appendf(&code, "%lf",  g->data.lfloat); break;
+					case LIT_BOOL:  sb_appendf(&code, "%d",   g->data.lbool);  break;
+					case LIT_CHAR:  sb_appendf(&code, "%lli", g->data.lint);   break;
+					default: UNREACHABLE; }
+
+					sb_appendf(&code, "\n", g->index);
+				}
+			}
+		}
 	}
 	sb_appendf(&code, "  align 8\n");
 	sb_appendf(&code, "\n");

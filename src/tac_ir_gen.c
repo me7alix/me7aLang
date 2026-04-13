@@ -17,8 +17,10 @@ HT_IMPL_NUM(ASTVarTable, uint, TAC_Operand)
 
 ASTVarTable avt = {0};
 
+static Type TUPTR = {.kind = TYPE_UPTR};
+static TAC_Operand NULL_OPR = {.kind = OPR_NULL};
+
 Type tac_ir_get_opr_type(TAC_Operand op) {
-	static Type TUPTR = {.kind = TYPE_UPTR};
 
 	switch (op.kind) {
 	case OPR_VAR: {
@@ -111,7 +113,12 @@ TAC_Operand tac_ir_gen_deref(IRGenExprCtx *ctx, TAC_Func *func, Type type, TAC_O
 TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_Node *en) {
 	if (!en) {
 		ctx->last_var = 0;
-		return (TAC_Operand) {.kind = OPR_NULL};
+		return NULL_OPR;
+	}
+
+	if (en->kind == AST_ARRAY) {
+		ctx->last_var = 0;
+		return NULL_OPR;
 	}
 
 	static Type TU8 = {.kind = TYPE_U8};
@@ -126,7 +133,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 					.array.length = strlen(en->literal.str) + 1
 				},
 				.index = data_id,
-				.data = (u8*) en->literal.str,
+				.data = en->literal,
 			}));
 
 			return (TAC_Operand) {
@@ -316,7 +323,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 						.arg1 = not_ptr,
 						.arg2 = (TAC_Operand) {
 							.kind = OPR_SIZEOF,
-							.size_of.type = (Type){.kind = TYPE_UPTR},
+							.size_of.type = TUPTR,
 							.size_of.vtype = ptr_base,
 						},
 						.dst = {
@@ -342,7 +349,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 						.arg1 = ptr,
 						.arg2 = (TAC_Operand) {
 							.kind = OPR_SIZEOF,
-							.size_of.type = (Type){.kind = TYPE_UPTR},
+							.size_of.type = TUPTR,
 							.size_of.vtype = ptr_base,
 						},
 						.dst = {
@@ -364,7 +371,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 						.arg1 = inst.dst,
 						.arg2 = (TAC_Operand) {
 							.kind = OPR_SIZEOF,
-							.size_of.type = (Type){.kind = TYPE_UPTR},
+							.size_of.type = TUPTR,
 							.size_of.vtype = *lt.pointer.base,
 						},
 						.dst = {
@@ -460,6 +467,7 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 			.arg1 = res,
 			.dst = (TAC_Operand) {
 				.kind = OPR_VAR,
+				.var.kind = VAR_STACK,
 				.var.type = cn->var_def.type,
 				.var.addr_id = var_id,
 			},
@@ -472,12 +480,67 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 			.var.addr_id = var_id++
 		});
 	} else {
+		printf("%zu\n", cn->var_def.uid);
 		ASTVarTable_add(&avt, cn->var_def.uid, (TAC_Operand) {
 			.kind = OPR_VAR,
 			.var.kind = VAR_STACK,
 			.var.type = cn->var_def.type,
 			.var.addr_id = ctx.last_var,
 		});
+	}
+
+	if (cn->var_def.expr)
+	if (cn->var_def.expr->kind == AST_ARRAY) {
+		TAC_Operand addr = da_last(&func->body).dst;
+		for (size_t i = 0; i < cn->var_def.expr->array.count; i++) {
+			IRGenExprCtx ctx = {0};
+			IRGenExprCtx ctx2 = {0};
+			Type base_type = *get_pointer_base(cn->var_def.type);
+
+			TAC_Instruction mult = {
+				.op = OP_MUL,
+				.arg1 = (TAC_Operand) {
+					.kind = OPR_LITERAL,
+					.literal = (Literal){
+						.kind = LIT_INT,
+						.type = TUPTR,
+						.lint = (long long) i,
+					},
+				},
+				.arg2 = (TAC_Operand){
+					.kind = OPR_SIZEOF,
+					.size_of.type = TUPTR,
+					.size_of.vtype = base_type,
+				},
+				.dst = (TAC_Operand){
+					.kind = OPR_VAR,
+					.var.kind = VAR_STACK,
+					.var.type = TUPTR,
+					.var.addr_id = var_id++,
+				},
+			};
+
+			TAC_Instruction add = {
+				.op = OP_ADD,
+				.arg1 = addr,
+				.arg2 = mult.dst,
+				.dst = (TAC_Operand){
+					.kind = OPR_VAR,
+					.var.kind = VAR_STACK,
+					.var.type = TUPTR,
+					.var.addr_id = var_id++,
+				},
+			};
+
+			da_append(&func->body, mult);
+			da_append(&func->body, add);
+
+			da_append(&func->body, ((TAC_Instruction){
+				.op = OP_ASSIGN,
+				.arg1 = tac_ir_gen_expr(&ctx2, prog, func, cn->var_def.expr->array.items[i]),
+				.dst = tac_ir_gen_deref(&ctx, func, base_type, add.dst),
+			}));
+		}
 	}
 }
 
@@ -549,7 +612,7 @@ void tac_ir_gen_func_call(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 		func_call.args[i] = tac_ir_gen_expr(&ctx, prog, func, arg);
 	}
 
-	func_call.args[cn->func_call.args.count] = (TAC_Operand) {.kind = OPR_NULL};
+	func_call.args[cn->func_call.args.count] = NULL_OPR;
 	da_append(&func->body, func_call);
 }
 
@@ -572,7 +635,7 @@ void tac_ir_gen_method_call(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 		method_call.args[i] = tac_ir_gen_expr(&ctx, prog, func, arg);
 	}
 
-	method_call.args[cn->method_call.args.count] = (TAC_Operand) {.kind = OPR_NULL};
+	method_call.args[cn->method_call.args.count] = NULL_OPR;
 	da_append(&func->body, method_call);
 }
 
@@ -652,7 +715,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 			if (cn->func_ret.type.kind == TYPE_NULL) {
 				da_append(&func->body, ((TAC_Instruction){
 					.op = OP_RETURN,
-					.arg1 = (TAC_Operand) {.kind = OPR_NULL},
+					.arg1 = NULL_OPR,
 				}));
 				break;
 			}
@@ -907,7 +970,7 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 				}));
 			}
 			break;
-		case SBL_VAR:
+		case SBL_VAR: break;
 			da_append(&prog.globals, ((TAC_GlobalVar){
 				.type = n->val.variable.type,
 				.index = data_id,
@@ -928,6 +991,42 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 		case AST_FUNC_DEF:
 			tac_ir_gen_func(&prog, cn);
 			break;
+
+		case AST_VAR_DEF:
+			bool is_none = true;
+			Literal data = {0};
+
+			if (cn->var_def.expr) {
+				is_none = false;
+				if (cn->var_def.expr->kind == AST_ARRAY) {
+					data.kind = LIT_ARR;
+					da_foreach (AST_Node*, el, &cn->var_def.expr->array) {
+						if ((*el)->kind != AST_LITERAL)
+							throw_error(cn->loc, "literal expected");
+						da_append(&data.array, (*el)->literal);
+					}
+				} else if (cn->var_def.expr->kind != AST_LITERAL) {
+					throw_error(cn->loc, "literal expected");
+				} else {
+					data = cn->var_def.expr->literal;
+				}
+			}
+
+			da_append(&prog.globals, ((TAC_GlobalVar){
+				.type = cn->var_def.type,
+				.index = data_id,
+				.is_none = is_none,
+				.data = is_none ? (Literal){0} : data,
+			}));
+
+			ASTVarTable_add(&avt, cn->var_def.uid, (TAC_Operand){
+				.kind = OPR_VAR,
+				.var.kind = VAR_DATA,
+				.var.type = cn->var_def.type,
+				.var.addr_id = data_id++,
+			});
+			break;
+
 		default:
 			UNREACHABLE;
 		}

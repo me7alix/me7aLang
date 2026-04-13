@@ -118,12 +118,14 @@ Type *parse_type_r(Parser *p) {
 
 		static Type tuptr = (Type) {.kind = TYPE_UPTR};
 		AST_Node *arrLenExpr = parse_expr(p, EXPR_PARSING_SQBRA, &tuptr);
-		long long calculatedArrLen = calc_arr_len(arrLenExpr);
-
-		if (calculatedArrLen <= 0)
-			throw_error(arrLenExpr->loc, "array size must be greater than zero");
-
-		type->array.length = calculatedArrLen;
+		if (arrLenExpr) {
+			long long calculatedArrLen = calc_arr_len(arrLenExpr);
+			if (calculatedArrLen <= 0)
+				throw_error(arrLenExpr->loc, "array size must be greater than zero");
+			type->array.length = calculatedArrLen;
+		} else {
+			type->array.length = 0;
+		}
 
 		type->array.elem = parse_type_r(p);
 		return type;
@@ -302,11 +304,17 @@ AST_Node *parse_var_def(Parser *p) {
 
 	if (peek(p).kind == TOK_EQ) {
 		next(p);
-		vdn->var_def.expr = parse_expr(p, EXPR_PARSING_VAR, &type);
+		AST_Node *expr = parse_expr(p, EXPR_PARSING_VAR, &type);
+		vdn->var_def.expr = expr;
+		if (
+			expr->kind == AST_ARRAY               &&
+			vdn->var_def.type.kind == TYPE_ARRAY &&
+			vdn->var_def.type.array.length == 0
+		) vdn->var_def.type.array.length = expr->array.count;
 	}
 
 	if (smbt_add(p, SBL_VAR, vdn->var_def.id, (Symbol) {
-		.variable.type = type,
+		.variable.type = vdn->var_def.type,
 		.variable.uid = vdn->var_def.uid,
 	})) throw_error(vdn->loc, "redifinition of the variable");
 
@@ -904,9 +912,9 @@ Parser parser_parse(Token *tokens) {
 
 		case TOK_ID:
 			if (peek2(&p).kind == TOK_COL) {
-				parse_var_def(&p);
+				da_append(&prog->program.stmts, parse_var_def(&p));
 			} else if (peek2(&p).kind == TOK_ASSIGN) {
-				parse_var_assign(&p);
+				da_append(&prog->program.stmts, parse_var_assign(&p));
 			} else throw_error(peek(&p).loc, "unexpected top level declaration");
 			break;
 

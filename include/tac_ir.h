@@ -104,7 +104,8 @@ typedef struct {
 typedef struct {
 	Type type;
 	uint index;
-	u8 *data;
+	bool is_none;
+	Literal data;
 } TAC_GlobalVar;
 
 typedef struct {

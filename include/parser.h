@@ -14,6 +14,7 @@ typedef enum {
 	EXPR_PARSING_PAR,
 	EXPR_PARSING_STMT,
 	EXPR_PARSING_SQBRA,
+	EXPR_PARSING_ARRAY,
 } ExprParsingType;
 
 typedef enum {
@@ -22,9 +23,10 @@ typedef enum {
 	LIT_FLOAT,
 	LIT_BOOL,
 	LIT_STR,
+	LIT_ARR,
 } LiteralKind;
 
-typedef struct {
+typedef struct Literal {
 	LiteralKind kind;
 	Type type;
 
@@ -33,6 +35,8 @@ typedef struct {
 		double lfloat;
 		u8 lbool;
 		char *str;
+		DA(struct Literal) array;
+		char bytes[0];
 	};
 } Literal;
 
@@ -86,7 +90,8 @@ typedef enum {
 	AST_STRING, AST_VAR_MUT, AST_FUNC_RET_TYPE,
 	AST_FOR_STMT, AST_UN_OP, AST_BIN_OP, AST_PROG,
 	AST_LOOP_BREAK, AST_LOOP_CONTINUE, AST_UN_EXP,
-	AST_ELSE_STMT, AST_FUNC_DEF_ARG_ANY, AST_METHOD_CALL,
+	AST_ELSE_STMT, AST_FUNC_DEF_ARG_ANY,
+	AST_METHOD_CALL, AST_ARRAY,
 } AST_NodeKind;
 
 typedef struct AST_Node AST_Node;
@@ -178,6 +183,7 @@ struct AST_Node {
 			char *id;
 			uint uid;
 		} vid;
+		AST_Nodes array;
 		AST_Node *func_ret_exp;
 		Literal literal;
 		Type vtype;
