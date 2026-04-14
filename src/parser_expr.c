@@ -492,7 +492,7 @@ AST_Node *parse_array(Parser *p) {
 	);
 
 	while (peek(p).kind != TOK_CBRA) {
-		AST_Node *expr = parse_expr(p, EXPR_PARSING_ARRAY, NULL);
+		AST_Node *expr = parse_expr(p, EXPAR_ARRAY, NULL);
 		da_append(&al->array, expr);
 		next(p);
 
@@ -510,46 +510,47 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 	while (true) {
 		if (peek(p).kind == TOK_OPAR) {
 			next(p);
-			da_append(&nodes, parse_expr(p, EXPR_PARSING_PAR, vart));
+			da_append(&nodes, parse_expr(p, EXPAR_PAR, vart));
 		}
 
-		if (type == EXPR_PARSING_FUNC_CALL) {
-			if (peek(p).kind == TOK_COM) break;
+		switch (type) {
+		case EXPAR_FUNCALL:
+			if (peek(p).kind == TOK_COM) goto done;
 			else if (peek(p).kind == TOK_CPAR) {
 				p->cur_token--;
-				break;
-			}
-		} else if (type == EXPR_PARSING_VAR) {
-			if (peek(p).kind == TOK_SEMI) {
-				break;
-			}
-		} else if (type == EXPR_PARSING_SQBRA) {
+				goto done;
+			} break;
+		case EXPAR_VAR:
+			if (peek(p).kind == TOK_SEMI)
+				goto done;
+			break;
+		case EXPAR_SQBRA:
 			if (peek(p).kind == TOK_CSQBRA) {
 				next(p);
-				break;
-			}
-		} else if (type == EXPR_PARSING_PAR) {
+				goto done;
+			} break;
+		case EXPAR_PAR:
 			if (peek(p).kind == TOK_CPAR) {
 				next(p);
-				break;
-			}
-		} else if (type == EXPR_PARSING_STMT) {
+				goto done;
+			} break;
+		case EXPAR_STMT:
 			if (
 				peek(p).kind == TOK_OBRA  ||
 				peek(p).kind == TOK_ARROW ||
 				peek(p).kind == TOK_ARROW_EQ
 			) {
 				p->cur_token--;
-				break;
-			}
-		} else if (type == EXPR_PARSING_ARRAY) {
+				goto done;
+			} break;
+		case EXPAR_ARRAY:
 			if (
 				peek(p).kind == TOK_COM ||
 				peek(p).kind == TOK_CBRA
 			) {
 				p->cur_token--;
-				break;
-			}
+				goto done;
+			} break;
 		}
 
 		switch (peek(p).kind) {
@@ -702,7 +703,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				.ebin.r = NULL
 			));
 			next(p);
-			da_append(&nodes, parse_expr(p, EXPR_PARSING_SQBRA, &TUPTR));
+			da_append(&nodes, parse_expr(p, EXPAR_SQBRA, &TUPTR));
 			p->cur_token--;
 			break;
 
@@ -768,6 +769,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 		next(p);
 	}
 
+done:
 	AST_Node *expr = expr_expand(&nodes);
 	if (expr) expr_analysis(p, expr, vart);
 	da_free(&nodes);
