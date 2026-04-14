@@ -1,7 +1,7 @@
 import "std/libc.m7"
 
 macro ht_foreach_node(nodevar, ht) {
-    for _ht_idx: uptr = 0; (ht).capacity > 0 && _ht_idx < (ht).capacity; _ht_idx += 1 ->
+    for _ht_idx: uptr = 0; (ht).capacity > 0 && _ht_idx < (ht).capacity; _ht_idx += 1 then
 		for nodevar := (ht).arr[_ht_idx]; nodevar != null; nodevar = nodevar.next \
 }
 

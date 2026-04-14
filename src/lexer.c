@@ -93,9 +93,6 @@ Lexer lexer_lex(char *file, char *code) {
 			if (l.cur_char[1] == '=') {
 				add_token(&l, TOK_MINUS_EQ, "-=");
 				l.cur_char++;
-			} else if (l.cur_char[1] == '>') {
-				add_token(&l, TOK_ARROW, "->");
-				l.cur_char++;
 			} else add_token(&l, TOK_MINUS, "-");
 		} break;
 
@@ -295,6 +292,7 @@ Lexer lexer_lex(char *file, char *code) {
 			} else if (is_keyword(&l, "static",   TOK_STATIC,     l.cur_char)) {
 			} else if (is_keyword(&l, "block",    TOK_BLOCK,      l.cur_char)) {
 			} else if (is_keyword(&l, "def",      TOK_MACRO_OBJ,  l.cur_char)) {
+			} else if (is_keyword(&l, "then",     TOK_ARROW,      l.cur_char)) {
 			} else if (is_keyword(&l, "macro",    TOK_MACRO_FUNC, l.cur_char)) {}
 
 			else if (isalpha(*l.cur_char) || *l.cur_char == '_')

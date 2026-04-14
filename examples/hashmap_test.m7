@@ -10,7 +10,7 @@ fn main() {
 
 	printf("one: %p\n", hm.get("one"))
 
-	ht_foreach_node (node, hm) ->
+	ht_foreach_node (node, hm) then
 		printf("%s\t%d\n", node.key, node.val)
 
 	hm.free()

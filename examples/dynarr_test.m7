@@ -10,6 +10,7 @@ fn main() {
 	nums.append(56)
 	nums.append(78)
 
+	// remove 420
 	nums.remove_ordered(1)
 
 	printf("count: %zu\n", nums.count)
@@ -17,11 +18,20 @@ fn main() {
 	printf("first: %d\n", nums.first())
 	printf("last: %d\n\n", nums.last())
 
+	// add 1 to 69
+	*nums.at(0) += 1
+
+	// change 78 to 90
 	nums.set(nums.count - 1, 90)
 
-	da_foreach (num, nums) {
-		printf("%zu) %d\n", (num - nums.items + 1):uptr, *num)
+	nums2: Numbers
+	da_copy(nums2, nums)
+
+	da_foreach (num, nums2) {
+		idx := (num - nums2.items + 1):uptr
+		printf("%zu) %d\n", idx, *num)
 	}
 
 	nums.free()
+	nums2.free()
 }

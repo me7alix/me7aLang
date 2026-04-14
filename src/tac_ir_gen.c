@@ -21,7 +21,6 @@ static Type TUPTR = {.kind = TYPE_UPTR};
 static TAC_Operand NULL_OPR = {.kind = OPR_NULL};
 
 Type tac_ir_get_opr_type(TAC_Operand op) {
-
 	switch (op.kind) {
 	case OPR_VAR: {
 		if (op.var.type.kind == TYPE_STRUCT) {

@@ -6,9 +6,12 @@ macro da_foreach(vn, da) {
 
 macro da_copy(dst, src) {
 	(dst).reserve((src).count)
-	da_foreach (item, (src)) {
-		(dst).append(*(item))
-	}
+	(dst).count = (src).count
+	memcpy(
+		(dst).items,
+		(src).items,
+		sizeof(*(dst).items) * (dst).count,
+	)
 }
 
 macro DynArr(N, T) {
@@ -26,6 +29,7 @@ macro DynArrDecl(N, T) {
 		fn append(item: T)
 		fn set(index: uptr, item: T)
 		fn get(index: uptr): T
+		fn at(index: uptr): *T
 		fn reset()
 		fn first(): T
 		fn last(): T
@@ -63,32 +67,57 @@ macro DynArrImpl(N, T) {
 			self.count += 1
 		}
 
+		fn check_index(index: uptr) {
+			if index < 0 || index >= self.count {
+				printf("dynarr error: index %zu is not in the range 0..%zu\n", index, self.count)
+				exit(1)
+			}
+		}
+
 		fn set(index: uptr, item: T) {
+			self.check_index(index)
 			self.items[index] = item
 		}
 
 		fn get(index: uptr): T {
+			self.check_index(index)
 			return self.items[index]
+		}
+
+		fn at(index: uptr): *T {
+			self.check_index(index)
+			return self.items + index
 		}
 
 		fn reset() {
 			self.count = 0
 		}
 
+		fn check_empty() {
+			if self.count <= 0 {
+				printf("dynarr error: empty dynamic array\n")
+				exit(1)
+			}
+		}
+
 		fn first(): T {
-			return self.get(0:uptr)
+			self.check_empty()
+			return self.get(0)
 		}
 
 		fn last(): T {
+			self.check_empty()
 			return self.get(self.count - 1)
 		}
 
 		fn remove_unordered(index: uptr) {
+			self.check_index(index)
 			self.set(index, self.last())
 			self.count -= 1
 		}
 
 		fn remove_ordered(index: uptr) {
+			self.check_index(index)
 			self.set(index, self.last())
 			memmove(self.items + index, self.items + index + 1,
 					sizeof(*self.items) * (self.count - index))

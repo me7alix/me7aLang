@@ -12,7 +12,7 @@ fn bubble_sort(arr: *int, cnt: uptr) {
 			}
 		}
 
-		if !change ->
+		if !change then
 			break
 	}
 }
@@ -25,6 +25,6 @@ arr: []int = {
 
 fn main() {
 	bubble_sort(arr, arr_len(arr))
-	for i: uptr = 0; i < 10; i+=1 ->
+	for i: uptr = 0; i < 10; i+=1 then
 		printf("%zi: %d\n", i, arr[i])
 }

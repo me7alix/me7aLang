@@ -197,9 +197,15 @@ bool type_is_int(Type t) {
 Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 	switch (expr->kind) {
 	case AST_ARRAY:
+		bool err = false;
+		if      (!vart)              err = true;
+		else if (!is_pointer(*vart)) err = true;
+		if (err) throw_error(expr->loc, "types mismatching");
+
+		Type baseType = *get_pointer_base(*vart);
 		da_foreach (AST_Node*, n, &expr->array) {
-			Type nt = expr_analysis(p, *n, get_pointer_base(*vart));
-			if (!compare_types(*get_pointer_base(*vart), nt)) {
+			Type nt = expr_analysis(p, *n, &baseType);
+			if (!compare_types(baseType, nt)) {
 				throw_error((*n)->loc, "types mismatching");
 			}
 		}
@@ -277,6 +283,14 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 					);
 
 					lt = ct;
+				} else {
+					if (is_pointer(lt)) {
+						if (get_pointer_base(lt)->kind == TYPE_STRUCT)
+							goto no_err;
+					}
+					
+					throw_error(expr->ebin.l->loc, "struct expected");
+					no_err:;
 				}
 
 				da_foreach (StructMember, member, &lt.pointer.base->user->ustruct.members) {
@@ -331,6 +345,9 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 
 					lt = *lt.pointer.base;
 				}
+
+				if (lt.kind != TYPE_STRUCT)
+					throw_error(expr->loc, "struct expected");
 
 				da_foreach (StructMember, member, &lt.user->ustruct.members) {
 					if (member->kind == STMEM_FIELD) {
@@ -468,34 +485,22 @@ AST_ExprOp get_un_op(Token tok) {
 	};
 }
 
-AST_Node *parse_array(Parser *p, Type *vart) {
-	Location alc = next(p).loc;
-	AST_Nodes array = {0};
+AST_Node *parse_array(Parser *p) {
 	AST_Node *al = ast_new(
 		.kind = AST_ARRAY,
-		.loc = alc,
+		.loc = next(p).loc,
 	);
 
-	if (!is_pointer(*vart))
-		throw_error(alc, "types mismatching");
-
 	while (peek(p).kind != TOK_CBRA) {
-		Type base_type = *get_pointer_base(*vart);
-		AST_Node *expr = parse_expr(p,
-			EXPR_PARSING_ARRAY,
-			&base_type
-		);
-
-		da_append(&array, expr);
+		AST_Node *expr = parse_expr(p, EXPR_PARSING_ARRAY, NULL);
+		da_append(&al->array, expr);
 		next(p);
 
-		if (peek(p).kind == TOK_COM)
-			next(p);
+		if (peek(p).kind == TOK_COM) next(p);
 		else if (peek(p).kind != TOK_CBRA)
-			throw_error(alc, "unexpected token");
+			throw_error(al->loc, "unexpected token");
 	}
 
-	al->array = array;
 	return al;
 }
 
@@ -594,7 +599,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			break;
 
 		case TOK_OBRA:
-			da_append(&nodes, parse_array(p, vart));
+			da_append(&nodes, parse_array(p));
 			break;
 
 		case TOK_FALSE:
