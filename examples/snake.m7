@@ -141,14 +141,14 @@ fn main() {
 			draw_game()
 
 			rl_draw_text(
-					"Game over!",
-					200, MAP_HEIGHT/2 * TILE_SIZE - 20,
-					40, rl_ColorWhite)
+				"Game over!",
+				200, MAP_HEIGHT/2 * TILE_SIZE - 20,
+				40, rl_ColorWhite)
 
 			rl_draw_text(
-					"Press SPACE to restart",
-					200, MAP_HEIGHT/2 * TILE_SIZE + 20,
-					18, rl_ColorWhite)
+				"Press SPACE to restart",
+				200, MAP_HEIGHT/2 * TILE_SIZE + 20,
+				18, rl_ColorWhite)
 
 			if rl_is_key_pressed(rl_KeySpace) {
 				game_init()

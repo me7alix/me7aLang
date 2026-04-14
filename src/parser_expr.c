@@ -225,7 +225,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 			expr->literal.type = *vart;
 		} else {
 			switch (expr->literal.kind) {
-			case LIT_CHAR:  expr->literal.type = (Type) {.kind = TYPE_I8};   break;
+			case LIT_CHAR:  expr->literal.type = (Type) {.kind = TYPE_U8};   break;
 			case LIT_FLOAT: expr->literal.type = (Type) {.kind = TYPE_F32};  break;
 			case LIT_BOOL:  expr->literal.type = (Type) {.kind = TYPE_BOOL}; break;
 			case LIT_INT: {
