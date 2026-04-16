@@ -86,6 +86,15 @@ static inline void* new_impl(size_t size, void *init) {
     #define CP_INT_DEFINED
 #endif
 
+/* Expression-based pattern matching (switch-like construct) */
+
+static size_t match_ptr = 0;
+static int match_stack[32];
+#define match(v) (match_stack[match_ptr++] = (v))
+#define mwh(v) ((v) == match_stack[match_ptr-1]) ?
+#define mth(v) (match_ptr--, v) :
+#define mow(v) (match_ptr--, v)
+
 /* Dynamic array */
 
 #define DA(type) struct { type *items; size_t count, capacity; }
