@@ -754,8 +754,8 @@ void parse_method(Parser *p, UserType *st) {
 	);
 
 	AST_Node *func = parse_function(p, self);
-	da_foreach (StructMember, member, &st->ustruct.members) {
-		if (member->kind == STMEM_METHOD) {
+	da_foreach (Member, member, &st->ustruct.members) {
+		if (member->kind == MBR_METHOD) {
 			AST_Node *memb = member->as.method.func;
 
 			if (strcmp(memb->func_def.id, func->func_def.id) != 0)
@@ -787,8 +787,8 @@ void parse_method(Parser *p, UserType *st) {
 		}
 	}
 
-	da_append(&st->ustruct.members, ((StructMember){
-		.kind = STMEM_METHOD,
+	da_append(&st->ustruct.members, ((Member){
+		.kind = MBR_METHOD,
 		.as.method.func = func,
 	}));
 }
@@ -819,8 +819,8 @@ void parse_struct(Parser *p) {
 			char *id = next(p).data;
 			Type type = *parse_type(p);
 
-			da_append(&st->ustruct.members, ((StructMember){
-				.kind = STMEM_FIELD,
+			da_append(&st->ustruct.members, ((Member){
+				.kind = MBR_FIELD,
 				.as.field.type = type,
 				.as.field.id = id,
 			}));

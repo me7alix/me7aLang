@@ -29,8 +29,8 @@ Type tac_ir_get_opr_type(TAC_Operand op) {
 			for (size_t i = 0; i < op.var.fields.count; i++) {
 				char *off = da_get(&op.var.fields, i);
 
-				da_foreach (StructMember, member, &op.var.type.user->ustruct.members) {
-					if (member->kind == STMEM_FIELD) {
+				da_foreach (Member, member, &op.var.type.user->ustruct.members) {
+					if (member->kind == MBR_FIELD) {
 						if (strcmp(member->as.field.id, off) == 0) {
 							op.var.type = member->as.field.type;
 							res = member->as.field.type;
@@ -932,8 +932,8 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 	ht_foreach_node(UserTypes, kv, &p->ut) {
 		UserType *ut = kv->val;
 		if (ut->kind == TYPE_STRUCT) {
-			da_foreach (StructMember, member, &ut->ustruct.members) {
-				if (member->kind == STMEM_METHOD) {
+			da_foreach (Member, member, &ut->ustruct.members) {
+				if (member->kind == MBR_METHOD) {
 					char *name = malloc(1 << 12);
 					char *id = member->as.method.func->func_def.id;
 					sprintf(name, "method_%s_%s", ut->id, id);

@@ -52,8 +52,8 @@ typedef struct AST_Node AST_Node;
 
 typedef struct {
 	enum {
-		STMEM_FIELD,
-		STMEM_METHOD,
+		MBR_FIELD,
+		MBR_METHOD,
 	} kind;
 
 	union {
@@ -65,7 +65,7 @@ typedef struct {
 			AST_Node *func;
 		} method;
 	} as;
-} StructMember;
+} Member;
 
 struct UserType {
 	TypeKind kind;
@@ -73,7 +73,7 @@ struct UserType {
 
 	union {
 		struct {
-			DA(StructMember) members;
+			DA(Member) members;
 		} ustruct;
 	};
 };

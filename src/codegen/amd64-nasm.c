@@ -71,8 +71,8 @@ uint get_type_size(Type type) {
 	switch (type.kind) {
 	case TYPE_STRUCT:
 		uint total = 0;
-		da_foreach (StructMember, member, &type.user->ustruct.members) {
-			if (member->kind == STMEM_FIELD) {
+		da_foreach (Member, member, &type.user->ustruct.members) {
+			if (member->kind == MBR_FIELD) {
 				total += get_type_size(member->as.field.type);
 			}
 		}
@@ -90,8 +90,8 @@ uint get_struct_offset(TAC_Operand var) {
 
 	for (size_t i = 0; i < var.var.fields.count; i++) {
 		char *off = da_get(&var.var.fields, i);
-		da_foreach (StructMember, member, &var.var.type.user->ustruct.members) {
-			if (member->kind == STMEM_FIELD) {
+		da_foreach (Member, member, &var.var.type.user->ustruct.members) {
+			if (member->kind == MBR_FIELD) {
 				total += get_type_size(member->as.field.type);
 				if (strcmp(member->as.field.id, off) == 0) {
 					var.var.type = member->as.field.type;
@@ -346,15 +346,15 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				case TYPE_ARRAY:
 				case TYPE_POINTER:
 				case TYPE_UINT: case TYPE_U8:
-				case TYPE_U32: case TYPE_U16:
-				case TYPE_U64: case TYPE_UPTR:
+				case TYPE_U32:  case TYPE_U16:
+				case TYPE_U64:  case TYPE_UPTR:
 					sb_appendf(&body, "  mul %s, %s\n", arg1, arg2);
 					break;
 
 				case TYPE_IPTR:
 				case TYPE_BOOL: case TYPE_I8:
-				case TYPE_INT: case TYPE_I32:
-				case TYPE_I64: case TYPE_I16:
+				case TYPE_INT:  case TYPE_I32:
+				case TYPE_I64:  case TYPE_I16:
 					sb_appendf(&body, "  imul %s, %s\n", arg1, arg2);
 					break;
 
@@ -372,16 +372,16 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				case TYPE_ARRAY:
 				case TYPE_POINTER:
 				case TYPE_UINT: case TYPE_U8:
-				case TYPE_U32: case TYPE_U16:
-				case TYPE_U64: case TYPE_UPTR:
+				case TYPE_U32:  case TYPE_U16:
+				case TYPE_U64:  case TYPE_UPTR:
 					sb_appendf(&body, "  xor rdx, rdx\n");
 					sb_appendf(&body, "  div %s\n", arg2);
 					break;
 
 				case TYPE_IPTR:
 				case TYPE_BOOL: case TYPE_I8:
-				case TYPE_INT: case TYPE_I32:
-				case TYPE_I64: case TYPE_I16:
+				case TYPE_INT:  case TYPE_I32:
+				case TYPE_I64:  case TYPE_I16:
 					sb_appendf(&body, "  %s\n", SEI[reg_row]);
 					sb_appendf(&body, "  idiv %s\n", arg2);
 					break;
@@ -456,63 +456,65 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 
 			if (dst_type.kind == arg1_type.kind) { UNREACHABLE; }
 
-			int dst_size = 0;
-			int src_size = 0;
-			bool src_signed = false;
+			int dsz = 0;
+			int ssz = 0;
+			bool ssig = false;
 
 			switch (dst_type.kind) {
-				case TYPE_I8: dst_size = 1; break;
-				case TYPE_U8: dst_size = 1; break;
-				case TYPE_I16: dst_size = 2; break;
-				case TYPE_U16: dst_size = 2; break;
-				case TYPE_INT: case TYPE_I32: dst_size = 4; break;
-				case TYPE_UINT: case TYPE_U32: dst_size = 4; break;
-				case TYPE_I64: case TYPE_IPTR: dst_size = 8; break;
-				case TYPE_U64: case TYPE_UPTR: case TYPE_POINTER: dst_size = 8; break;
+				case TYPE_I8:  dsz = 1; break;
+				case TYPE_U8:  dsz = 1; break;
+				case TYPE_I16: dsz = 2; break;
+				case TYPE_U16: dsz = 2; break;
+				case TYPE_U64:
+				case TYPE_UPTR: case TYPE_POINTER: dsz = 8; break;
+				case TYPE_INT:  case TYPE_I32:     dsz = 4; break;
+				case TYPE_UINT: case TYPE_U32:     dsz = 4; break;
+				case TYPE_I64:  case TYPE_IPTR:    dsz = 8; break;
 				default: UNREACHABLE;
 			}
 
 			switch (arg1_type.kind) {
-				case TYPE_I8: src_size = 1; src_signed = true; break;
-				case TYPE_U8: src_size = 1; src_signed = false; break;
-				case TYPE_I16: src_size = 2; src_signed = true; break;
-				case TYPE_U16: src_size = 2; src_signed = false; break;
-				case TYPE_INT: case TYPE_I32: src_size = 4; src_signed = true; break;
-				case TYPE_UINT: case TYPE_U32: src_size = 4; src_signed = false; break;
-				case TYPE_I64: case TYPE_IPTR: src_size = 8; src_signed = true; break;
-				case TYPE_U64: case TYPE_UPTR: case TYPE_POINTER: src_size = 8; src_signed = false; break;
+				case TYPE_I8:  ssz = 1; ssig = true;  break;
+				case TYPE_U8:  ssz = 1; ssig = false; break;
+				case TYPE_I16: ssz = 2; ssig = true;  break;
+				case TYPE_U16: ssz = 2; ssig = false; break;
+				case TYPE_U64:
+				case TYPE_UPTR: case TYPE_POINTER: ssz = 8; ssig = false; break;
+				case TYPE_INT:  case TYPE_I32:     ssz = 4; ssig = true;  break;
+				case TYPE_UINT: case TYPE_U32:     ssz = 4; ssig = false; break;
+				case TYPE_I64:  case TYPE_IPTR:    ssz = 8; ssig = true;  break;
 				default: UNREACHABLE;
 			}
 
-			const char* ext_inst = src_signed ? "movsx" : "movzx";
+			const char* ext_inst = ssig ? "movsx" : "movzx";
 			const char* dst_reg = NULL;
 			const char* src_reg = NULL;
 			const char* low_reg = NULL;
 
-			switch (dst_size) {
-				case 1: dst_reg = "al"; low_reg = "al"; break;
-				case 2: dst_reg = "ax"; low_reg = "ax"; break;
+			switch (dsz) {
+				case 1: dst_reg = "al";  low_reg = "al";  break;
+				case 2: dst_reg = "ax";  low_reg = "ax";  break;
 				case 4: dst_reg = "eax"; low_reg = "eax"; break;
 				case 8: dst_reg = "rax"; low_reg = "eax"; break;
 				default: UNREACHABLE;
 			}
 
-			switch (src_size) {
-				case 1: src_reg = "al"; break;
-				case 2: src_reg = "ax"; break;
+			switch (ssz) {
+				case 1: src_reg = "al";  break;
+				case 2: src_reg = "ax";  break;
 				case 4: src_reg = "eax"; break;
 				case 8: src_reg = "rax"; break;
 				default: UNREACHABLE;
 			}
 
-			if (dst_size > src_size) {
-				bool is_32_to_64_signed = (src_size == 4 && dst_size == 8 && src_signed);
+			if (dsz > ssz) {
+				bool is_32_to_64_signed = (ssz == 4 && dsz == 8 && ssig);
 				if (is_32_to_64_signed) {
 					ext_inst = "movsxd";
 				}
 				sb_appendf(&body, "  %s %s, %s\n", ext_inst, dst_reg, opr_to_nasm(ci.arg1));
 				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst), dst_reg);
-			} else if (dst_size < src_size) {
+			} else if (dsz < ssz) {
 				sb_appendf(&body, "  mov %s, %s\n", src_reg, opr_to_nasm(ci.arg1));
 				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst), low_reg);
 			} else {
@@ -522,20 +524,23 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		} break;
 
 		case OP_ASSIGN: {
-			bool is_first_assign = false;
+			bool fst_asg = false;
 			if (ci.dst.var.kind != VAR_ADDR) {
 				uint *off = OffTable_get(&stack_table, ci.dst.var.addr_id);
 
 				if (!off) {
-					is_first_assign = true;
+					fst_asg = true;
 					total_offset_add(get_type_size(ci.dst.var.type));
 					OffTable_add(&stack_table, ci.dst.var.addr_id, total_offset);
 				}
 			}
 
-			if (ci.dst.var.type.kind == TYPE_ARRAY && is_first_assign) {
+			if (ci.dst.var.type.kind == TYPE_ARRAY && fst_asg) {
 				reg_alloc(ci, arg1, arg2);
-				total_offset_add(get_type_size(*ci.dst.var.type.array.elem) * ci.dst.var.type.array.length);
+				total_offset_add(
+					get_type_size(*ci.dst.var.type.array.elem) *
+					ci.dst.var.type.array.length);
+
 				sb_appendf(&body, "  lea %s, [rbp - %u]\n", arg1, total_offset);
 				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst), arg1);
 			}

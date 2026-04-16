@@ -268,16 +268,20 @@ int main(int argc, char **argv) {
 
 		systemf(
 			"nasm -f %s %s",
-			tp == TP_WINDOWS ? "win64"   :
-			tp == TP_LINUX   ? "elf64"   :
-			tp == TP_MACOS   ? "macho64" : "",
+			(match(tp),
+				mwh(TP_WINDOWS) mth("win64")
+				mwh(TP_LINUX)   mth("elf64")
+				mwh(TP_MACOS)   mth("macho64")
+				                mow("err")),
 			output_file);
 	}
 
 	char *obj_ext =
-		tp == TP_WINDOWS ? "obj" :
-		tp == TP_LINUX   ? "o"   :
-		tp == TP_MACOS   ? "o"   : "";
+		(match(tp),
+			mwh(TP_WINDOWS) mth("obj")
+			mwh(TP_LINUX)   mth("o")
+			mwh(TP_MACOS)   mth("o")
+			                mow("err"));
 
 	if (!save_asm_output) {
 		switch (tp) {

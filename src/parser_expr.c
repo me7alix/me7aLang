@@ -293,8 +293,8 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 					no_err:;
 				}
 
-				da_foreach (StructMember, member, &lt.pointer.base->user->ustruct.members) {
-					if (member->kind == STMEM_METHOD) {
+				da_foreach (Member, member, &lt.pointer.base->user->ustruct.members) {
+					if (member->kind == MBR_METHOD) {
 						if (strcmp(expr->ebin.r->method_call.id,
 								member->as.method.func->func_def.id) == 0) {
 							AST_Node *func    = member->as.method.func;
@@ -349,8 +349,8 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 				if (lt.kind != TYPE_STRUCT)
 					throw_error(expr->loc, "struct expected");
 
-				da_foreach (StructMember, member, &lt.user->ustruct.members) {
-					if (member->kind == STMEM_FIELD) {
+				da_foreach (Member, member, &lt.user->ustruct.members) {
+					if (member->kind == MBR_FIELD) {
 						if (strcmp(expr->ebin.r->vid.id,
 								member->as.field.id) == 0) {
 							expr->ebin.type = member->as.field.type;
