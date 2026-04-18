@@ -149,6 +149,9 @@ static size_t match_val = 0;
 #define da_last(da) \
     (da)->items[CP_ASSERT((da)->count > 0), ((da)->count - 1)]
 
+#define da_first(da) \
+    (da)->items[CP_ASSERT((da)->count > 0), 0]
+
 #define da_resize(da, cnt) \
     do { \
         (da)->count = (cnt); \

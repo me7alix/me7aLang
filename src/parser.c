@@ -33,6 +33,13 @@ void pop_scope(Parser *p) {
 }
 
 static uint VUID = 1;
+
+bool smbt_glob_add(Parser *p, SymbolType st, char *id, Symbol smbl) {
+	if (SymbolTable_get(&da_first(&p->sss), (SymbolKey) { st, id })) return true;
+	SymbolTable_add(&da_first(&p->sss), (SymbolKey) { st, id }, smbl);
+	return false;
+}
+
 bool smbt_add(Parser *p, SymbolType st, char *id, Symbol smbl) {
 	if (SymbolTable_get(&da_last(&p->sss), (SymbolKey) { st, id })) return true;
 	SymbolTable_add(&da_last(&p->sss), (SymbolKey) { st, id }, smbl);
@@ -676,6 +683,9 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 		}
 
 		sf->func_def.is_def = true;
+		fdn->func_def.body = parse_body(p, fdn, true);
+		pop_scope(p);
+		return fdn;
 	} else {
 		if (peek(p).kind == TOK_SEMI) {
 			pop_scope(p);
@@ -683,17 +693,12 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 			smbt_add(p, SBL_FUNC_DEF, fdn->func_def.id, fds);
 			return NULL;
 		} else {
+			smbt_glob_add(p, SBL_FUNC_DEF, fdn->func_def.id, fds);
 			fdn->func_def.body = parse_body(p, fdn, true);
 			pop_scope(p);
-			smbt_add(p, SBL_FUNC_DEF, fdn->func_def.id, fds);
 			return fdn;
 		}
 	}
-
-	fdn->func_def.body = parse_body(p, fdn, true);
-	pop_scope(p);
-
-	return fdn;
 }
 
 void parse_extern(Parser *p) {
