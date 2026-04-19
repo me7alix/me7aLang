@@ -85,7 +85,7 @@ float op_prec(AST_ExprOp op, bool l) {
 }
 
 Type get_func_type(SymbolType kind, Symbol *func) {
-	Type *type = type_new(.kind = TYPE_FUNCTION);
+	Type *type = new(Type, .kind = TYPE_FUNCTION);
 	AST_Nodes *args;
 	switch (kind) {
 	case SBL_FUNC_DEF:
@@ -275,7 +275,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 						.pointer.base = nt,
 					};
 
-					expr->ebin.l = ast_new(
+					expr->ebin.l = new(AST_Node,
 						.kind = AST_UN_EXP,
 						.eun.op = AST_OP_REF,
 						.eun.v = expr->ebin.l,
@@ -336,7 +336,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 				/* Auto-dereferencing */
 
 				if (lt.kind == TYPE_POINTER) {
-					expr->ebin.l = ast_new(
+					expr->ebin.l = new(AST_Node,
 						.kind = AST_UN_EXP,
 						.eun.op = AST_OP_DEREF,
 						.eun.v = expr->ebin.l,
@@ -486,7 +486,7 @@ AST_ExprOp get_un_op(Token tok) {
 }
 
 AST_Node *parse_array(Parser *p) {
-	AST_Node *al = ast_new(
+	AST_Node *al = new(AST_Node,
 		.kind = AST_ARRAY,
 		.loc = next(p).loc,
 	);
@@ -571,7 +571,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				p->cur_token--;
 			} else {
 				Symbol *var = smbt_get(p, SBL_VAR, peek(p).data);
-				da_append(&nodes, ast_new(
+				da_append(&nodes, new(AST_Node,
 					.kind = AST_VID,
 					.loc = peek(p).loc,
 					.vid.id = peek(p).data,
@@ -582,7 +582,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			break;
 
 		case TOK_INT:
-			da_append(&nodes, ast_new(
+			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
 				.literal.kind = LIT_INT,
 				.loc = peek(p).loc,
@@ -591,7 +591,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			break;
 
 		case TOK_TRUE:
-			da_append(&nodes, ast_new(
+			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
 				.loc = peek(p).loc,
 				.literal.kind = LIT_BOOL,
@@ -604,7 +604,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			break;
 
 		case TOK_FALSE:
-			da_append(&nodes, ast_new(
+			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
 				.literal.kind = LIT_BOOL,
 				.literal.lint = 0,
@@ -614,7 +614,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 		case TOK_NULL: {
 			Type *u0 = malloc(sizeof(Type));
 			*u0 = (Type) {.kind = TYPE_NULL};
-			da_append(&nodes, ast_new(
+			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
 				.literal.kind = LIT_INT,
 				.literal.lint = 0,
@@ -626,7 +626,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 		} break;
 
 		case TOK_STRING:
-			da_append(&nodes, ast_new(
+			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
 				.loc = peek(p).loc,
 				.literal.kind = LIT_STR,
@@ -635,7 +635,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			break;
 
 		case TOK_CHAR:
-			da_append(&nodes, ast_new(
+			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
 				.loc = peek(p).loc,
 				.literal.kind = LIT_CHAR,
@@ -644,7 +644,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			break;
 
 		case TOK_FLOAT:
-			da_append(&nodes, ast_new(
+			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
 				.literal.kind = LIT_FLOAT,
 				.literal.lfloat = parse_float(peek(p).data),
@@ -653,7 +653,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 
 		case TOK_COL: {
 			Type t = *parse_type(p);
-			da_append(&nodes, ast_new(
+			da_append(&nodes, new(AST_Node,
 				.kind = AST_UN_EXP,
 				.loc = peek(p).loc,
 				.eun.type = t,
@@ -664,18 +664,18 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 
 		case TOK_SIZEOF:
 			if (peek2(p).kind == TOK_COL) {
-				da_append(&nodes, ast_new(
+				da_append(&nodes, new(AST_Node,
 					.kind = AST_UN_EXP,
 					.loc = peek(p).loc,
 					.eun.op = get_un_op(next(p)),
 					.eun.type = TUPTR,
-					.eun.v = ast_new(
+					.eun.v = new(AST_Node,
 						.kind = AST_LITERAL,
 						.literal.type = *parse_type(p),
 					),
 				));
 			} else {
-				da_append(&nodes, ast_new(
+				da_append(&nodes, new(AST_Node,
 					.kind = AST_UN_EXP,
 					.loc = peek(p).loc,
 					.eun.op = get_un_op(peek(p)),
@@ -686,7 +686,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			break;
 
 		case TOK_EXC: case TOK_TILDA:
-			da_append(&nodes, ast_new(
+			da_append(&nodes, new(AST_Node,
 				.kind = AST_UN_EXP,
 				.loc = peek(p).loc,
 				.eun.op = get_un_op(peek(p)),
@@ -695,7 +695,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			break;
 
 		case TOK_OSQBRA:
-			da_append(&nodes, ast_new(
+			da_append(&nodes, new(AST_Node,
 				.kind = AST_BIN_EXP,
 				.loc = peek(p).loc,
 				.ebin.op = get_bin_op(peek(p)),
@@ -719,7 +719,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 		case TOK_EQ:      case TOK_PS:
 		case TOK_DOT:     case TOK_PIPE:
 		case TOK_XOR: {
-			da_append(&nodes, ast_new(
+			da_append(&nodes, new(AST_Node,
 				.kind = AST_BIN_EXP,
 				.loc = peek(p).loc,
 				.ebin.op = get_bin_op(peek(p)),
@@ -745,7 +745,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			}
 
 			if (!is_unary_op) {
-				da_append(&nodes, ast_new(
+				da_append(&nodes, new(AST_Node,
 					.kind = AST_BIN_EXP,
 					.loc = peek(p).loc,
 					.ebin.op = get_bin_op(peek(p)),
@@ -753,7 +753,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 					.ebin.r = NULL
 				));
 			} else {
-				da_append(&nodes, ast_new(
+				da_append(&nodes, new(AST_Node,
 					.kind = AST_UN_EXP,
 					.loc = peek(p).loc,
 					.eun.op = get_un_op(peek(p)),

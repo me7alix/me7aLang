@@ -239,9 +239,6 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart);
 AST_Node *parse_func_call(Parser *parser);
 AST_Node *parse_method_call(Parser *parser);
 
-AST_Node *ast_alloc(AST_Node node);
-#define ast_new(...) ast_alloc((AST_Node){__VA_ARGS__})
-
 #define UNREACHABLE \
 	do { \
 		fprintf( \
