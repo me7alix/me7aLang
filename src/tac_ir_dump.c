@@ -22,9 +22,9 @@ char *tac_ir_dump_opr_type(TAC_Operand op) {
 	case TYPE_IPTR:   return "iptr";
 	case TYPE_POINTER:
 	case TYPE_ARRAY:  return "ptr";
-	case TYPE_STRUCT:
+	case TYPE_STRUCT:;
 		char *ns = malloc(256);
-		sprintf(ns, "struct<%s>", type.user->id);
+		sprintf(ns, "struct<%s>", type.as.user->id);
 		return ns;
 	default:
 		return "ERR";
@@ -33,38 +33,38 @@ char *tac_ir_dump_opr_type(TAC_Operand op) {
 
 void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 	switch (opr.kind) {
-	case OPR_FUNC_INP: sprintf(buf, "FI(%u):%d", opr.func_inp.arg_id,
-							                     opr.func_inp.type.kind);    break;
+	case OPR_FUNC_INP: sprintf(buf, "FI(%u):%d", opr.as.func_inp.arg_id,
+							                     opr.as.func_inp.type.kind);    break;
 	case OPR_SIZEOF:   sprintf(buf, "sizeof:%s", tac_ir_dump_opr_type(opr)); break;
 	case OPR_FUNC_RET: sprintf(buf, "FR:%s",     tac_ir_dump_opr_type(opr)); break;
-	case OPR_NAME:     sprintf(buf, "\"%s\"",    opr.name);                  break;
-	case OPR_LABEL:    sprintf(buf, ".L%u",      opr.label_id);              break;
-	case OPR_FIELD:    sprintf(buf, ">%s",       opr.field_id);              break;	
+	case OPR_NAME:     sprintf(buf, "\"%s\"",    opr.as.name);                  break;
+	case OPR_LABEL:    sprintf(buf, ".L%u",      opr.as.label_id);              break;
+	case OPR_FIELD:    sprintf(buf, ">%s",       opr.as.field_id);              break;	
 	case OPR_NULL:     sprintf(buf, "NULL");                                 break;
 
 	case OPR_VAR: {
-		switch (opr.var.kind) {
+		switch (opr.as.var.kind) {
 		case VAR_STACK:
-			sprintf(buf, "(%u)", opr.var.addr_id);
+			sprintf(buf, "(%u)", opr.as.var.addr_id);
 			break;
-		case VAR_ADDR:
-			int id = opr.var.addr_id;
-			switch (opr.var.addr_kind) {
+		case VAR_ADDR:;
+			int id = opr.as.var.addr_id;
+			switch (opr.as.var.addr_kind) {
 			case VAR_STACK: sprintf(buf, "[(%u)]", id); break;
 			case VAR_DATA:  sprintf(buf, "[{%u}]", id); break;
 			case VAR_ADDR:  sprintf(buf, "[[%u]]", id); break;
 			} break;
 		case VAR_DATA:
-			sprintf(buf, "{%u}", opr.var.addr_id);
+			sprintf(buf, "{%u}", opr.as.var.addr_id);
 			break;
 		}
 
 		char scnd[256];
-		if (opr.var.fields.count > 0) {
+		if (opr.as.var.fields.count > 0) {
 			strcpy(scnd, buf);
 
 			StringBuilder fields = {0};
-			da_foreach (char*, field, &opr.var.fields) {
+			da_foreach (char*, field, &opr.as.var.fields) {
 				sb_appendf(&fields, ".%s", *field);
 			}
 
@@ -76,23 +76,23 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 	} break;
 
 	case OPR_LITERAL: {
-		switch (opr.literal.type.kind) {
+		switch (opr.as.literal.type.kind) {
 		case TYPE_I32:
 		case TYPE_INT:
-			sprintf(buf, "%d:%s", (i32) opr.literal.lint, tac_ir_dump_opr_type(opr));
+			sprintf(buf, "%d:%s", (i32) opr.as.literal.as.lint, tac_ir_dump_opr_type(opr));
 			break;
 		case TYPE_I8:
 		case TYPE_BOOL:
-			sprintf(buf, "%d:%s", (i8) opr.literal.lint, tac_ir_dump_opr_type(opr));
+			sprintf(buf, "%d:%s", (i8) opr.as.literal.as.lint, tac_ir_dump_opr_type(opr));
 			break;
 		case TYPE_POINTER:
 		case TYPE_UPTR:
 		case TYPE_IPTR:
 		case TYPE_I64:
-			sprintf(buf, "%lli:%s", opr.literal.lint, tac_ir_dump_opr_type(opr));
+			sprintf(buf, "%lli:%s", opr.as.literal.as.lint, tac_ir_dump_opr_type(opr));
 			break;
 		case TYPE_F32:
-			sprintf(buf, "%f:%s", (float) opr.literal.lfloat, tac_ir_dump_opr_type(opr));
+			sprintf(buf, "%f:%s", (float) opr.as.literal.as.lfloat, tac_ir_dump_opr_type(opr));
 			break;
 		default:
 			sprintf(buf, "ERR");
@@ -104,8 +104,8 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 void tac_ir_dump_inst(TAC_Instruction inst, char *res) {
 	char arg1[64], arg2[64], dst[64];
 
-	tac_ir_dump_opr(inst.arg1, arg1);
-	tac_ir_dump_opr(inst.arg2, arg2);
+	tac_ir_dump_opr(inst.args[0], arg1);
+	tac_ir_dump_opr(inst.args[1], arg2);
 	tac_ir_dump_opr(inst.dst, dst);
 
 	switch (inst.op) {

@@ -66,20 +66,13 @@ typedef struct {
 			uint addr_id;
 			DA(char*) fields;
 		} var;
-	};
+	} as;
 } TAC_Operand;
 
 typedef struct {
 	TAC_OpCode op;
 	TAC_Operand dst;
-
-	union {
-		TAC_Operand args[16];
-		struct {
-			TAC_Operand arg1;
-			TAC_Operand arg2;
-		};
-	};
+	TAC_Operand args[16];
 } TAC_Instruction;
 
 typedef struct {

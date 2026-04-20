@@ -12,7 +12,7 @@ Type TUPTR = {.kind = TYPE_UPTR};
 static Token peek(Parser *p)  { return *p->cur_token;       }
 static Token peek2(Parser *p) { return *(p->cur_token + 1); }
 static Token next(Parser *p)  { return *p->cur_token++;     }
-Symbol *smbt_get(Parser *p, SymbolType st, char *id);
+Symbol *smbt_get(Parser *p, SymbolKind st, char *id);
 
 double parse_float(char *data) {
 	return atof(data);
@@ -84,21 +84,21 @@ float op_prec(AST_ExprOp op, bool l) {
 	return 0.0;
 }
 
-Type get_func_type(SymbolType kind, Symbol *func) {
+Type get_func_type(SymbolKind kind, Symbol *func) {
 	Type *type = new(Type, .kind = TYPE_FUNCTION);
 	AST_Nodes *args;
 	switch (kind) {
 	case SBL_FUNC_DEF:
-		type->func.ret = &func->func_def.type;
+		type->as.func.ret = &func->func_def.type;
 		args = &func->func_def.args;
 		break;
 	case SBL_FUNC_EXTERN:
-		type->func.ret = &func->func_extern.type;
+		type->as.func.ret = &func->func_extern.type;
 		args = &func->func_extern.args;
 	}
 
 	da_foreach (AST_Node*, arg, args) {
-		da_append(&type->func.args, (*arg)->func_def_arg.type);
+		da_append(&type->as.func.args, (*arg)->as.func_def_arg.type);
 	}
 
 	return *type;
@@ -113,10 +113,10 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 	if (nodes->count == 1) {
 		bool error = false;
 		if (da_get(nodes, 0)->kind == AST_BIN_EXP) {
-			if (!da_get(nodes, 0)->ebin.l ||
-				!da_get(nodes, 0)->ebin.r) error = true;
+			if (!da_get(nodes, 0)->as.ebin.l ||
+				!da_get(nodes, 0)->as.ebin.r) error = true;
 		} else if (da_get(nodes, 0)->kind == AST_UN_EXP) {
-			if (!da_get(nodes, 0)->eun.v) error = true;
+			if (!da_get(nodes, 0)->as.eun.v) error = true;
 		}
 
 		if (error) throw_error(da_get(nodes, 0)->loc, "wrong expression");
@@ -129,11 +129,11 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 
 		bool isBinOp =
 			node->kind == AST_BIN_EXP &&
-			!(node->ebin.l && node->ebin.r);
+			!(node->as.ebin.l && node->as.ebin.r);
 
 		bool isUnOp =
 			node->kind == AST_UN_EXP &&
-			!node->eun.v;
+			!node->as.eun.v;
 
 		if (!isBinOp && !isUnOp) {
 			bool isLeft = false;
@@ -141,15 +141,15 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 
 			if (i != 0) {
 				switch (da_get(nodes, i-1)->kind) {
-				case AST_BIN_EXP: lp = op_prec(da_get(nodes, i-1)->ebin.op, true); break;
-				case AST_UN_EXP:  lp = op_prec(da_get(nodes, i-1)->eun.op,  true); break;
+				case AST_BIN_EXP: lp = op_prec(da_get(nodes, i-1)->as.ebin.op, true); break;
+				case AST_UN_EXP:  lp = op_prec(da_get(nodes, i-1)->as.eun.op,  true); break;
 				default: throw_error(da_get(nodes, i-1)->loc, "wrong expression"); }
 			}
 
 			if (i != nodes->count-1) {
 				switch (da_get(nodes, i+1)->kind) {
-				case AST_BIN_EXP: rp = op_prec(da_get(nodes, i+1)->ebin.op, false); break;
-				case AST_UN_EXP:  rp = op_prec(da_get(nodes, i+1)->eun.op,  false); break;
+				case AST_BIN_EXP: rp = op_prec(da_get(nodes, i+1)->as.ebin.op, false); break;
+				case AST_UN_EXP:  rp = op_prec(da_get(nodes, i+1)->as.eun.op,  false); break;
 				default: throw_error(da_get(nodes, i+1)->loc, "wrong expression");  }
 			}
 
@@ -159,13 +159,13 @@ AST_Node *expr_expand(AST_Nodes *nodes) {
 
 			if (isLeft) {
 				switch (da_get(nodes, i-1)->kind) {
-				case AST_BIN_EXP: da_get(nodes, i-1)->ebin.r = node; break;
-				case AST_UN_EXP:  da_get(nodes, i-1)->eun.v = node;  break;
+				case AST_BIN_EXP: da_get(nodes, i-1)->as.ebin.r = node; break;
+				case AST_UN_EXP:  da_get(nodes, i-1)->as.eun.v = node;  break;
 				default: UNREACHABLE; }
 			} else {
 				switch (da_get(nodes, i+1)->kind) {
-				case AST_BIN_EXP: da_get(nodes, i+1)->ebin.l = node; break;
-				case AST_UN_EXP:  da_get(nodes, i+1)->eun.v = node;  break;
+				case AST_BIN_EXP: da_get(nodes, i+1)->as.ebin.l = node; break;
+				case AST_UN_EXP:  da_get(nodes, i+1)->as.eun.v = node;  break;
 				default: UNREACHABLE; }
 			}
 
@@ -203,7 +203,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 		if (err) throw_error(expr->loc, "types mismatching");
 
 		Type baseType = *get_pointer_base(*vart);
-		da_foreach (AST_Node*, n, &expr->array) {
+		da_foreach (AST_Node*, n, &expr->as.array) {
 			Type nt = expr_analysis(p, *n, &baseType);
 			if (!compare_types(baseType, nt)) {
 				throw_error((*n)->loc, "types mismatching");
@@ -212,43 +212,43 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 		return *vart;
 
 	case AST_FUNC_CALL:
-		return expr->func_call.type;
+		return expr->as.func_call.type;
 
 	case AST_VID: {
-		Symbol *var = smbt_get(p, SBL_VAR, expr->vid.id);
+		Symbol *var = smbt_get(p, SBL_VAR, expr->as.vid.id);
 		if (!var) throw_error(expr->loc, "no such variable in the scope");
 		return var->variable.type;
 	} break;
 
 	case AST_LITERAL: {
-		if (vart && expr->literal.kind == LIT_INT) {
-			expr->literal.type = *vart;
+		if (vart && expr->as.literal.kind == LIT_INT) {
+			expr->as.literal.type = *vart;
 		} else {
-			switch (expr->literal.kind) {
-			case LIT_CHAR:  expr->literal.type = (Type) {.kind = TYPE_U8};   break;
-			case LIT_FLOAT: expr->literal.type = (Type) {.kind = TYPE_F32};  break;
-			case LIT_BOOL:  expr->literal.type = (Type) {.kind = TYPE_BOOL}; break;
+			switch (expr->as.literal.kind) {
+			case LIT_CHAR:  expr->as.literal.type = (Type) {.kind = TYPE_U8};   break;
+			case LIT_FLOAT: expr->as.literal.type = (Type) {.kind = TYPE_F32};  break;
+			case LIT_BOOL:  expr->as.literal.type = (Type) {.kind = TYPE_BOOL}; break;
 			case LIT_INT: {
-				if(expr->literal.type.kind == TYPE_NULL) {
-					expr->literal.type = (Type) {.kind = TYPE_INT};
+				if(expr->as.literal.type.kind == TYPE_NULL) {
+					expr->as.literal.type = (Type) {.kind = TYPE_INT};
 				}
 			} break;
 			case LIT_STR: {
 				static Type TU8 = {.kind = TYPE_U8};
-				expr->literal.type = (Type){
+				expr->as.literal.type = (Type){
 					.kind = TYPE_POINTER,
-					.pointer.base = &TU8
+					.as.pointer.base = &TU8
 				};
 			} break;
 			}
 		}
 
-		return expr->literal.type;
+		return expr->as.literal.type;
 	} break;
 
 	case AST_BIN_EXP: {
-		Type lt = expr_analysis(p, expr->ebin.l, vart);
-		switch (expr->ebin.op) {
+		Type lt = expr_analysis(p, expr->as.ebin.l, vart);
+		switch (expr->as.ebin.op) {
 		case AST_OP_VAR_EQ:
 		case AST_OP_ADD_EQ:
 		case AST_OP_SUB_EQ:
@@ -262,8 +262,8 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 			}
 		}
 
-		if (expr->ebin.op == AST_OP_FIELD) {
-			if (expr->ebin.r->kind == AST_METHOD_CALL) {
+		if (expr->as.ebin.op == AST_OP_FIELD) {
+			if (expr->as.ebin.r->kind == AST_METHOD_CALL) {
 				/* Auto-referencing */
 
 				if (lt.kind == TYPE_STRUCT) {
@@ -272,14 +272,14 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 
 					Type ct = {
 						.kind = TYPE_POINTER,
-						.pointer.base = nt,
+						.as.pointer.base = nt,
 					};
 
-					expr->ebin.l = new(AST_Node,
+					expr->as.ebin.l = new(AST_Node,
 						.kind = AST_UN_EXP,
-						.eun.op = AST_OP_REF,
-						.eun.v = expr->ebin.l,
-						.eun.type = ct,
+						.as.eun.op = AST_OP_REF,
+						.as.eun.v = expr->as.ebin.l,
+						.as.eun.type = ct,
 					);
 
 					lt = ct;
@@ -289,71 +289,71 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 							goto no_err;
 					}
 					
-					throw_error(expr->ebin.l->loc, "struct expected");
+					throw_error(expr->as.ebin.l->loc, "struct expected");
 					no_err:;
 				}
 
-				da_foreach (Member, member, &lt.pointer.base->user->ustruct.members) {
+				da_foreach (Member, member, &lt.as.pointer.base->as.user->as.ustruct.members) {
 					if (member->kind == MBR_METHOD) {
-						if (strcmp(expr->ebin.r->method_call.id,
-								member->as.method.func->func_def.id) == 0) {
+						if (strcmp(expr->as.ebin.r->as.method_call.id,
+								member->as.method.func->as.func_def.id) == 0) {
 							AST_Node *func    = member->as.method.func;
-							AST_Node *metCall = expr->ebin.r;
+							AST_Node *metCall = expr->as.ebin.r;
 
 							/* Method call types checking */
 
-							if (func->func_def.args.count != metCall->method_call.args.count) {
+							if (func->as.func_def.args.count != metCall->as.method_call.args.count) {
 								throw_error(metCall->loc, "arguments count mismatching");
 							}
 
-							for (size_t i = 1; i < func->func_def.args.count; i++) {
-								Type req_type = func->func_def.args.items[i]->func_def_arg.type;
-								AST_Node *arg = metCall->method_call.args.items[i];
+							for (size_t i = 1; i < func->as.func_def.args.count; i++) {
+								Type req_type = func->as.func_def.args.items[i]->as.func_def_arg.type;
+								AST_Node *arg = metCall->as.method_call.args.items[i];
 								expr_analysis(p, arg, &req_type);
 
 								if (!compare_types(req_type, parser_get_type(p, arg))) {
 									throw_error(
-										metCall->method_call.args.items[i]->loc,
+										metCall->as.method_call.args.items[i]->loc,
 										"types mismatching");
 								}
 							}
 
-							/* Passing the struct pointer to the method */
+							/* Passing the struct as.pointer to the method */
 
-							expr->ebin.type = func->func_def.type;
+							expr->as.ebin.type = func->as.func_def.type;
 
-							metCall->method_call.struct_name = lt.pointer.base->user->id;
-							metCall->method_call.args.items[0] = expr->ebin.l;
-							metCall->method_call.type = expr->ebin.type;
+							metCall->as.method_call.struct_name = lt.as.pointer.base->as.user->id;
+							metCall->as.method_call.args.items[0] = expr->as.ebin.l;
+							metCall->as.method_call.type = expr->as.ebin.type;
 
-							return expr->ebin.type;
+							return expr->as.ebin.type;
 						}
 					}
 				}
 
-				throw_error(expr->ebin.l->loc, "no such method");
+				throw_error(expr->as.ebin.l->loc, "no such method");
 			} else {
 				/* Auto-dereferencing */
 
 				if (lt.kind == TYPE_POINTER) {
-					expr->ebin.l = new(AST_Node,
+					expr->as.ebin.l = new(AST_Node,
 						.kind = AST_UN_EXP,
-						.eun.op = AST_OP_DEREF,
-						.eun.v = expr->ebin.l,
-						.eun.type = *lt.pointer.base,
+						.as.eun.op = AST_OP_DEREF,
+						.as.eun.v = expr->as.ebin.l,
+						.as.eun.type = *lt.as.pointer.base,
 					);
 
-					lt = *lt.pointer.base;
+					lt = *lt.as.pointer.base;
 				}
 
 				if (lt.kind != TYPE_STRUCT)
 					throw_error(expr->loc, "struct expected");
 
-				da_foreach (Member, member, &lt.user->ustruct.members) {
+				da_foreach (Member, member, &lt.as.user->as.ustruct.members) {
 					if (member->kind == MBR_FIELD) {
-						if (strcmp(expr->ebin.r->vid.id,
+						if (strcmp(expr->as.ebin.r->as.vid.id,
 								member->as.field.id) == 0) {
-							expr->ebin.type = member->as.field.type;
+							expr->as.ebin.type = member->as.field.type;
 							return member->as.field.type;
 						}
 					}
@@ -363,73 +363,73 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 			}
 		}
 
-		Type rt = expr_analysis(p, expr->ebin.r, vart);
-		expr->ebin.type = lt;
+		Type rt = expr_analysis(p, expr->as.ebin.r, vart);
+		expr->as.ebin.type = lt;
 
-		if (is_pointer(lt) && is_pointer(rt) && expr->ebin.op == AST_OP_SUB) {
-			expr->ebin.type = (Type){.kind = TYPE_IPTR};
+		if (is_pointer(lt) && is_pointer(rt) && expr->as.ebin.op == AST_OP_SUB) {
+			expr->as.ebin.type = (Type){.kind = TYPE_IPTR};
 		} else if ((lt.kind == TYPE_IPTR && is_pointer(rt)) ||
 			(is_pointer(lt) && rt.kind == TYPE_IPTR) ||
 			(lt.kind == TYPE_UPTR && is_pointer(rt)) ||
 			(is_pointer(lt) && rt.kind == TYPE_UPTR)) {
 			Type ptr_type = is_pointer(lt) ? lt : rt;
-			expr->ebin.type = (Type) {
+			expr->as.ebin.type = (Type) {
 				.kind = TYPE_POINTER,
-				.pointer.base = get_pointer_base(ptr_type)
+				.as.pointer.base = get_pointer_base(ptr_type)
 			};
 		} else if (!compare_types(lt, rt)) {
-			AST_Node *le = expr->ebin.l, *re = expr->ebin.r;
+			AST_Node *le = expr->as.ebin.l, *re = expr->as.ebin.r;
 			if ((le->kind == AST_LITERAL || re->kind == AST_LITERAL) &&
 				(type_is_int(lt) && type_is_int(rt))) {
 				AST_Node *lit     = le->kind == AST_LITERAL ? le : re;
 				AST_Node *not_lit = le->kind != AST_LITERAL ? le : re;
-				lit->literal.type = parser_get_type(p, not_lit);
+				lit->as.literal.type = parser_get_type(p, not_lit);
 			} else throw_error(expr->loc, "operation on different types");
 		}
 
-		switch (expr->ebin.op) {
+		switch (expr->as.ebin.op) {
 		case AST_OP_EQ: case AST_OP_NOT_EQ:
 		case AST_OP_LESS_EQ: case AST_OP_GREAT_EQ:
 		case AST_OP_GREAT: case AST_OP_LESS:
-			expr->ebin.type.kind = TYPE_BOOL;
+			expr->as.ebin.type.kind = TYPE_BOOL;
 		default:;
 		}
 
-		if (expr->ebin.op == AST_OP_ARR)
-			expr->ebin.type = *expr->ebin.type.pointer.base;
+		if (expr->as.ebin.op == AST_OP_ARR)
+			expr->as.ebin.type = *expr->as.ebin.type.as.pointer.base;
 
-		return expr->ebin.type;
+		return expr->as.ebin.type;
 	} break;
 
 	case AST_UN_EXP: {
-		switch (expr->eun.op) {
+		switch (expr->as.eun.op) {
 		case AST_OP_SIZEOF: {
-			expr_analysis(p, expr->eun.v, NULL);
+			expr_analysis(p, expr->as.eun.v, NULL);
 		} break;
 
 		case AST_OP_CAST: {
-			expr_analysis(p, expr->eun.v, &expr->eun.type);
+			expr_analysis(p, expr->as.eun.v, &expr->as.eun.type);
 		} break;
 
 		case AST_OP_REF: {
-			Type vt = expr_analysis(p, expr->eun.v, vart);
+			Type vt = expr_analysis(p, expr->as.eun.v, vart);
 			Type *base = malloc(sizeof(Type)); *base = vt;
-			expr->eun.type = (Type) {.kind = TYPE_POINTER, .pointer.base = base};
+			expr->as.eun.type = (Type) {.kind = TYPE_POINTER, .as.pointer.base = base};
 		} break;
 
 		case AST_OP_DEREF: {
-			Type vt = expr_analysis(p, expr->eun.v, vart);
-			expr->eun.type = vt;
+			Type vt = expr_analysis(p, expr->as.eun.v, vart);
+			expr->as.eun.type = vt;
 			if (!is_pointer(vt))
-				throw_error(expr->eun.v->loc, "pointer expected");
-			expr->eun.type = *vt.pointer.base;
+				throw_error(expr->as.eun.v->loc, "as.pointer expected");
+			expr->as.eun.type = *vt.as.pointer.base;
 		} break;
 
 		default:
-			expr->eun.type = expr_analysis(p, expr->eun.v, vart);
+			expr->as.eun.type = expr_analysis(p, expr->as.eun.v, vart);
 		}
 
-		return expr->eun.type;
+		return expr->as.eun.type;
 	} break;
 
 	default:
@@ -493,7 +493,7 @@ AST_Node *parse_array(Parser *p) {
 
 	while (peek(p).kind != TOK_CBRA) {
 		AST_Node *expr = parse_expr(p, EXPAR_ARRAY, NULL);
-		da_append(&al->array, expr);
+		da_append(&al->as.array, expr);
 		next(p);
 
 		if (peek(p).kind == TOK_COM) next(p);
@@ -559,7 +559,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				if (nodes.count > 0) {
 					if (
 						da_last(&nodes)->kind    == AST_BIN_EXP  &&
-						da_last(&nodes)->ebin.op == AST_OP_FIELD
+						da_last(&nodes)->as.ebin.op == AST_OP_FIELD
 					) {
 						da_append(&nodes, parse_method_call(p));
 						p->cur_token--;
@@ -574,8 +574,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				da_append(&nodes, new(AST_Node,
 					.kind = AST_VID,
 					.loc = peek(p).loc,
-					.vid.id = peek(p).data,
-					.vid.uid = var ? var->variable.uid : 0,
+					.as.vid.id = peek(p).data,
+					.as.vid.uid = var ? var->variable.uid : 0,
 				));
 				
 			}
@@ -584,9 +584,9 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 		case TOK_INT:
 			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
-				.literal.kind = LIT_INT,
+				.as.literal.kind = LIT_INT,
 				.loc = peek(p).loc,
-				.literal.lint = parse_int(peek(p).data),
+				.as.literal.as.lint = parse_int(peek(p).data),
 			));
 			break;
 
@@ -594,8 +594,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
 				.loc = peek(p).loc,
-				.literal.kind = LIT_BOOL,
-				.literal.lint = 1,
+				.as.literal.kind = LIT_BOOL,
+				.as.literal.as.lint = 1,
 			));
 			break;
 
@@ -606,8 +606,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 		case TOK_FALSE:
 			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
-				.literal.kind = LIT_BOOL,
-				.literal.lint = 0,
+				.as.literal.kind = LIT_BOOL,
+				.as.literal.as.lint = 0,
 			));
 			break;
 
@@ -616,11 +616,11 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			*u0 = (Type) {.kind = TYPE_NULL};
 			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
-				.literal.kind = LIT_INT,
-				.literal.lint = 0,
-				.literal.type = (Type) {
+				.as.literal.kind = LIT_INT,
+				.as.literal.as.lint = 0,
+				.as.literal.type = (Type) {
 					.kind = TYPE_POINTER,
-					.pointer.base = u0
+					.as.pointer.base = u0
 				},
 			));
 		} break;
@@ -629,8 +629,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
 				.loc = peek(p).loc,
-				.literal.kind = LIT_STR,
-				.literal.str = peek(p).data,
+				.as.literal.kind = LIT_STR,
+				.as.literal.as.str = peek(p).data,
 			));
 			break;
 
@@ -638,16 +638,16 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
 				.loc = peek(p).loc,
-				.literal.kind = LIT_CHAR,
-				.literal.lint = peek(p).data[0],
+				.as.literal.kind = LIT_CHAR,
+				.as.literal.as.lint = peek(p).data[0],
 			));
 			break;
 
 		case TOK_FLOAT:
 			da_append(&nodes, new(AST_Node,
 				.kind = AST_LITERAL,
-				.literal.kind = LIT_FLOAT,
-				.literal.lfloat = parse_float(peek(p).data),
+				.as.literal.kind = LIT_FLOAT,
+				.as.literal.as.lfloat = parse_float(peek(p).data),
 			));
 			break;
 
@@ -656,9 +656,9 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			da_append(&nodes, new(AST_Node,
 				.kind = AST_UN_EXP,
 				.loc = peek(p).loc,
-				.eun.type = t,
-				.eun.op = AST_OP_CAST,
-				.eun.v = NULL,
+				.as.eun.type = t,
+				.as.eun.op = AST_OP_CAST,
+				.as.eun.v = NULL,
 			));
 		} break;
 
@@ -667,20 +667,20 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				da_append(&nodes, new(AST_Node,
 					.kind = AST_UN_EXP,
 					.loc = peek(p).loc,
-					.eun.op = get_un_op(next(p)),
-					.eun.type = TUPTR,
-					.eun.v = new(AST_Node,
+					.as.eun.op = get_un_op(next(p)),
+					.as.eun.type = TUPTR,
+					.as.eun.v = new(AST_Node,
 						.kind = AST_LITERAL,
-						.literal.type = *parse_type(p),
+						.as.literal.type = *parse_type(p),
 					),
 				));
 			} else {
 				da_append(&nodes, new(AST_Node,
 					.kind = AST_UN_EXP,
 					.loc = peek(p).loc,
-					.eun.op = get_un_op(peek(p)),
-					.eun.type = TUPTR,
-					.eun.v = NULL,
+					.as.eun.op = get_un_op(peek(p)),
+					.as.eun.type = TUPTR,
+					.as.eun.v = NULL,
 				));
 			}
 			break;
@@ -689,8 +689,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			da_append(&nodes, new(AST_Node,
 				.kind = AST_UN_EXP,
 				.loc = peek(p).loc,
-				.eun.op = get_un_op(peek(p)),
-				.eun.v = NULL,
+				.as.eun.op = get_un_op(peek(p)),
+				.as.eun.v = NULL,
 			));
 			break;
 
@@ -698,9 +698,9 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			da_append(&nodes, new(AST_Node,
 				.kind = AST_BIN_EXP,
 				.loc = peek(p).loc,
-				.ebin.op = get_bin_op(peek(p)),
-				.ebin.l = NULL,
-				.ebin.r = NULL
+				.as.ebin.op = get_bin_op(peek(p)),
+				.as.ebin.l = NULL,
+				.as.ebin.r = NULL
 			));
 			next(p);
 			da_append(&nodes, parse_expr(p, EXPAR_SQBRA, &TUPTR));
@@ -722,9 +722,9 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 			da_append(&nodes, new(AST_Node,
 				.kind = AST_BIN_EXP,
 				.loc = peek(p).loc,
-				.ebin.op = get_bin_op(peek(p)),
-				.ebin.l = NULL,
-				.ebin.r = NULL
+				.as.ebin.op = get_bin_op(peek(p)),
+				.as.ebin.l = NULL,
+				.as.ebin.r = NULL
 			));
 		} break;
 
@@ -738,8 +738,8 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 					is_unary_op = false;
 				} else {
 					bool isBinOp = da_last(&nodes)->kind == AST_BIN_EXP;
-					if (isBinOp && da_last(&nodes)->ebin.l &&
-						da_last(&nodes)->ebin.r) isBinOp = false;
+					if (isBinOp && da_last(&nodes)->as.ebin.l &&
+						da_last(&nodes)->as.ebin.r) isBinOp = false;
 					if (isBinOp) is_unary_op = true;
 				}
 			}
@@ -748,16 +748,16 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 				da_append(&nodes, new(AST_Node,
 					.kind = AST_BIN_EXP,
 					.loc = peek(p).loc,
-					.ebin.op = get_bin_op(peek(p)),
-					.ebin.l = NULL,
-					.ebin.r = NULL
+					.as.ebin.op = get_bin_op(peek(p)),
+					.as.ebin.l = NULL,
+					.as.ebin.r = NULL
 				));
 			} else {
 				da_append(&nodes, new(AST_Node,
 					.kind = AST_UN_EXP,
 					.loc = peek(p).loc,
-					.eun.op = get_un_op(peek(p)),
-					.eun.v = NULL,
+					.as.eun.op = get_un_op(peek(p)),
+					.as.eun.v = NULL,
 				));
 			}
 		} break;
@@ -769,7 +769,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 		next(p);
 	}
 
-done:
+done:;
 	AST_Node *expr = expr_expand(&nodes);
 	if (expr) expr_analysis(p, expr, vart);
 	da_free(&nodes);

@@ -91,7 +91,7 @@ Lexer *get_lexer(PreprocCtx *p, char *file, bool *isImported) {
 				return NULL;
 			}
 
-			Lexer *newLexer = new(Lexer);
+			Lexer *newLexer = new(Lexer, 0);
 			*newLexer = lexer_lex(path.items, code);
 			return newLexer;
 		}
@@ -155,7 +155,7 @@ bool insert_macro(PreprocCtx *p) {
 		}
 		break;
 
-	case MACRO_FUNC:
+	case MACRO_FUNC:;
 		DA(Tokens) args = {0};
 		size_t savedInd = p->cur_tok;
 

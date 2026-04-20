@@ -1,5 +1,5 @@
 CC ?= gcc
-CFLAGS ?= -std=c99 -D_GNU_SOURCE
+CFLAGS ?= -std=c99 -pedantic -D_GNU_SOURCE
 SRCS := \
 src/main.c \
 src/preprocessor.c \

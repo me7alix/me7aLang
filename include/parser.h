@@ -36,8 +36,8 @@ typedef struct Literal {
 		u8 lbool;
 		char *str;
 		DA(struct Literal) array;
-		char bytes[0];
-	};
+		char bytes[1];
+	} as;
 } Literal;
 
 typedef enum {
@@ -94,7 +94,6 @@ typedef enum {
 	AST_METHOD_CALL, AST_ARRAY,
 } AST_NodeKind;
 
-typedef struct AST_Node AST_Node;
 typedef DA(AST_Node*) AST_Nodes;
 
 struct AST_Node {
@@ -187,7 +186,7 @@ struct AST_Node {
 		AST_Node *func_ret_exp;
 		Literal literal;
 		Type vtype;
-	};
+	} as;
 };
 
 typedef enum {
@@ -195,7 +194,7 @@ typedef enum {
 	SBL_FUNC_DEF,
 	SBL_FUNC_EXTERN,
 	SBL_FUNC_EX_USED,
-} SymbolType;
+} SymbolKind;
 
 typedef union {
 	struct {
@@ -214,7 +213,7 @@ typedef union {
 	} variable;
 } Symbol;
 
-typedef struct { SymbolType type; char *id; } SymbolKey;
+typedef struct { SymbolKind kind; char *id; } SymbolKey;
 HT_DECL(SymbolTable, SymbolKey, Symbol)
 typedef DA(SymbolTable) SymbolScopeStack;
 

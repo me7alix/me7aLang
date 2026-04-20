@@ -25,6 +25,7 @@ typedef enum {
 	TYPE_STRUCT,
 } TypeKind;
 
+typedef struct AST_Node AST_Node;
 typedef struct UserType UserType;
 typedef struct Struct Struct;
 typedef struct Type Type;
@@ -45,10 +46,8 @@ struct Type {
 			Type *ret;
 		} func;
 		UserType *user;
-	};
+	} as;
 };
-
-typedef struct AST_Node AST_Node;
 
 typedef struct {
 	enum {
@@ -75,13 +74,13 @@ struct UserType {
 		struct {
 			DA(Member) members;
 		} ustruct;
-	};
+	} as;
 };
 
 HT_DECL_STR(UserTypes, UserType*)
 
 #define is_pointer(t) ((t).kind == TYPE_ARRAY || (t).kind == TYPE_POINTER)
-#define get_pointer_base(t) ((t).kind == TYPE_POINTER ? (t).pointer.base : (t).array.elem)
+#define get_pointer_base(t) ((t).kind == TYPE_POINTER ? (t).as.pointer.base : (t).as.array.elem)
 
 static bool compare_types(Type a, Type b) {
 	if (is_pointer(a) && is_pointer(b)) {
@@ -91,10 +90,10 @@ static bool compare_types(Type a, Type b) {
 			get_pointer_base(b)->kind == TYPE_NULL)
 		) return false;
 	} else if (a.kind == TYPE_FUNCTION && b.kind == TYPE_FUNCTION) {
-		if (!compare_types(*a.func.ret, *b.func.ret)) return false;
-		if (a.func.args.count != b.func.args.count)   return false;
-		for (size_t i = 0; i < a.func.args.count; i++) {
-			if (!compare_types(a.func.args.items[i], b.func.args.items[i])) {
+		if (!compare_types(*a.as.func.ret, *b.as.func.ret)) return false;
+		if (a.as.func.args.count != b.as.func.args.count)   return false;
+		for (size_t i = 0; i < a.as.func.args.count; i++) {
+			if (!compare_types(a.as.func.args.items[i], b.as.func.args.items[i])) {
 				return false;
 			}
 		}
