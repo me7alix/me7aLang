@@ -41,6 +41,14 @@ typedef enum {
 } TAC_VarKind;
 
 typedef struct {
+	bool to_spill;
+	uint start;
+	uint end;
+} TAC_VarInterval;
+
+HT_DECL(TAC_VarIntervals, uint, TAC_VarInterval)
+
+typedef struct {
 	TAC_OperandKind kind;
 
 	union {
@@ -86,6 +94,7 @@ typedef struct {
 	Type ret_type;
 	DA(TAC_FuncArg) args;
 	DA(TAC_Instruction) body;
+	TAC_VarIntervals var_ints;
 } TAC_Func;
 
 typedef struct {

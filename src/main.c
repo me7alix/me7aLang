@@ -9,7 +9,7 @@
 #include "../include/tac_ir.h"
 
 // codegens
-#include "./codegen/amd64-nasm.c"
+#include "./codegen/nasm_amd64.c"
 
 #if defined(_WIN32)
 TargetPlatform tp = TP_WINDOWS;

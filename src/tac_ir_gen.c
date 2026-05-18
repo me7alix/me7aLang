@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <limits.h>
 
 #include "../include/tac_ir.h"
 #include "../include/parser.h"
@@ -14,11 +15,49 @@ uint label_id = 1;
 
 HT_DECL(ASTVarTable, uint, TAC_Operand)
 HT_IMPL_NUM(ASTVarTable, uint, TAC_Operand)
+HT_IMPL_NUM(TAC_VarIntervals, uint, TAC_VarInterval)
 
+TAC_VarIntervals vit = {0};
 ASTVarTable avt = {0};
 
 static Type TUPTR = {.kind = TYPE_UPTR};
 static TAC_Operand NULL_OPR = {.kind = OPR_NULL};
+
+static void calc_var_interval(TAC_Func *func, size_t idx, TAC_Operand opr) {
+	if (
+		opr.as.var.kind == VAR_STACK ||
+		opr.as.var.kind == VAR_ADDR  &&
+		opr.as.var.addr_kind == VAR_STACK
+	) {
+		TAC_VarInterval *inter = TAC_VarIntervals_get(
+			&func->var_ints,
+			opr.as.var.addr_id);
+
+		if (!inter) {
+			TAC_VarIntervals_add(
+				&func->var_ints,
+				opr.as.var.addr_id,
+				(TAC_VarInterval){0});
+
+			inter = TAC_VarIntervals_get(
+				&func->var_ints,
+				opr.as.var.addr_id);
+
+			inter->to_spill = false;
+			inter->start = INT_MAX;
+		}
+
+		if (inter->start > idx) inter->start = idx;
+		if (inter->end   < idx) inter->end   = idx;
+	}
+}
+
+static void calc_inst_intervals(TAC_Func *func, TAC_Instruction *inst, size_t idx) {
+	calc_var_interval(func, idx, inst->dst);
+	for (size_t i = 0; i < 16; i++) {
+		calc_var_interval(func, idx, inst->args[i]);
+	}
+}
 
 Type tac_ir_get_opr_type(TAC_Operand op) {
 	switch (op.kind) {
@@ -50,7 +89,7 @@ Type tac_ir_get_opr_type(TAC_Operand op) {
 	case OPR_FUNC_INP: return op.as.func_inp.type;
 	case OPR_FUNC_RET: return op.as.func_ret.type;
 	case OPR_SIZEOF:   return TUPTR;
-	default: UNREACHABLE; return (Type) {0};
+	default: UNREACHABLE; return (Type){0};
 	}
 }
 
@@ -171,8 +210,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 	case AST_METHOD_CALL: {
 		tac_ir_gen_method_call(prog, func, en);
 
-		if (ctx->is_met_call_gen)
-			break;
+		if (ctx->is_met_call_gen) break;
 
 		TAC_Operand res = {
 			.kind = OPR_FUNC_RET,
@@ -318,7 +356,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 
 				if (expr_ast_op != AST_OP_SUB) {
 					TAC_Instruction sf = {
-						.op   = OP_MUL,
+						.op = OP_MUL,
 						.args[0] = not_ptr,
 						.args[1] = (TAC_Operand) {
 							.kind = OPR_SIZEOF,
@@ -366,7 +404,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			} else if (is_pointer(lt) && is_pointer(rt)) {
 				if (expr_ast_op == AST_OP_SUB) {
 					TAC_Instruction sf = {
-						.op   = OP_DIV,
+						.op = OP_DIV,
 						.args[0] = inst.dst,
 						.args[1] = (TAC_Operand) {
 							.kind = OPR_SIZEOF,
@@ -412,12 +450,9 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			return tac_ir_gen_deref(ctx, func, en->as.eun.type, arg);
 		}
 
-		TAC_Operand arg = tac_ir_gen_expr(ctx, prog, func, en->as.eun.v);
-
-		TAC_Operand ret;
-		if (tac_ir_opr_calc(en, arg, (TAC_Operand){0}, &ret)) {
+		TAC_Operand ret, arg = tac_ir_gen_expr(ctx, prog, func, en->as.eun.v);
+		if (tac_ir_opr_calc(en, arg, (TAC_Operand){0}, &ret))
 			return ret;
-		}
 
 		TAC_Instruction inst = {
 			.args[0] = arg,
@@ -461,30 +496,27 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->as.var_def.expr);
 
 	if (ctx.last_var == 0) {
-		da_append(&func->body, ((TAC_Instruction){
+		TAC_Instruction inst = {
 			.op = OP_ASSIGN,
 			.args[0] = res,
 			.dst = (TAC_Operand) {
 				.kind = OPR_VAR,
 				.as.var.kind = VAR_STACK,
 				.as.var.type = cn->as.var_def.type,
-				.as.var.addr_id = var_id,
+				.as.var.addr_id = var_id++,
 			},
-		}));
+		};
 
-		ASTVarTable_add(&avt, cn->as.var_def.uid, (TAC_Operand) {
-			.kind = OPR_VAR,
-			.as.var.kind = VAR_STACK,
-			.as.var.type = cn->as.var_def.type,
-			.as.var.addr_id = var_id++
-		});
+		da_append(&func->body, inst);
+		ASTVarTable_add(&avt, cn->as.var_def.uid, inst.dst);
 	} else {
-		ASTVarTable_add(&avt, cn->as.var_def.uid, (TAC_Operand) {
+		TAC_Operand opr = {
 			.kind = OPR_VAR,
 			.as.var.kind = VAR_STACK,
 			.as.var.type = cn->as.var_def.type,
 			.as.var.addr_id = ctx.last_var,
-		});
+		};
+		ASTVarTable_add(&avt, cn->as.var_def.uid, opr);
 	}
 
 	if (cn->as.var_def.expr)
@@ -518,6 +550,8 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 				},
 			};
 
+			da_append(&func->body, mult);
+
 			TAC_Instruction add = {
 				.op = OP_ADD,
 				.args[0] = addr,
@@ -530,14 +564,15 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 				},
 			};
 
-			da_append(&func->body, mult);
 			da_append(&func->body, add);
 
-			da_append(&func->body, ((TAC_Instruction){
+			TAC_Instruction asg = {
 				.op = OP_ASSIGN,
 				.args[0] = tac_ir_gen_expr(&ctx2, prog, func, cn->as.var_def.expr->as.array.items[i]),
 				.dst = tac_ir_gen_deref(&ctx, func, base_type, add.dst),
-			}));
+			};
+
+			da_append(&func->body, asg);
 		}
 	}
 }
@@ -580,17 +615,22 @@ void tac_ir_gen_var_mut(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 		};
 
 		da_append(&func->body, op_eq_res);
-		da_append(&func->body, ((TAC_Instruction){
+
+		TAC_Instruction asg = {
 			.op = OP_ASSIGN,
 			.args[0] = op_eq_res.dst,
 			.dst = dst,
-		}));
+		};
+
+		da_append(&func->body, asg);
 	} else {
-		da_append(&func->body, ((TAC_Instruction){
+		TAC_Instruction inst = {
 			.op = OP_ASSIGN,
 			.args[0] = res,
 			.dst = dst,
-		}));
+		};
+
+		da_append(&func->body, inst);
 	}
 }
 
@@ -652,14 +692,16 @@ void tac_ir_gen_if_chain(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, A
 	uint label_start = label_id++;
 	uint label_end = label_id++;
 
-	da_append(&func->body, ((TAC_Instruction){
+	TAC_Instruction inst = {
 		.op = OP_JUMP_IF_NOT,
 		.args[0] = res,
 		.dst = (TAC_Operand) {
 			.kind = OPR_LABEL,
 			.as.label_id = label_start,
 		},
-	}));
+	};
+
+	da_append(&func->body, inst);
 
 	tac_ir_gen_body(ctx, prog, func, cn->as.stmt_if.body);
 
@@ -731,15 +773,17 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 					.args[0] = res,
 				}));
 				break;
-			case OPR_VAR:
-				da_append(&func->body, ((TAC_Instruction){
+			case OPR_VAR:;
+				TAC_Instruction inst = {
 					.op = OP_RETURN,
 					.args[0] = (TAC_Operand) {
 						.kind = OPR_VAR,
 						.as.var.type = cn->as.func_ret.type,
 						.as.var.addr_id = res.as.var.addr_id,
 					},
-				}));
+				};
+
+				da_append(&func->body, inst);
 				break;
 			default:
 				UNREACHABLE;
@@ -790,14 +834,16 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 			IRGenExprCtx ectx = {0};
 			TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->as.stmt_while.expr);
 
-			da_append(&func->body, ((TAC_Instruction){
+			TAC_Instruction jin = {
 				.op = OP_JUMP_IF_NOT,
 				.args[0] = res,
 				.dst = (TAC_Operand) {
 					.kind = OPR_LABEL,
 					.as.label_id = ctx->label_end,
 				},
-			}));
+			};
+
+			da_append(&func->body, jin);
 
 			tac_ir_gen_body(ctx, prog, func, cn->as.stmt_while.body);
 
@@ -848,14 +894,16 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 			IRGenExprCtx ectx = {0};
 			TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->as.stmt_for.expr);
 
-			da_append(&func->body, ((TAC_Instruction){
+			TAC_Instruction jin = {
 				.op = OP_JUMP_IF_NOT,
 				.args[0] = res,
 				.dst = (TAC_Operand) {
 					.kind = OPR_LABEL,
 					.as.label_id = ctx->label_end,
 				},
-			}));
+			};
+
+			da_append(&func->body, jin);
 
 			ctx->for_var_mut = cn->as.stmt_for.mut;
 			tac_ir_gen_body(ctx, prog, func, cn->as.stmt_for.body);
@@ -899,7 +947,7 @@ void tac_ir_gen_func(TAC_Program *prog, AST_Node *fn) {
 
 	for (size_t i = 0; i < fn->as.func_def.args.count; i++) {
 		AST_Node *cn = da_get(&fn->as.func_def.args, i);
-		da_append(&func.body, ((TAC_Instruction) {
+		TAC_Instruction inst = {
 			.op = OP_ASSIGN,
 			.args[0] = (TAC_Operand) {
 				.kind = OPR_FUNC_INP,
@@ -908,16 +956,14 @@ void tac_ir_gen_func(TAC_Program *prog, AST_Node *fn) {
 			},
 			.dst = (TAC_Operand) {
 				.kind = OPR_VAR,
+				.as.var.kind = VAR_STACK,
 				.as.var.type = cn->as.func_def_arg.type,
-				.as.var.addr_id = var_id,
+				.as.var.addr_id = var_id++,
 			},
-		}));
-		ASTVarTable_add(&avt, cn->as.func_def_arg.uid, (TAC_Operand) {
-			.kind = OPR_VAR,
-			.as.var.kind = VAR_STACK,
-			.as.var.type = cn->as.func_def_arg.type,
-			.as.var.addr_id = var_id++
-		});
+		};
+
+		da_append(&func.body, inst);
+		ASTVarTable_add(&avt, cn->as.func_def_arg.uid, inst.dst);
 	}
 
 	IRGenBodyCtx bctx = {0};
@@ -925,16 +971,78 @@ void tac_ir_gen_func(TAC_Program *prog, AST_Node *fn) {
 	da_append(&prog->funcs, func);
 }
 
+typedef struct {
+	uint start, end;
+} Interval;
+
+void tac_ir_gen_calc_inters(TAC_Program *prog) {
+	da_foreach (TAC_Func, func, &prog->funcs) {
+		static DA(size_t) func_calls = {0};
+		da_reset(&func_calls);
+		static DA(uint) ref_vars = {0};
+		da_reset(&ref_vars);
+		static DA(Interval) loop_ints = {0};
+		da_reset(&loop_ints);
+
+		for (size_t i = 0; i < func->body.count; i++) {
+			TAC_Instruction ci = func->body.items[i];
+			calc_inst_intervals(func, &ci, i);
+
+			switch (ci.op) {
+			case OP_JUMP_IF_NOT:
+				for (size_t j = i + 1; j < func->body.count; j++) {
+					bool loop_end_cond =
+						func->body.items[j].op == OP_LABEL &&
+						func->body.items[j].args[0].as.label_id == ci.dst.as.label_id &&
+						func->body.items[j - 1].op == OP_JUMP;
+					if (loop_end_cond) da_append(&loop_ints, ((Interval){i, j}));
+				}
+				break;
+			case OP_REF:
+				da_append(&ref_vars, ci.args[0].as.var.addr_id);
+				break;
+			case OP_FUNC_CALL:
+				da_append(&func_calls, i);
+			}
+		}
+
+		ht_foreach_node (TAC_VarIntervals, n, &func->var_ints) {
+			da_foreach (uint, ref_var, &ref_vars) {
+				if (n->key == *ref_var) {
+					n->val.to_spill = true;
+				}
+			}
+
+			da_foreach (size_t, func_call, &func_calls) {
+				if (n->val.start <= *func_call && n->val.end >= *func_call) {
+					n->val.to_spill = true;
+				}
+			}
+
+			da_foreach (Interval, loop_int, &loop_ints) {
+				if (n->val.start <= loop_int->end && n->val.end >= loop_int->start) {
+					if (
+						loop_int->end > n->val.end &&
+						!(n->val.start > loop_int->start && n->val.end < loop_int->end)
+					) {
+						n->val.end = loop_int->end;
+					}
+				}
+			}
+		}
+	}
+}
+
 TAC_Program tac_ir_gen_prog(Parser *p) {
 	TAC_Program prog = {0};
 	label_id = 0;
 
-	ht_foreach_node(UserTypes, kv, &p->ut) {
+	ht_foreach_node (UserTypes, kv, &p->ut) {
 		UserType *ut = kv->val;
 		if (ut->kind == TYPE_STRUCT) {
 			da_foreach (Member, member, &ut->as.ustruct.members) {
 				if (member->kind == MBR_METHOD) {
-					char *name = malloc(1 << 12);
+					char *name = malloc(1 << 10);
 					char *id = member->as.method.func->as.func_def.id;
 					sprintf(name, "method_%s_%s", ut->id, id);
 
@@ -994,7 +1102,7 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 			bool is_none = true;
 			Literal data = {0};
 
-			if (cn->as.var_def.expr) {
+			if (cn->as.var_def.expr && cn->as.var_def.type.kind != TYPE_STRUCT) {
 				is_none = false;
 				if (cn->as.var_def.expr->kind == AST_ARRAY) {
 					data.kind = LIT_ARR;
@@ -1030,5 +1138,6 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 		}
 	}
 
+	tac_ir_gen_calc_inters(&prog);
 	return prog;
 }

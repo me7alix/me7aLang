@@ -39,7 +39,7 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 	case OPR_FUNC_RET: sprintf(buf, "FR:%s",     tac_ir_dump_opr_type(opr)); break;
 	case OPR_NAME:     sprintf(buf, "\"%s\"",    opr.as.name);                  break;
 	case OPR_LABEL:    sprintf(buf, ".L%u",      opr.as.label_id);              break;
-	case OPR_FIELD:    sprintf(buf, ">%s",       opr.as.field_id);              break;	
+	case OPR_FIELD:    sprintf(buf, ">%s",       opr.as.field_id);              break;
 	case OPR_NULL:     sprintf(buf, "NULL");                                 break;
 
 	case OPR_VAR: {
@@ -153,8 +153,14 @@ void tac_ir_dump_inst(TAC_Instruction inst, char *res) {
 
 void ir_dump_func(TAC_Func func, FILE *fl) {
 	fprintf(fl, "%s:\n", func.name);
+
+	ht_foreach_node (TAC_VarIntervals, vi, &func.var_ints) {
+		fprintf(fl, "    | %u [%u %u]\n", vi->key, vi->val.start, vi->val.end);
+	}
+
 	for (size_t i = 0; i < func.body.count; i++) {
 		char res[256];
+		fprintf(fl, "%5zu:", i);
 		tac_ir_dump_inst(da_get(&func.body, i), res);
 		fprintf(fl, "%s\n", res);
 	}
