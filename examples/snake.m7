@@ -11,7 +11,6 @@ struct Vec2 {
 	y: int
 }
 
-
 strbuf:    [128]u8
 apple:     Vec2
 snake:     [MAP_SIZE]Vec2
