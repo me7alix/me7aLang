@@ -117,7 +117,7 @@ typedef struct {
 } TAC_Program;
 
 Type tac_ir_get_opr_type(TAC_Operand op);
-TAC_Program tac_ir_gen_prog(Parser *parser);
+TAC_Program tac_ir_gen_prog(Parser *parser, int opt_level);
 
 // tac_ir_dump
 void tac_ir_dump_opr(TAC_Operand opr, char *buf);

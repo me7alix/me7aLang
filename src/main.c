@@ -110,6 +110,8 @@ void print_usage() {
 		"  -o   Output file path\n"
 		"  -c   Compile to object file\n"
 		"  -lf  Linker flags\n"
+		"  -O0  Disable optimizations\n"
+		"  -O1  Enable basic optimizations\n"
 		"  -asm Save assembler output\n"
 		"  -ir  Save IR output\n");
 }
@@ -172,6 +174,7 @@ int main(int argc, char **argv) {
 	bool compile_to_obj    = false;
 	bool save_asm_output   = false;
 	bool save_ir_output    = false;
+	int  opt_level         = 1;
 
 	if (argc == 1) {
 		print_usage();
@@ -206,6 +209,18 @@ int main(int argc, char **argv) {
 			save_ir_output = true;
 		} else if (strcmp(argv[i], "-c") == 0) {
 			compile_to_obj = true;
+		} else if (strncmp(argv[i], "-O", 2) == 0) {
+			size_t arg_len = strlen(argv[i]);
+			if (arg_len > 3) {
+				fprintf(stderr, "invalid option %s\n", argv[i]);
+				return 1;
+			}
+
+			opt_level = argv[i][2] - '0';
+			if (opt_level < 0 || opt_level > 1) {
+				fprintf(stderr, "no such optimization level %s\n", argv[i]);
+				return 1;
+			}
 		} else if (
 			strcmp(argv[i], "-h") == 0 ||
 			strcmp(argv[i], "--help") == 0) {
@@ -256,13 +271,13 @@ int main(int argc, char **argv) {
 		entry_point = *preprocCtx.lexer;
 
 		Parser parser = parser_parse(entry_point.tokens.items);
-		TAC_Program prog = tac_ir_gen_prog(&parser);
+		TAC_Program prog = tac_ir_gen_prog(&parser, opt_level);
 		if (save_ir_output) {
 			sprintf(buf, "%s.ir", srcs.items[i]);
 			tac_ir_dump_prog(&prog, buf);
 		}
 
-		char *cg = nasm_gen_prog(&prog, tp);
+		char *cg = nasm_gen_prog(&prog, tp, opt_level);
 		sprintf(output_file, "%s.asm", srcs.items[i]);
 		write_to_file(output_file, cg);
 
@@ -317,7 +332,6 @@ int main(int argc, char **argv) {
 			da_foreach (char*, src, &srcs) {
 				systemf("rm %s.o", *src);
 			} break;
-
 		case TP_WINDOWS:
 			da_foreach (char*, src, &srcs) {
 				systemf("del /F /Q %s.obj", *src);

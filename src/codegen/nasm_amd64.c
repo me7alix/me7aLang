@@ -57,12 +57,14 @@ HT_IMPL_NUM(RegTable, uint, Register)
 OffTable stack_table = {0};
 OffTable data_table = {0};
 
+static int opt_level;
+TargetPlatform tp;
+
 // Function context
 DA(Register) free_regs;
 RegTable used_regs;
 TAC_VarIntervals var_ints;
 StringBuilder body = {0};
-TargetPlatform tp;
 uint total_offset;
 uint inst_idx;
 
@@ -355,15 +357,16 @@ void total_offset_add(uint off) {
 }
 
 void nasm_gen_new_var(TAC_Instruction ci, char *dst, OprKind *opr_kind) {
-	reg_allocator_free();
-
-	if (ci.dst.as.var.type.kind != TYPE_STRUCT) {
-		Register reg;
-		if (reg_allocator_push(ci.dst.as.var.addr_id, &reg)) {
-			if (opr_kind) *opr_kind = REG;
-			size_t row = get_reg_size(ci.dst.as.var.type);
-			sprintf(dst, "%s", reg_forms[reg][row]);
-			return;
+	if (opt_level > 0) {
+		reg_allocator_free();
+		if (ci.dst.as.var.type.kind != TYPE_STRUCT) {
+			Register reg;
+			if (reg_allocator_push(ci.dst.as.var.addr_id, &reg)) {
+				if (opr_kind) *opr_kind = REG;
+				size_t row = get_reg_size(ci.dst.as.var.type);
+				sprintf(dst, "%s", reg_forms[reg][row]);
+				return;
+			}
 		}
 	}
 
@@ -832,9 +835,10 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 	sb_appendf(code, "\n");
 }
 
-char *nasm_gen_prog(TAC_Program *prog, TargetPlatform tp) {
+char *nasm_gen_prog(TAC_Program *prog, TargetPlatform _tp, int _opt_level) {
 	StringBuilder code = {0};
-	tp = tp;
+	opt_level = _opt_level;
+	tp = _tp;
 
 	da_foreach(TAC_Extern, ext, &prog->externs)
 		sb_appendf(&code, "extern %s\n", ext->name);

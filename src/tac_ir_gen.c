@@ -20,10 +20,11 @@ HT_IMPL_NUM(TAC_VarIntervals, uint, TAC_VarInterval)
 TAC_VarIntervals vit = {0};
 ASTVarTable avt = {0};
 
+static int opt_level;
 static Type TUPTR = {.kind = TYPE_UPTR};
 static TAC_Operand NULL_OPR = {.kind = OPR_NULL};
 
-static void calc_var_interval(TAC_Func *func, size_t idx, TAC_Operand opr) {
+void calc_var_interval(TAC_Func *func, size_t idx, TAC_Operand opr) {
 	if (
 		opr.as.var.kind == VAR_STACK ||
 		opr.as.var.kind == VAR_ADDR  &&
@@ -52,7 +53,7 @@ static void calc_var_interval(TAC_Func *func, size_t idx, TAC_Operand opr) {
 	}
 }
 
-static void calc_inst_intervals(TAC_Func *func, TAC_Instruction *inst, size_t idx) {
+void calc_inst_intervals(TAC_Func *func, TAC_Instruction *inst, size_t idx) {
 	calc_var_interval(func, idx, inst->dst);
 	for (size_t i = 0; i < 16; i++) {
 		calc_var_interval(func, idx, inst->args[i]);
@@ -64,10 +65,8 @@ Type tac_ir_get_opr_type(TAC_Operand op) {
 	case OPR_VAR: {
 		if (op.as.var.type.kind == TYPE_STRUCT) {
 			Type res = op.as.var.type;
-
 			for (size_t i = 0; i < op.as.var.fields.count; i++) {
 				char *off = da_get(&op.as.var.fields, i);
-
 				da_foreach (Member, member, &op.as.var.type.as.user->as.ustruct.members) {
 					if (member->kind == MBR_FIELD) {
 						if (strcmp(member->as.field.id, off) == 0) {
@@ -78,10 +77,8 @@ Type tac_ir_get_opr_type(TAC_Operand op) {
 					}
 				}
 			}
-
 			return res;
 		}
-
 		return op.as.var.type;
 	} break;
 
@@ -273,9 +270,12 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			return l;
 		}
 
-		TAC_Operand ret;
-		if (tac_ir_opr_calc(en, l, r, &ret))
-			return ret;
+		if (opt_level > 0) {
+			TAC_Operand ret;
+			if (tac_ir_opr_calc(en, l, r, &ret)) {
+				return ret;
+			}
+		}
 
 		Type exp_type;
 		switch (en->as.ebin.op) {
@@ -451,8 +451,11 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		}
 
 		TAC_Operand ret, arg = tac_ir_gen_expr(ctx, prog, func, en->as.eun.v);
-		if (tac_ir_opr_calc(en, arg, (TAC_Operand){0}, &ret))
-			return ret;
+		if (opt_level > 0) {
+			if (tac_ir_opr_calc(en, arg, (TAC_Operand){0}, &ret)) {
+				return ret;
+			}
+		}
 
 		TAC_Instruction inst = {
 			.args[0] = arg,
@@ -580,8 +583,10 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 void tac_ir_gen_var_mut(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	IRGenExprCtx ctx = {0};
 
-	if (cn->as.var_mut.expr->kind == AST_BIN_EXP &&
-			cn->as.var_mut.expr->as.ebin.op == AST_OP_FIELD) {
+	if (
+		cn->as.var_mut.expr->kind == AST_BIN_EXP &&
+		cn->as.var_mut.expr->as.ebin.op == AST_OP_FIELD
+	) {
 		ctx.is_met_call_gen = true;
 		tac_ir_gen_expr(&ctx, prog, func, cn->as.var_mut.expr);
 		return;
@@ -1033,9 +1038,9 @@ void tac_ir_gen_calc_inters(TAC_Program *prog) {
 	}
 }
 
-TAC_Program tac_ir_gen_prog(Parser *p) {
+TAC_Program tac_ir_gen_prog(Parser *p, int _opt_level) {
 	TAC_Program prog = {0};
-	label_id = 0;
+	opt_level = _opt_level;
 
 	ht_foreach_node (UserTypes, kv, &p->ut) {
 		UserType *ut = kv->val;
@@ -1075,18 +1080,6 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 					.ret_type = n->val.func_def.type,
 				}));
 			}
-			break;
-		case SBL_VAR: break;
-			da_append(&prog.globals, ((TAC_GlobalVar){
-				.type = n->val.variable.type,
-				.index = data_id,
-			}));
-			ASTVarTable_add(&avt, n->val.variable.uid, (TAC_Operand){
-				.kind = OPR_VAR,
-				.as.var.kind = VAR_DATA,
-				.as.var.type = n->val.variable.type,
-				.as.var.addr_id = data_id++,
-			});
 		}
 	}
 
@@ -1138,6 +1131,7 @@ TAC_Program tac_ir_gen_prog(Parser *p) {
 		}
 	}
 
-	tac_ir_gen_calc_inters(&prog);
+	if (opt_level > 0)
+		tac_ir_gen_calc_inters(&prog);
 	return prog;
 }
