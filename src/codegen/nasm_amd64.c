@@ -214,12 +214,15 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 					Register reg = *RegTable_get(&used_regs, opr.as.var.addr_id);
 					sb_appendf(&body, "  mov rax, %s\n", reg_forms[reg][3]);
 				}
-				sprintf(rbuf, "%s[rax + %u]", ts, field_off);
+				if (field_off) sprintf(rbuf, "%s[rax + %u]", ts, field_off);
+				else           sprintf(rbuf, "%s[rax]", ts);
 			} else if (opr.as.var.addr_kind == VAR_DATA) {
-				sprintf(rbuf, "%s[rel D%u + %lu]", ts, opr.as.var.addr_id, field_off);
+				if (field_off) sprintf(rbuf, "%s[rel D%u + %lu]", ts, opr.as.var.addr_id, field_off);
+				else           sprintf(rbuf, "%s[rel D%u]", ts, opr.as.var.addr_id);
 			} else UNREACHABLE;
 		} else if (opr.as.var.kind == VAR_DATA) {
-			sprintf(rbuf, "%s[rel D%u + %u]", ts, opr.as.var.addr_id, field_off);
+			if (field_off) sprintf(rbuf, "%s[rel D%u + %u]", ts, opr.as.var.addr_id, field_off);
+			else           sprintf(rbuf, "%s[rel D%u]", ts, opr.as.var.addr_id);
 		}
 	} break;
 
