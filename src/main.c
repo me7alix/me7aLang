@@ -9,7 +9,7 @@
 #include "../include/tac_ir.h"
 
 // codegens
-#include "./codegen/nasm_amd64.c"
+char *nasm_gen_prog(TAC_Program *prog, TargetPlatform tp, int opt_lvl);
 
 #if defined(_WIN32)
 TargetPlatform tp = TP_WINDOWS;

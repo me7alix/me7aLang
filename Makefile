@@ -7,7 +7,8 @@ src/lexer.c \
 src/parser.c \
 src/parser_expr.c \
 src/tac_ir_dump.c \
-src/tac_ir_gen.c
+src/tac_ir_gen.c \
+src/codegen/nasm_amd64.c
 
 ifeq ($(OS),Windows_NT)
 EXE := .exe

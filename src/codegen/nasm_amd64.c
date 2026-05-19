@@ -58,7 +58,7 @@ OffTable stack_table = {0};
 OffTable data_table = {0};
 
 static int opt_level;
-TargetPlatform tp;
+static TargetPlatform tp;
 
 // Function context
 DA(Register) free_regs;
