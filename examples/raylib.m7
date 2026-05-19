@@ -1,28 +1,513 @@
-def rl_ColorGray   0xFF888888
-def rl_ColorBlack  0xFF000000
-def rl_ColorWhite  0xFFFFFFFF
-def rl_ColorRed    0xFF0000FF
-def rl_ColorGreen  0xFF00FF00
-def rl_ColorBlue   0xFFFF0000
-def rl_ColorYellow 0xFF00FFFF
-def rl_ColorPurple 0xFFFF00FF
+// struct Color (8 values)
+def GRAY 0xFF888888
+def BLACK 0xFF000000
+def WHITE 0xFFFFFFFF
+def RED 0xFF0000FF
+def GREEN 0xFF00FF00
+def BLUE 0xFFFF0000
+def YELLOW 0xFF00FFFF
+def PURPLE 0xFFFF00FF
+// enum ConfigFlags (16 values)
+def FLAG_VSYNC_HINT 64
+def FLAG_FULLSCREEN_MODE 2
+def FLAG_WINDOW_RESIZABLE 4
+def FLAG_WINDOW_UNDECORATED 8
+def FLAG_WINDOW_HIDDEN 128
+def FLAG_WINDOW_MINIMIZED 512
+def FLAG_WINDOW_MAXIMIZED 1024
+def FLAG_WINDOW_UNFOCUSED 2048
+def FLAG_WINDOW_TOPMOST 4096
+def FLAG_WINDOW_ALWAYS_RUN 256
+def FLAG_WINDOW_TRANSPARENT 16
+def FLAG_WINDOW_HIGHDPI 8192
+def FLAG_WINDOW_MOUSE_PASSTHROUGH 16384
+def FLAG_BORDERLESS_WINDOWED_MODE 32768
+def FLAG_MSAA_4X_HINT 32
+def FLAG_INTERLACED_HINT 65536
+// enum TraceLogLevel (8 values)
+def LOG_ALL 0
+def LOG_TRACE 1
+def LOG_DEBUG 2
+def LOG_INFO 3
+def LOG_WARNING 4
+def LOG_ERROR 5
+def LOG_FATAL 6
+def LOG_NONE 7
+// enum KeyboardKey (110 values)
+def KEY_NULL 0
+def KEY_APOSTROPHE 39
+def KEY_COMMA 44
+def KEY_MINUS 45
+def KEY_PERIOD 46
+def KEY_SLASH 47
+def KEY_ZERO 48
+def KEY_ONE 49
+def KEY_TWO 50
+def KEY_THREE 51
+def KEY_FOUR 52
+def KEY_FIVE 53
+def KEY_SIX 54
+def KEY_SEVEN 55
+def KEY_EIGHT 56
+def KEY_NINE 57
+def KEY_SEMICOLON 59
+def KEY_EQUAL 61
+def KEY_A 65
+def KEY_B 66
+def KEY_C 67
+def KEY_D 68
+def KEY_E 69
+def KEY_F 70
+def KEY_G 71
+def KEY_H 72
+def KEY_I 73
+def KEY_J 74
+def KEY_K 75
+def KEY_L 76
+def KEY_M 77
+def KEY_N 78
+def KEY_O 79
+def KEY_P 80
+def KEY_Q 81
+def KEY_R 82
+def KEY_S 83
+def KEY_T 84
+def KEY_U 85
+def KEY_V 86
+def KEY_W 87
+def KEY_X 88
+def KEY_Y 89
+def KEY_Z 90
+def KEY_LEFT_BRACKET 91
+def KEY_BACKSLASH 92
+def KEY_RIGHT_BRACKET 93
+def KEY_GRAVE 96
+def KEY_SPACE 32
+def KEY_ESCAPE 256
+def KEY_ENTER 257
+def KEY_TAB 258
+def KEY_BACKSPACE 259
+def KEY_INSERT 260
+def KEY_DELETE 261
+def KEY_RIGHT 262
+def KEY_LEFT 263
+def KEY_DOWN 264
+def KEY_UP 265
+def KEY_PAGE_UP 266
+def KEY_PAGE_DOWN 267
+def KEY_HOME 268
+def KEY_END 269
+def KEY_CAPS_LOCK 280
+def KEY_SCROLL_LOCK 281
+def KEY_NUM_LOCK 282
+def KEY_PRINT_SCREEN 283
+def KEY_PAUSE 284
+def KEY_F1 290
+def KEY_F2 291
+def KEY_F3 292
+def KEY_F4 293
+def KEY_F5 294
+def KEY_F6 295
+def KEY_F7 296
+def KEY_F8 297
+def KEY_F9 298
+def KEY_F10 299
+def KEY_F11 300
+def KEY_F12 301
+def KEY_LEFT_SHIFT 340
+def KEY_LEFT_CONTROL 341
+def KEY_LEFT_ALT 342
+def KEY_LEFT_SUPER 343
+def KEY_RIGHT_SHIFT 344
+def KEY_RIGHT_CONTROL 345
+def KEY_RIGHT_ALT 346
+def KEY_RIGHT_SUPER 347
+def KEY_KB_MENU 348
+def KEY_KP_0 320
+def KEY_KP_1 321
+def KEY_KP_2 322
+def KEY_KP_3 323
+def KEY_KP_4 324
+def KEY_KP_5 325
+def KEY_KP_6 326
+def KEY_KP_7 327
+def KEY_KP_8 328
+def KEY_KP_9 329
+def KEY_KP_DECIMAL 330
+def KEY_KP_DIVIDE 331
+def KEY_KP_MULTIPLY 332
+def KEY_KP_SUBTRACT 333
+def KEY_KP_ADD 334
+def KEY_KP_ENTER 335
+def KEY_KP_EQUAL 336
+def KEY_BACK 4
+def KEY_MENU 5
+def KEY_VOLUME_UP 24
+def KEY_VOLUME_DOWN 25
+// enum MouseButton (7 values)
+def MOUSE_BUTTON_LEFT 0
+def MOUSE_BUTTON_RIGHT 1
+def MOUSE_BUTTON_MIDDLE 2
+def MOUSE_BUTTON_SIDE 3
+def MOUSE_BUTTON_EXTRA 4
+def MOUSE_BUTTON_FORWARD 5
+def MOUSE_BUTTON_BACK 6
+// enum MouseCursor (11 values)
+def MOUSE_CURSOR_DEFAULT 0
+def MOUSE_CURSOR_ARROW 1
+def MOUSE_CURSOR_IBEAM 2
+def MOUSE_CURSOR_CROSSHAIR 3
+def MOUSE_CURSOR_POINTING_HAND 4
+def MOUSE_CURSOR_RESIZE_EW 5
+def MOUSE_CURSOR_RESIZE_NS 6
+def MOUSE_CURSOR_RESIZE_NWSE 7
+def MOUSE_CURSOR_RESIZE_NESW 8
+def MOUSE_CURSOR_RESIZE_ALL 9
+def MOUSE_CURSOR_NOT_ALLOWED 10
+// enum GamepadButton (18 values)
+def GAMEPAD_BUTTON_UNKNOWN 0
+def GAMEPAD_BUTTON_LEFT_FACE_UP 1
+def GAMEPAD_BUTTON_LEFT_FACE_RIGHT 2
+def GAMEPAD_BUTTON_LEFT_FACE_DOWN 3
+def GAMEPAD_BUTTON_LEFT_FACE_LEFT 4
+def GAMEPAD_BUTTON_RIGHT_FACE_UP 5
+def GAMEPAD_BUTTON_RIGHT_FACE_RIGHT 6
+def GAMEPAD_BUTTON_RIGHT_FACE_DOWN 7
+def GAMEPAD_BUTTON_RIGHT_FACE_LEFT 8
+def GAMEPAD_BUTTON_LEFT_TRIGGER_1 9
+def GAMEPAD_BUTTON_LEFT_TRIGGER_2 10
+def GAMEPAD_BUTTON_RIGHT_TRIGGER_1 11
+def GAMEPAD_BUTTON_RIGHT_TRIGGER_2 12
+def GAMEPAD_BUTTON_MIDDLE_LEFT 13
+def GAMEPAD_BUTTON_MIDDLE 14
+def GAMEPAD_BUTTON_MIDDLE_RIGHT 15
+def GAMEPAD_BUTTON_LEFT_THUMB 16
+def GAMEPAD_BUTTON_RIGHT_THUMB 17
+// enum GamepadAxis (6 values)
+def GAMEPAD_AXIS_LEFT_X 0
+def GAMEPAD_AXIS_LEFT_Y 1
+def GAMEPAD_AXIS_RIGHT_X 2
+def GAMEPAD_AXIS_RIGHT_Y 3
+def GAMEPAD_AXIS_LEFT_TRIGGER 4
+def GAMEPAD_AXIS_RIGHT_TRIGGER 5
+// enum MaterialMapIndex (11 values)
+def MATERIAL_MAP_ALBEDO 0
+def MATERIAL_MAP_METALNESS 1
+def MATERIAL_MAP_NORMAL 2
+def MATERIAL_MAP_ROUGHNESS 3
+def MATERIAL_MAP_OCCLUSION 4
+def MATERIAL_MAP_EMISSION 5
+def MATERIAL_MAP_HEIGHT 6
+def MATERIAL_MAP_CUBEMAP 7
+def MATERIAL_MAP_IRRADIANCE 8
+def MATERIAL_MAP_PREFILTER 9
+def MATERIAL_MAP_BRDF 10
+// enum ShaderLocationIndex (30 values)
+def SHADER_LOC_VERTEX_POSITION 0
+def SHADER_LOC_VERTEX_TEXCOORD01 1
+def SHADER_LOC_VERTEX_TEXCOORD02 2
+def SHADER_LOC_VERTEX_NORMAL 3
+def SHADER_LOC_VERTEX_TANGENT 4
+def SHADER_LOC_VERTEX_COLOR 5
+def SHADER_LOC_MATRIX_MVP 6
+def SHADER_LOC_MATRIX_VIEW 7
+def SHADER_LOC_MATRIX_PROJECTION 8
+def SHADER_LOC_MATRIX_MODEL 9
+def SHADER_LOC_MATRIX_NORMAL 10
+def SHADER_LOC_VECTOR_VIEW 11
+def SHADER_LOC_COLOR_DIFFUSE 12
+def SHADER_LOC_COLOR_SPECULAR 13
+def SHADER_LOC_COLOR_AMBIENT 14
+def SHADER_LOC_MAP_ALBEDO 15
+def SHADER_LOC_MAP_METALNESS 16
+def SHADER_LOC_MAP_NORMAL 17
+def SHADER_LOC_MAP_ROUGHNESS 18
+def SHADER_LOC_MAP_OCCLUSION 19
+def SHADER_LOC_MAP_EMISSION 20
+def SHADER_LOC_MAP_HEIGHT 21
+def SHADER_LOC_MAP_CUBEMAP 22
+def SHADER_LOC_MAP_IRRADIANCE 23
+def SHADER_LOC_MAP_PREFILTER 24
+def SHADER_LOC_MAP_BRDF 25
+def SHADER_LOC_VERTEX_BONEIDS 26
+def SHADER_LOC_VERTEX_BONEWEIGHTS 27
+def SHADER_LOC_MATRIX_BONETRANSFORMS 28
+def SHADER_LOC_VERTEX_INSTANCETRANSFORM 29
+// enum ShaderUniformDataType (13 values)
+def SHADER_UNIFORM_FLOAT 0
+def SHADER_UNIFORM_VEC2 1
+def SHADER_UNIFORM_VEC3 2
+def SHADER_UNIFORM_VEC4 3
+def SHADER_UNIFORM_INT 4
+def SHADER_UNIFORM_IVEC2 5
+def SHADER_UNIFORM_IVEC3 6
+def SHADER_UNIFORM_IVEC4 7
+def SHADER_UNIFORM_UINT 8
+def SHADER_UNIFORM_UIVEC2 9
+def SHADER_UNIFORM_UIVEC3 10
+def SHADER_UNIFORM_UIVEC4 11
+def SHADER_UNIFORM_SAMPLER2D 12
+// enum ShaderAttributeDataType (4 values)
+def SHADER_ATTRIB_FLOAT 0
+def SHADER_ATTRIB_VEC2 1
+def SHADER_ATTRIB_VEC3 2
+def SHADER_ATTRIB_VEC4 3
+// enum PixelFormat (24 values)
+def PIXELFORMAT_UNCOMPRESSED_GRAYSCALE 1
+def PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA 2
+def PIXELFORMAT_UNCOMPRESSED_R5G6B5 3
+def PIXELFORMAT_UNCOMPRESSED_R8G8B8 4
+def PIXELFORMAT_UNCOMPRESSED_R5G5B5A1 5
+def PIXELFORMAT_UNCOMPRESSED_R4G4B4A4 6
+def PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 7
+def PIXELFORMAT_UNCOMPRESSED_R32 8
+def PIXELFORMAT_UNCOMPRESSED_R32G32B32 9
+def PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 10
+def PIXELFORMAT_UNCOMPRESSED_R16 11
+def PIXELFORMAT_UNCOMPRESSED_R16G16B16 12
+def PIXELFORMAT_UNCOMPRESSED_R16G16B16A16 13
+def PIXELFORMAT_COMPRESSED_DXT1_RGB 14
+def PIXELFORMAT_COMPRESSED_DXT1_RGBA 15
+def PIXELFORMAT_COMPRESSED_DXT3_RGBA 16
+def PIXELFORMAT_COMPRESSED_DXT5_RGBA 17
+def PIXELFORMAT_COMPRESSED_ETC1_RGB 18
+def PIXELFORMAT_COMPRESSED_ETC2_RGB 19
+def PIXELFORMAT_COMPRESSED_ETC2_EAC_RGBA 20
+def PIXELFORMAT_COMPRESSED_PVRT_RGB 21
+def PIXELFORMAT_COMPRESSED_PVRT_RGBA 22
+def PIXELFORMAT_COMPRESSED_ASTC_4x4_RGBA 23
+def PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA 24
+// enum TextureFilter (6 values)
+def TEXTURE_FILTER_POINT 0
+def TEXTURE_FILTER_BILINEAR 1
+def TEXTURE_FILTER_TRILINEAR 2
+def TEXTURE_FILTER_ANISOTROPIC_4X 3
+def TEXTURE_FILTER_ANISOTROPIC_8X 4
+def TEXTURE_FILTER_ANISOTROPIC_16X 5
+// enum TextureWrap (4 values)
+def TEXTURE_WRAP_REPEAT 0
+def TEXTURE_WRAP_CLAMP 1
+def TEXTURE_WRAP_MIRROR_REPEAT 2
+def TEXTURE_WRAP_MIRROR_CLAMP 3
+// enum CubemapLayout (5 values)
+def CUBEMAP_LAYOUT_AUTO_DETECT 0
+def CUBEMAP_LAYOUT_LINE_VERTICAL 1
+def CUBEMAP_LAYOUT_LINE_HORIZONTAL 2
+def CUBEMAP_LAYOUT_CROSS_THREE_BY_FOUR 3
+def CUBEMAP_LAYOUT_CROSS_FOUR_BY_THREE 4
+// enum FontType (3 values)
+def FONT_DEFAULT 0
+def FONT_BITMAP 1
+def FONT_SDF 2
+// enum BlendMode (8 values)
+def BLEND_ALPHA 0
+def BLEND_ADDITIVE 1
+def BLEND_MULTIPLIED 2
+def BLEND_ADD_COLORS 3
+def BLEND_SUBTRACT_COLORS 4
+def BLEND_ALPHA_PREMULTIPLY 5
+def BLEND_CUSTOM 6
+def BLEND_CUSTOM_SEPARATE 7
+// enum Gesture (11 values)
+def GESTURE_NONE 0
+def GESTURE_TAP 1
+def GESTURE_DOUBLETAP 2
+def GESTURE_HOLD 4
+def GESTURE_DRAG 8
+def GESTURE_SWIPE_RIGHT 16
+def GESTURE_SWIPE_LEFT 32
+def GESTURE_SWIPE_UP 64
+def GESTURE_SWIPE_DOWN 128
+def GESTURE_PINCH_IN 256
+def GESTURE_PINCH_OUT 512
+// enum CameraMode (5 values)
+def CAMERA_CUSTOM 0
+def CAMERA_FREE 1
+def CAMERA_ORBITAL 2
+def CAMERA_FIRST_PERSON 3
+def CAMERA_THIRD_PERSON 4
+// enum CameraProjection (2 values)
+def CAMERA_PERSPECTIVE 0
+def CAMERA_ORTHOGRAPHIC 1
+// enum NPatchLayout (3 values)
+def NPATCH_NINE_PATCH 0
+def NPATCH_THREE_PATCH_VERTICAL 1
+def NPATCH_THREE_PATCH_HORIZONTAL 2
 
-def rl_KeyD     68
-def rl_KeyA     65
-def rl_KeyS     83
-def rl_KeyW     87
-def rl_KeySpace 32
-
-extern InitWindow         rl_init_window(width: int, height: int, title: *u8)
-extern SetTargetFPS       rl_set_target_fps(fps: int)
-extern DrawText           rl_draw_text(text: *u8, posX: int, posY: int, fontSize: int, clr: int)
-extern DrawRectangleLines rl_draw_rect_lines(x: int, y: int, w: int, h: int, clr: int)
-extern DrawRectangle      rl_draw_rect(x: int, y: int, w: int, h: int, clr: int)
-extern GetRandomValue     rl_rand(from: int, to: int): int
-extern IsKeyDown          rl_is_key_down(key: int): bool
-extern IsKeyPressed       rl_is_key_pressed(key: int): bool
-extern WindowShouldClose  rl_window_should_close(): bool
-extern ClearBackground    rl_clear_bg(clr: int)
-extern BeginDrawing       rl_begin_drawing()
-extern EndDrawing         rl_end_drawing()
-extern CloseWindow        rl_close_window()
+extern InitWindow(width: int, height: int, title: *u8)
+extern CloseWindow()
+extern WindowShouldClose(): bool
+extern IsWindowReady(): bool
+extern IsWindowFullscreen(): bool
+extern IsWindowHidden(): bool
+extern IsWindowMinimized(): bool
+extern IsWindowMaximized(): bool
+extern IsWindowFocused(): bool
+extern IsWindowResized(): bool
+extern ToggleFullscreen()
+extern ToggleBorderlessWindowed()
+extern MaximizeWindow()
+extern MinimizeWindow()
+extern RestoreWindow()
+extern SetWindowTitle(title: *u8)
+extern SetWindowPosition(x: int, y: int)
+extern SetWindowMonitor(monitor: int)
+extern SetWindowMinSize(width: int, height: int)
+extern SetWindowMaxSize(width: int, height: int)
+extern SetWindowSize(width: int, height: int)
+extern SetWindowOpacity(opacity: float)
+extern SetWindowFocused()
+extern GetScreenWidth(): int
+extern GetScreenHeight(): int
+extern GetRenderWidth(): int
+extern GetRenderHeight(): int
+extern GetMonitorCount(): int
+extern GetCurrentMonitor(): int
+extern GetMonitorWidth(monitor: int): int
+extern GetMonitorHeight(monitor: int): int
+extern GetMonitorPhysicalWidth(monitor: int): int
+extern GetMonitorPhysicalHeight(monitor: int): int
+extern GetMonitorRefreshRate(monitor: int): int
+extern GetMonitorName(monitor: int): *u8
+extern SetClipboardText(text: *u8)
+extern GetClipboardText(): *u8
+extern EnableEventWaiting()
+extern DisableEventWaiting()
+extern ShowCursor()
+extern HideCursor()
+extern IsCursorHidden(): bool
+extern EnableCursor()
+extern DisableCursor()
+extern IsCursorOnScreen(): bool
+extern ClearBackground(color: int)
+extern BeginDrawing()
+extern EndDrawing()
+extern EndMode2D()
+extern EndMode3D()
+extern EndTextureMode()
+extern EndShaderMode()
+extern BeginBlendMode(mode: int)
+extern EndBlendMode()
+extern BeginScissorMode(x: int, y: int, width: int, height: int)
+extern EndScissorMode()
+extern EndVrStereoMode()
+extern SetTargetFPS(fps: int)
+extern GetFrameTime(): float
+extern GetFPS(): int
+extern SwapScreenBuffer()
+extern PollInputEvents()
+extern GetRandomValue(min: int, max: int): int
+extern UnloadRandomSequence(sequence: *int)
+extern TakeScreenshot(fileName: *u8)
+extern OpenURL(url: *u8)
+extern SetTraceLogLevel(logLevel: int)
+extern SaveFileText(fileName: *u8, text: *u8): bool
+extern FileRename(fileName: *u8, fileRename: *u8): int
+extern FileRemove(fileName: *u8): int
+extern FileCopy(srcPath: *u8, dstPath: *u8): int
+extern FileMove(srcPath: *u8, dstPath: *u8): int
+extern FileTextReplace(fileName: *u8, search: *u8, replacement: *u8): int
+extern FileTextFindIndex(fileName: *u8, search: *u8): int
+extern FileExists(fileName: *u8): bool
+extern DirectoryExists(dirPath: *u8): bool
+extern IsFileExtension(fileName: *u8, ext: *u8): bool
+extern GetFileLength(fileName: *u8): int
+extern GetFileExtension(fileName: *u8): *u8
+extern GetFileName(filePath: *u8): *u8
+extern GetFileNameWithoutExt(filePath: *u8): *u8
+extern GetDirectoryPath(filePath: *u8): *u8
+extern GetPrevDirectoryPath(dirPath: *u8): *u8
+extern GetWorkingDirectory(): *u8
+extern GetApplicationDirectory(): *u8
+extern MakeDirectory(dirPath: *u8): int
+extern ChangeDirectory(dirPath: *u8): bool
+extern IsPathFile(path: *u8): bool
+extern IsFileNameValid(fileName: *u8): bool
+extern IsFileDropped(): bool
+extern SetAutomationEventBaseFrame(frame: int)
+extern StartAutomationEventRecording()
+extern StopAutomationEventRecording()
+extern IsKeyPressed(key: int): bool
+extern IsKeyPressedRepeat(key: int): bool
+extern IsKeyDown(key: int): bool
+extern IsKeyReleased(key: int): bool
+extern IsKeyUp(key: int): bool
+extern GetKeyPressed(): int
+extern GetCharPressed(): int
+extern GetKeyName(key: int): *u8
+extern SetExitKey(key: int)
+extern IsGamepadAvailable(gamepad: int): bool
+extern GetGamepadName(gamepad: int): *u8
+extern IsGamepadButtonPressed(gamepad: int, button: int): bool
+extern IsGamepadButtonDown(gamepad: int, button: int): bool
+extern IsGamepadButtonReleased(gamepad: int, button: int): bool
+extern IsGamepadButtonUp(gamepad: int, button: int): bool
+extern GetGamepadButtonPressed(): int
+extern GetGamepadAxisCount(gamepad: int): int
+extern GetGamepadAxisMovement(gamepad: int, axis: int): float
+extern SetGamepadMappings(mappings: *u8): int
+extern SetGamepadVibration(gamepad: int, leftMotor: float, rightMotor: float, duration: float)
+extern IsMouseButtonPressed(button: int): bool
+extern IsMouseButtonDown(button: int): bool
+extern IsMouseButtonReleased(button: int): bool
+extern IsMouseButtonUp(button: int): bool
+extern GetMouseX(): int
+extern GetMouseY(): int
+extern SetMousePosition(x: int, y: int)
+extern SetMouseOffset(offsetX: int, offsetY: int)
+extern SetMouseScale(scaleX: float, scaleY: float)
+extern GetMouseWheelMove(): float
+extern SetMouseCursor(cursor: int)
+extern GetTouchX(): int
+extern GetTouchY(): int
+extern GetTouchPointId(index: int): int
+extern GetTouchPointCount(): int
+extern GetGestureDetected(): int
+extern GetGestureHoldDuration(): float
+extern GetGestureDragAngle(): float
+extern GetGesturePinchAngle(): float
+extern DrawPixel(posX: int, posY: int, color: int)
+extern DrawLine(startPosX: int, startPosY: int, endPosX: int, endPosY: int, color: int)
+extern DrawCircle(centerX: int, centerY: int, radius: float, color: int)
+extern DrawCircleLines(centerX: int, centerY: int, radius: float, color: int)
+extern DrawEllipse(centerX: int, centerY: int, radiusH: float, radiusV: float, color: int)
+extern DrawEllipseLines(centerX: int, centerY: int, radiusH: float, radiusV: float, color: int)
+extern DrawRectangle(posX: int, posY: int, width: int, height: int, color: int)
+extern DrawRectangleGradientV(posX: int, posY: int, width: int, height: int, top: int, bottom: int)
+extern DrawRectangleGradientH(posX: int, posY: int, width: int, height: int, left: int, right: int)
+extern DrawRectangleLines(posX: int, posY: int, width: int, height: int, color: int)
+extern ColorIsEqual(col1: int, col2: int): bool
+extern Fade(color: int, alpha: float): int
+extern ColorToInt(color: int): int
+extern ColorFromHSV(hue: float, saturation: float, value: float): int
+extern ColorTint(color: int, tint: int): int
+extern ColorBrightness(color: int, factor: float): int
+extern ColorContrast(color: int, contrast: float): int
+extern ColorAlpha(color: int, alpha: float): int
+extern ColorAlphaBlend(dst: int, src: int, tint: int): int
+extern ColorLerp(color1: int, color2: int, factor: float): int
+extern GetPixelDataSize(width: int, height: int, format: int): int
+extern DrawFPS(posX: int, posY: int)
+extern DrawText(text: *u8, posX: int, posY: int, fontSize: int, color: int)
+extern SetTextLineSpacing(spacing: int)
+extern MeasureText(text: *u8, fontSize: int): int
+extern LoadCodepoints(text: *u8, count: *int): *int
+extern UnloadCodepoints(codepoints: *int)
+extern GetCodepointCount(text: *u8): int
+extern GetCodepoint(text: *u8, codepointSize: *int): int
+extern GetCodepointNext(text: *u8, codepointSize: *int): int
+extern GetCodepointPrevious(text: *u8, codepointSize: *int): int
+extern CodepointToUTF8(codepoint: int, utf8Size: *int): *u8
+extern TextIsEqual(text1: *u8, text2: *u8): bool
+extern TextSubtext(text: *u8, position: int, length: int): *u8
+extern TextRemoveSpaces(text: *u8): *u8
+extern TextFindIndex(text: *u8, search: *u8): int
+extern TextToInteger(text: *u8): int
+extern TextToFloat(text: *u8): float
+extern DrawGrid(slices: int, spacing: float)
+extern InitAudioDevice()
+extern CloseAudioDevice()
+extern IsAudioDeviceReady(): bool
+extern SetMasterVolume(volume: float)
+extern GetMasterVolume(): float
+extern SetAudioStreamBufferSizeDefault(size: int)

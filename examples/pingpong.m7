@@ -4,17 +4,17 @@ def SCREEN_WIDTH  800
 def SCREEN_HEIGHT 600
 
 fn main() {
-	rl_init_window(SCREEN_WIDTH, SCREEN_HEIGHT, "Ping pong")
-	rl_set_target_fps(60)
+	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Ping pong")
+	SetTargetFPS(60)
 
 	// Ball
 	ball_speed   := 5
 	ball_r       := 15
-	ball_x       := rl_rand(100, SCREEN_WIDTH - 100)
-	ball_y       := rl_rand(100, SCREEN_HEIGHT/2)
-	ball_dir_x   := rl_rand(0, 1) * 2 - 1
+	ball_x       := GetRandomValue(100, SCREEN_WIDTH - 100)
+	ball_y       := GetRandomValue(100, SCREEN_HEIGHT/2)
+	ball_dir_x   := GetRandomValue(0, 1) * 2 - 1
 	ball_dir_y   := -1
-	
+
 	// Paddle
 	paddle_speed := 4
 	paddle_w     := 100
@@ -22,9 +22,9 @@ fn main() {
 	paddle_x     := SCREEN_WIDTH / 2 - paddle_w / 2
 	paddle_y     := SCREEN_HEIGHT - paddle_h * 2
 
-	while !rl_window_should_close() {
-		rl_begin_drawing()
-		rl_clear_bg(rl_ColorBlack)
+	while !WindowShouldClose() {
+		BeginDrawing()
+		ClearBackground(BLACK)
 
 		ball_x += ball_dir_x * ball_speed
 		ball_y += ball_dir_y * ball_speed
@@ -39,25 +39,25 @@ fn main() {
 			ball_dir_y = -ball_dir_y
 		}
 
-		if rl_is_key_down(rl_KeyD) && paddle_x < SCREEN_WIDTH - paddle_w {
+		if IsKeyDown(KEY_D) && paddle_x < SCREEN_WIDTH - paddle_w {
 			paddle_x += paddle_speed
 		}
 
-		if rl_is_key_down(rl_KeyA) && paddle_x > 0 {
+		if IsKeyDown(KEY_A) && paddle_x > 0 {
 			paddle_x -= paddle_speed
 		}
-		
+
 		x_check := paddle_x + paddle_w > ball_x && paddle_x < ball_x + ball_r * 2
 		y_check := paddle_y + paddle_h > ball_y && paddle_y < ball_y + ball_r * 2
-		
+
 		if x_check && y_check {
 			ball_dir_y = -ball_dir_y
 		}
 
-		rl_draw_rect_lines(ball_x, ball_y, ball_r*2, ball_r*2, rl_ColorRed)
-		rl_draw_rect_lines(paddle_x, paddle_y, paddle_w, paddle_h, rl_ColorBlue)
-		rl_end_drawing()
+		DrawRectangleLines(ball_x, ball_y, ball_r*2, ball_r*2, RED)
+		DrawRectangleLines(paddle_x, paddle_y, paddle_w, paddle_h, BLUE)
+		EndDrawing()
 	}
 
-	rl_close_window()
+	CloseWindow()
 }
