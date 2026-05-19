@@ -1298,8 +1298,8 @@ static void GetDataTypeAndName(const char *typeName, int typeNameLen, char *type
         }
         else if ((typeName[k] == '.') && (typeNameLen == 3)) // Handle varargs ...);
         {
-	    const char *varargsDots = "...";
-	    const char *varargsArg = "args";
+        const char *varargsDots = "...";
+        const char *varargsArg = "args";
             MemoryCopy(type, varargsDots, TextLength(varargsDots));
             MemoryCopy(name, varargsArg, TextLength(varargsArg));
             break;
@@ -1494,15 +1494,15 @@ static char *TextReplace(char *text, const char *replace, const char *by)
 */
 
 const char *ConvertTypeToM7(const char *ct) {
-	if (strcmp(ct, "const char *")   == 0) return "*u8";
-	if (strcmp(ct, "unsigned int *") == 0) return "*uint";
-	if (strcmp(ct, "int *")          == 0) return "*int";
-	if (strcmp(ct, "void")           == 0) return "u0";
-	if (strcmp(ct, "bool")           == 0) return "bool";
-	if (strcmp(ct, "int")            == 0) return "int";
-	if (strcmp(ct, "float")          == 0) return "float";
-	if (strcmp(ct, "Color")          == 0) return "int";
-	return NULL;
+    if (strcmp(ct, "const char *")   == 0) return "*u8";
+    if (strcmp(ct, "unsigned int *") == 0) return "*uint";
+    if (strcmp(ct, "int *")          == 0) return "*int";
+    if (strcmp(ct, "void")           == 0) return "u0";
+    if (strcmp(ct, "bool")           == 0) return "bool";
+    if (strcmp(ct, "int")            == 0) return "int";
+    if (strcmp(ct, "float")          == 0) return "float";
+    if (strcmp(ct, "Color")          == 0) return "int";
+    return NULL;
 }
 
 #define strappf(s1, ...) sprintf(s1 + strlen(s1), __VA_ARGS__)
@@ -1514,35 +1514,35 @@ static void ExportParsedData(const char *fileName, int format)
 
     switch (format)
     {
-		case M7:
+        case M7:
         {
-			// Print enums info
+            // Print enums info
             for (int i = 0; i < enumCount; i++)
             {
                 fprintf(outFile, "// enum %s (%i values)\n", enums[i].name, enums[i].valueCount);
                 for (int e = 0; e < enums[i].valueCount; e++) {
-					fprintf(outFile, "def %s %i\n", enums[i].valueName[e], enums[i].valueInteger[e]);
-				}
+                    fprintf(outFile, "def %s %i\n", enums[i].valueName[e], enums[i].valueInteger[e]);
+                }
             }
-			fprintf(outFile, "\n");
+            fprintf(outFile, "\n");
 
-			// Print functions info
+            // Print functions info
             for (int i = 0; i < funcCount; i++)
             {
-				char buf[1024] = {0};
+                char buf[1024] = {0};
                 strappf(buf, "extern %s(", funcs[i].name);
                 for (int p = 0; p < funcs[i].paramCount; p++) {
-					const char *m7Type = ConvertTypeToM7(funcs[i].paramType[p]);
-					if (!m7Type) goto skip;
-					strappf(buf, "%s: %s", funcs[i].paramName[p], m7Type);
-					if (p != funcs[i].paramCount - 1) strappf(buf, ", ");
-				}
-				const char *m7RetType = ConvertTypeToM7(funcs[i].retType);
-				if (!m7RetType) goto skip;
-				if (strcmp(m7RetType, "u0") == 0) strappf(buf, ")\n");
-				else strappf(buf, "): %s\n", m7RetType);
-				fprintf(outFile, "%s", buf);
-				skip:;
+                    const char *m7Type = ConvertTypeToM7(funcs[i].paramType[p]);
+                    if (!m7Type) goto skip;
+                    strappf(buf, "%s: %s", funcs[i].paramName[p], m7Type);
+                    if (p != funcs[i].paramCount - 1) strappf(buf, ", ");
+                }
+                const char *m7RetType = ConvertTypeToM7(funcs[i].retType);
+                if (!m7RetType) goto skip;
+                if (strcmp(m7RetType, "u0") == 0) strappf(buf, ")\n");
+                else strappf(buf, "): %s\n", m7RetType);
+                fprintf(outFile, "%s", buf);
+                skip:;
             }
         } break;
         case DEFAULT:
