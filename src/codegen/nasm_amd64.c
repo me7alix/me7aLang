@@ -134,7 +134,6 @@ bool reg_allocator_push(uint var_id, Register *reg) {
 	TAC_VarInterval vi = *TAC_VarIntervals_get(&var_ints, var_id);
 	if (vi.to_spill || free_regs.count == 0)
 		return false;
-
 	*reg = da_last(&free_regs);
 	free_regs.count--;
 	RegTable_add(&used_regs, var_id, *reg);
@@ -769,8 +768,12 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				}
 			}
 
-			sb_appendf(&body, "  mov rsp, rbp\n");
-			sb_appendf(&body, "  pop rbp\n");
+			sb_appendf(&body, "  leave\n");
+			sb_appendf(&body, "  pop r15\n");
+			sb_appendf(&body, "  pop r14\n");
+			sb_appendf(&body, "  pop r13\n");
+			sb_appendf(&body, "  pop r12\n");
+			sb_appendf(&body, "  pop rbx\n");
 			sb_appendf(&body, "  ret\n");
 		} break;
 
@@ -817,21 +820,29 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		}
 	}
 
-	bool is_stack_used = total_offset != 0;
 	total_offset += 48;
 	align_up(&total_offset, 16);
+	total_offset += 8;
 
+	sb_appendf(code, "  push rbx\n");
+	sb_appendf(code, "  push r12\n");
+	sb_appendf(code, "  push r13\n");
+	sb_appendf(code, "  push r14\n");
+	sb_appendf(code, "  push r15\n");
 	sb_appendf(code, "  push rbp\n");
 	sb_appendf(code, "  mov rbp, rsp\n");
 	sb_appendf(code, "  sub rsp, %u\n", total_offset);
-
 	sb_appendf(code, "%s", body.items);
 
 	if (da_last(&func.body).op != OP_RETURN) {
 		if (strcmp(func.name, "main") == 0)
 			sb_appendf(code, "  mov eax, 0\n");
-		sb_appendf(code, "  mov rsp, rbp\n");
-		sb_appendf(code, "  pop rbp\n");
+		sb_appendf(code, "  leave\n");
+		sb_appendf(code, "  pop r15\n");
+		sb_appendf(code, "  pop r14\n");
+		sb_appendf(code, "  pop r13\n");
+		sb_appendf(code, "  pop r12\n");
+		sb_appendf(code, "  pop rbx\n");
 		sb_appendf(code, "  ret\n");
 	}
 

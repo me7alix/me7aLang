@@ -994,14 +994,33 @@ void tac_ir_gen_calc_inters(TAC_Program *prog) {
 			calc_inst_intervals(func, &ci, i);
 
 			switch (ci.op) {
-			case OP_JUMP_IF_NOT:
-				for (size_t j = i + 1; j < func->body.count; j++) {
-					bool loop_end_cond =
+			case OP_JUMP_IF_NOT:;
+				Interval intr;
+				uint search_for;
+
+				for (int j = i + 1; j < func->body.count; j++) {
+					if (
 						func->body.items[j].op == OP_LABEL &&
 						func->body.items[j].args[0].as.label_id == ci.dst.as.label_id &&
-						func->body.items[j - 1].op == OP_JUMP;
-					if (loop_end_cond) da_append(&loop_ints, ((Interval){i, j}));
+						func->body.items[j-1].op == OP_JUMP
+					) {
+						intr.end = j;
+						search_for = func->body.items[j-1].dst.as.label_id;
+						break;
+					}
 				}
+
+				for (int j = (int)i - 1; j >= 0; j--) {
+					if (
+						func->body.items[j].op == OP_LABEL &&
+						func->body.items[j].args[0].as.label_id == search_for
+					) {
+						intr.start = j;
+						break;
+					}
+				}
+
+				da_append(&loop_ints, intr);
 				break;
 			case OP_REF:
 				da_append(&ref_vars, ci.args[0].as.var.addr_id);
@@ -1018,11 +1037,11 @@ void tac_ir_gen_calc_inters(TAC_Program *prog) {
 				}
 			}
 
-			da_foreach (size_t, func_call, &func_calls) {
+			/*da_foreach (size_t, func_call, &func_calls) {
 				if (n->val.start <= *func_call && n->val.end >= *func_call) {
 					n->val.to_spill = true;
 				}
-			}
+			}*/
 
 			da_foreach (Interval, loop_int, &loop_ints) {
 				if (n->val.start <= loop_int->end && n->val.end >= loop_int->start) {
