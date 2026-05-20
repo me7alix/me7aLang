@@ -51,10 +51,12 @@ float op_prec(AST_ExprOp op, bool l) {
 	case AST_OP_NOT_EQ:
 		if (l) return 0.9;
 		else   return 0.8;
-	case AST_OP_AND:
 	case AST_OP_OR:
 		if (l) return 0.6;
 		else   return 0.5;
+	case AST_OP_AND:
+		if (l) return 0.65;
+		else   return 0.55;
 	case AST_OP_CAST:
 		if (l) return 0.0;
 		else   return 5.0;
@@ -288,7 +290,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 						if (get_pointer_base(lt)->kind == TYPE_STRUCT)
 							goto no_err;
 					}
-					
+
 					throw_error(expr->as.ebin.l->loc, "struct expected");
 					no_err:;
 				}
@@ -577,7 +579,7 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 					.as.vid.id = peek(p).data,
 					.as.vid.uid = var ? var->variable.uid : 0,
 				));
-				
+
 			}
 			break;
 
