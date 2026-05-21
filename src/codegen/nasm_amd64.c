@@ -61,11 +61,13 @@ static int opt_level;
 static TargetPlatform tp;
 
 // Function context
+DA(Register) regs_to_save;
 DA(Register) free_regs;
 RegTable used_regs;
 TAC_VarIntervals var_ints;
 StringBuilder body = {0};
-uint total_offset;
+bool is_there_return;
+uint stack_offset;
 uint inst_idx;
 
 size_t get_reg_size(Type t) {
@@ -137,6 +139,17 @@ bool reg_allocator_push(uint var_id, Register *reg) {
 	*reg = da_last(&free_regs);
 	free_regs.count--;
 	RegTable_add(&used_regs, var_id, *reg);
+
+	bool to_save = true;
+	da_foreach (Register, saved, &regs_to_save) {
+		if (*saved == *reg) {
+			to_save = false;
+			break;
+		}
+	}
+	if (to_save) {
+		da_append(&regs_to_save, *reg);
+	}
 	return true;
 }
 
@@ -353,9 +366,9 @@ void align_up(uint *x, uint a) {
 	if (*x % a != 0) *x += a - *x % a;
 }
 
-void total_offset_add(uint off) {
-	total_offset += off;
-	align_up(&total_offset, 8);
+void stack_offset_add(uint off) {
+	stack_offset += off;
+	align_up(&stack_offset, 8);
 }
 
 void nasm_gen_new_var(TAC_Instruction ci, char *dst, OprKind *opr_kind) {
@@ -374,30 +387,35 @@ void nasm_gen_new_var(TAC_Instruction ci, char *dst, OprKind *opr_kind) {
 
 	if (opr_kind) *opr_kind = MEM;
 	char ts[32]; opr_type_to_stack(ci.dst, ts);
-	total_offset_add(get_type_size(ci.dst.as.var.type));
-	OffTable_add(&stack_table, ci.dst.as.var.addr_id, total_offset);
-	sprintf(dst, "%s[rbp - %u]", ts, total_offset);
+	stack_offset_add(get_type_size(ci.dst.as.var.type));
+	OffTable_add(&stack_table, ci.dst.as.var.addr_id, stack_offset);
+	sprintf(dst, "%s[rbp - %u]", ts, stack_offset);
 }
 
 void nasm_gen_func(StringBuilder *code, TAC_Func func) {
-	if (func.body.count == 0) return;
-
-	RegTable_free(&used_regs);
-	used_regs = (RegTable){0};
-	var_ints = func.var_ints;
-	da_reset(&free_regs);
-	da_append(&free_regs, RBX);
-	da_append(&free_regs, R12);
-	da_append(&free_regs, R13);
-	da_append(&free_regs, R14);
-	da_append(&free_regs, R15);
-
 	if (!func.is_static)
 		sb_appendf(code, "global %s\n", func.name);
 	sb_appendf(code, "%s%s:\n", (tp == TP_MACOS ? "_" : ""), func.name);
 
+	if (func.body.count == 0) {
+		sb_appendf(code, "  ret\n\n");
+		return;
+	}
+
+	is_there_return = false;
+	RegTable_free(&used_regs);
+	used_regs = (RegTable){0};
+	var_ints = func.var_ints;
+	da_reset(&regs_to_save);
+	da_reset(&free_regs);
+	da_append(&free_regs, R15);
+	da_append(&free_regs, R14);
+	da_append(&free_regs, R13);
+	da_append(&free_regs, R12);
+	da_append(&free_regs, RBX);
+
 	sb_reset(&body);
-	total_offset = 0;
+	stack_offset = 0;
 
 	for (size_t i = 0; i < func.body.count; i++) {
 		char arg1[64], arg2[64], dst[64];
@@ -481,11 +499,12 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "  mov %s, %s\n", dst, opr1);
 			}
 
-			if      (ci.op == OP_ADD)    sb_appendf(&body, "  add %s, %s\n", arg1, arg2);
-			else if (ci.op == OP_SUB)    sb_appendf(&body, "  sub %s, %s\n", arg1, arg2);
-			else if (ci.op == OP_BW_AND) sb_appendf(&body, "  and %s, %s\n", arg1, arg2);
-			else if (ci.op == OP_BW_OR)  sb_appendf(&body, "  or  %s, %s\n", arg1, arg2);
-			else if (ci.op == OP_BW_XOR) sb_appendf(&body, "  xor %s, %s\n", arg1, arg2);
+			if      (ci.op == OP_ADD)    sb_appendf(&body, "  add %s, %s\n",  arg1, arg2);
+			else if (ci.op == OP_SUB)    sb_appendf(&body, "  sub %s, %s\n",  arg1, arg2);
+			else if (ci.op == OP_BW_AND) sb_appendf(&body, "  and %s, %s\n",  arg1, arg2);
+			else if (ci.op == OP_BW_OR)  sb_appendf(&body, "  or  %s, %s\n",  arg1, arg2);
+			else if (ci.op == OP_BW_XOR) sb_appendf(&body, "  xor %s, %s\n",  arg1, arg2);
+			else if (ci.op == OP_MUL)    sb_appendf(&body, "  imul %s, %s\n", arg1, arg2);
 
 			else if (ci.op == OP_BW_LS || ci.op == OP_BW_RS) {
 				const char *rcx = reg_forms[RCX][get_reg_size(ci.dst.as.var.type)];
@@ -493,25 +512,6 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "  %s %s, cl\n", ci.op == OP_BW_LS ? "shl" : "shr", arg1);
 			}
 
-			else if (ci.op == OP_MUL) {
-				switch (ci.dst.as.var.type.kind) {
-				case TYPE_ARRAY:
-				case TYPE_POINTER:
-				case TYPE_UINT: case TYPE_U8:
-				case TYPE_U32:  case TYPE_U16:
-				case TYPE_U64:  case TYPE_UPTR:
-					sb_appendf(&body, "  mul %s, %s\n", arg1, arg2);
-					break;
-				case TYPE_IPTR:
-				case TYPE_BOOL: case TYPE_I8:
-				case TYPE_INT:  case TYPE_I32:
-				case TYPE_I64:  case TYPE_I16:
-					sb_appendf(&body, "  imul %s, %s\n", arg1, arg2);
-					break;
-				default:
-					UNREACHABLE;
-				}
-			}
 
 			else if (ci.op == OP_DIV || ci.op == OP_MOD) {
 				char *SEI[] = {"cbw", "cwd", "cdq", "cqo"};
@@ -663,11 +663,11 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 
 			if (ci.dst.as.var.type.kind == TYPE_ARRAY && fst_asg) {
 				load_reserved_regs(ci, arg1, arg2);
-				total_offset_add(
+				stack_offset_add(
 					get_type_size(*ci.dst.as.var.type.as.array.elem) *
 					ci.dst.as.var.type.as.array.length);
 
-				sb_appendf(&body, "  lea %s, [rbp - %u]\n", arg1, total_offset);
+				sb_appendf(&body, "  lea %s, [rbp - %u]\n", arg1, stack_offset);
 				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), arg1);
 			}
 
@@ -768,13 +768,8 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				}
 			}
 
-			sb_appendf(&body, "  leave\n");
-			sb_appendf(&body, "  pop r15\n");
-			sb_appendf(&body, "  pop r14\n");
-			sb_appendf(&body, "  pop r13\n");
-			sb_appendf(&body, "  pop r12\n");
-			sb_appendf(&body, "  pop rbx\n");
-			sb_appendf(&body, "  ret\n");
+			is_there_return = true;
+			sb_appendf(&body, "  jmp .L_func_exit\n");
 		} break;
 
 		case OP_FUNC_CALL: {
@@ -820,33 +815,43 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		}
 	}
 
-	total_offset += 48;
-	align_up(&total_offset, 16);
-	total_offset += 8;
+	bool is_stack_used = stack_offset != 0;
+	stack_offset += 48;
+	align_up(&stack_offset, 16);
 
-	sb_appendf(code, "  push rbx\n");
-	sb_appendf(code, "  push r12\n");
-	sb_appendf(code, "  push r13\n");
-	sb_appendf(code, "  push r14\n");
-	sb_appendf(code, "  push r15\n");
-	sb_appendf(code, "  push rbp\n");
-	sb_appendf(code, "  mov rbp, rsp\n");
-	sb_appendf(code, "  sub rsp, %u\n", total_offset);
-	sb_appendf(code, "%s", body.items);
-
-	if (da_last(&func.body).op != OP_RETURN) {
-		if (strcmp(func.name, "main") == 0)
-			sb_appendf(code, "  mov eax, 0\n");
-		sb_appendf(code, "  leave\n");
-		sb_appendf(code, "  pop r15\n");
-		sb_appendf(code, "  pop r14\n");
-		sb_appendf(code, "  pop r13\n");
-		sb_appendf(code, "  pop r12\n");
-		sb_appendf(code, "  pop rbx\n");
-		sb_appendf(code, "  ret\n");
+	if (opt_level > 0) {
+		stack_offset += ((regs_to_save.count + is_stack_used) * 8 % 16 == 0) * 8;
+		for (size_t i = 0; i < regs_to_save.count; i++) {
+			sb_appendf(code, "  push %s\n", reg_forms[regs_to_save.items[i]][3]);
+		}
 	}
 
-	sb_appendf(code, "\n");
+	if (is_stack_used) {
+		sb_appendf(code, "  push rbp\n");
+		sb_appendf(code, "  mov rbp, rsp\n");
+		sb_appendf(code, "  sub rsp, %u\n", stack_offset);
+	} else {
+		if (regs_to_save.count * 8 % 16 == 0) {
+			sb_appendf(code, "  sub rsp, 8\n");
+		}
+	}
+
+	sb_appendf(code, "%s", body.items);
+
+	if (strcmp(func.name, "main") == 0)
+		sb_appendf(code, "  mov eax, 0\n");
+	if (is_there_return)
+		sb_appendf(code, ".L_func_exit:\n");
+	if (is_stack_used)
+		sb_appendf(code, "  leave\n");
+	else if (regs_to_save.count * 8 % 16 == 0)
+		sb_appendf(code, "  add rsp, 8\n");
+	if (opt_level > 0) {
+		for (long i = (long)regs_to_save.count - 1; i >= 0; i--) {
+			sb_appendf(code, "  pop %s\n", reg_forms[regs_to_save.items[i]][3]);
+		}
+	}
+	sb_appendf(code, "  ret\n\n");
 }
 
 char *nasm_gen_prog(TAC_Program *prog, TargetPlatform _tp, int _opt_level) {
