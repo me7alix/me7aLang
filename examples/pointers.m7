@@ -1,6 +1,6 @@
 import "std/libc.m7"
 
-fn change_fifth(arr: *int) then
+fn change_fifth(arr: *int) do
 	*(arr + 4) = 111
 
 fn main() {

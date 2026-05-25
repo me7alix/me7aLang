@@ -202,13 +202,13 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 		bool err = false;
 		if      (!vart)              err = true;
 		else if (!is_pointer(*vart)) err = true;
-		if (err) throw_error(expr->loc, "types mismatching");
+		if (err) throw_error(expr->loc, "types mismatch");
 
 		Type baseType = *get_pointer_base(*vart);
 		da_foreach (AST_Node*, n, &expr->as.array) {
 			Type nt = expr_analysis(p, *n, &baseType);
 			if (!compare_types(baseType, nt)) {
-				throw_error((*n)->loc, "types mismatching");
+				throw_error((*n)->loc, "types mismatch");
 			}
 		}
 		return *vart;
@@ -230,18 +230,17 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 			case LIT_CHAR:  expr->as.literal.type = (Type) {.kind = TYPE_U8};   break;
 			case LIT_FLOAT: expr->as.literal.type = (Type) {.kind = TYPE_F32};  break;
 			case LIT_BOOL:  expr->as.literal.type = (Type) {.kind = TYPE_BOOL}; break;
-			case LIT_INT: {
+			case LIT_INT:
 				if(expr->as.literal.type.kind == TYPE_NULL) {
 					expr->as.literal.type = (Type) {.kind = TYPE_INT};
 				}
-			} break;
-			case LIT_STR: {
+				break;
+			case LIT_STR:;
 				static Type TU8 = {.kind = TYPE_U8};
 				expr->as.literal.type = (Type){
 					.kind = TYPE_POINTER,
 					.as.pointer.base = &TU8
 				};
-			} break;
 			}
 		}
 
@@ -305,7 +304,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 							/* Method call types checking */
 
 							if (func->as.func_def.args.count != metCall->as.method_call.args.count) {
-								throw_error(metCall->loc, "arguments count mismatching");
+								throw_error(metCall->loc, "arguments count mismatch");
 							}
 
 							for (size_t i = 1; i < func->as.func_def.args.count; i++) {
@@ -316,7 +315,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 								if (!compare_types(req_type, parser_get_type(p, arg))) {
 									throw_error(
 										metCall->as.method_call.args.items[i]->loc,
-										"types mismatching");
+										"types mismatch");
 								}
 							}
 
@@ -490,8 +489,7 @@ AST_ExprOp get_un_op(Token tok) {
 AST_Node *parse_array(Parser *p) {
 	AST_Node *al = new(AST_Node,
 		.kind = AST_ARRAY,
-		.loc = next(p).loc,
-	);
+		.loc = next(p).loc);
 
 	while (peek(p).kind != TOK_CBRA) {
 		AST_Node *expr = parse_expr(p, EXPAR_ARRAY, NULL);
@@ -564,13 +562,11 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 						da_last(&nodes)->as.ebin.op == AST_OP_FIELD
 					) {
 						da_append(&nodes, parse_method_call(p));
-						p->cur_token--;
 						break;
 					}
 				}
 
 				da_append(&nodes, parse_func_call(p));
-				p->cur_token--;
 			} else {
 				Symbol *var = smbt_get(p, SBL_VAR, peek(p).data);
 				da_append(&nodes, new(AST_Node,
