@@ -7,13 +7,11 @@ macro ht_foreach_node(nodevar, ht) {
 
 static fn hash_str(p: *u8): u32 {
     h: u32 = 1144290428
-
     while *p != 0 {
         h = h ^ (*p):u32
 		p = p + 1
         h *= 2070933403
     }
-
     return h
 }
 
@@ -171,14 +169,8 @@ macro HashMapStrDecl(HT, VT) {
 
 macro HashMapStrImpl(HT, VT) {
 	HashMapImpl(HT, *u8, VT)
-
-	fn HT##_compare(a: *u8, b: *u8): int {
-		return strcmp(a, b)
-	}
-
-	fn HT##_hashf(str: *u8): u32 {
-		return hash_str(str);
-	}
+	fn HT##_compare(a: *u8, b: *u8): int => strcmp(a, b)
+	fn HT##_hashf(str: *u8): u32 => hash_str(str)
 }
 
 macro HashMapStr(HT, VT) {
@@ -188,12 +180,6 @@ macro HashMapStr(HT, VT) {
 
 macro HashMapNumImpl(HT, KT, VT) {
 	HashMapImpl(HT, KT, VT)
-
-	fn HT##_compare(a: KT, b: KT): int {
-		return a != b;
-	}
-
-	fn HT##_hashf(val: KT): u32 {
-		return hash_num(val);
-	}
+	fn HT##_compare(a: KT, b: KT): int => a != b
+	fn HT##_hashf(val: KT): u32 => hash_num(val)
 }

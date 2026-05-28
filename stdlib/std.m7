@@ -1,7 +1,20 @@
 import "std/libc.m7"
 
-macro arr_len(arr) { (sizeof(arr) / sizeof(*(arr))) }
-macro new(T) { calloc(1, sizeof:T): *T }
+macro arr_len(arr) {
+	(sizeof(arr) / sizeof(*(arr))) \
+}
+
+macro new(T) {
+	(calloc(1, sizeof:T): *T) \
+}
+
+macro swap(a, b) {
+	block {
+		_tmp := a
+		a = b
+		b = _tmp
+	}
+}
 
 macro do_while(expr, body) {
     while true {

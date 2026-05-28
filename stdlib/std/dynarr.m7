@@ -8,8 +8,7 @@ macro da_copy(dst, src) {
 	(dst).reserve((src).count)
 	(dst).count = (src).count
 	memcpy(
-		(dst).items,
-		(src).items,
+		(dst).items, (src).items,
 		sizeof(*(dst).items) * (dst).count,
 	)
 }
