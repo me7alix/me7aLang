@@ -10,9 +10,9 @@ macro new(T) {
 
 macro swap(a, b) {
 	block {
-		_tmp := a
+		tmp := a
 		a = b
-		b = _tmp
+		b = tmp
 	}
 }
 

@@ -126,8 +126,7 @@ Type *parse_type_r(Parser *p) {
 
 		type = new(Type,
 			.kind = TYPE_POINTER,
-			.as.pointer.base = parse_type_r(p),
-		);
+			.as.pointer.base = parse_type_r(p));
 
 		return type;
 	} else if (peek(p).kind == TOK_OSQBRA) {
@@ -236,7 +235,7 @@ AST_Node *parse_method_call(Parser *p) {
 }
 
 AST_Node *parse_func_call(Parser *p) {
-	AST_Node *fcn = new(AST_Node,.kind = AST_FUNC_CALL);
+	AST_Node *fcn = new(AST_Node, .kind = AST_FUNC_CALL);
 	fcn->loc = peek(p).loc;
 	fcn->as.func_call.id = next(p).data;
 	expect(peek(p), TOK_OPAR);
@@ -292,8 +291,6 @@ AST_Node *parse_func_call(Parser *p) {
 	if (!met_any && !is_next_any && arg_cnt < fargs.count)
 		throw_error(fcn->loc, "not enough arguments");
 
-	//next(p);
-	//expect(peek(p), TOK_CPAR);
 	return fcn;
 }
 
@@ -340,8 +337,7 @@ AST_Node *parse_var_assign(Parser *p) {
 		.loc = loc,
 		.as.var_def.id = id,
 		.as.var_def.uid = VUID++,
-		.as.var_def.expr = expr,
-	);
+		.as.var_def.expr = expr);
 
 	switch (expr->kind) {
 	case AST_BIN_EXP:
@@ -375,14 +371,12 @@ AST_Node *parse_var_assign(Parser *p) {
 
 AST_Node *parse_var_mut(Parser *p, ExprParsingType pt) {
 	AST_Node *exp = parse_expr(p, pt, NULL);
-	AST_Node *vmn = new(AST_Node,
+	return new(AST_Node,
 		.kind = AST_VAR_MUT,
 		.loc = exp->loc,
 		.as.var_mut.type = exp->as.ebin.type,
-		.as.var_mut.expr = exp,
+		.as.var_mut.expr = exp
 	);
-
-	return vmn;
 }
 
 AST_Node *parse_func_return(Parser *p, AST_Node *func) {
@@ -398,8 +392,9 @@ AST_Node *parse_func_return(Parser *p, AST_Node *func) {
 		ret->as.func_ret.type = (Type) {.kind = TYPE_NULL};
 	} else {
 		ret->as.func_ret.expr = parse_expr(p, EXPAR_VAR, NULL);
-		if (!compare_types(parser_get_type(p, ret->as.func_ret.expr), ret->as.func_ret.type))
+		if (!compare_types(parser_get_type(p, ret->as.func_ret.expr), ret->as.func_ret.type)) {
 			throw_error(ret->as.func_ret.expr->loc, "types mismatch");
+		}
 	}
 
 	return ret;
@@ -410,15 +405,13 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip);
 AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 	AST_Node *r = new(AST_Node,
 		.kind = AST_IF_STMT,
-		.loc = peek(p).loc);
-
-	next(p);
+		.loc = next(p).loc);
 
 	r->as.stmt_if.expr = parse_expr(p, EXPAR_STMT, NULL);
 	if (parser_get_type(p, r->as.stmt_if.expr).kind != TYPE_BOOL)
 		throw_error(r->as.stmt_while.expr->loc, "bool expected");
-	next(p);
 
+	next(p);
 	r->as.stmt_if.body = parse_body(p, func, false);
 
 	if (peek2(p).kind == TOK_ELSE_SYM) {
@@ -429,18 +422,19 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 		} else {
 			r->as.stmt_if.next = new(AST_Node,
 				.kind = AST_ELSE_STMT,
-				.loc = next(p).loc,
-			);
+				.loc = next(p).loc);
 			r->as.stmt_if.next->as.stmt_else.body = parse_body(p, func, false);
 		}
-	} else r->as.stmt_if.next = NULL;
+	} else {
+		r->as.stmt_if.next = NULL;
+	}
 
 	return r;
 }
 
 AST_Node *parse_while_stmt(Parser *p, AST_Node *func) {
 	next(p);
-	AST_Node *r = new(AST_Node,.kind = AST_WHILE_STMT);
+	AST_Node *r = new(AST_Node, .kind = AST_WHILE_STMT);
 
 	r->as.stmt_while.expr = parse_expr(p, EXPAR_STMT, NULL);
 	if (parser_get_type(p, r->as.stmt_while.expr).kind != TYPE_BOOL)
@@ -455,9 +449,7 @@ AST_Node *parse_while_stmt(Parser *p, AST_Node *func) {
 AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 	AST_Node *r = new(AST_Node,
 		.kind = AST_FOR_STMT,
-		.loc = peek(p).loc,
-	);
-	next(p);
+		.loc = next(p).loc);
 
 	push_scope(p);
 
@@ -492,7 +484,7 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 	if (peek(p).kind == TOK_ARROW)    is_arrow    = true;
 	if (peek(p).kind == TOK_ARROW_EQ) is_arrow_eq = true;
 
-	AST_Node *body = new(AST_Node,.kind = AST_BODY);
+	AST_Node *body = new(AST_Node, .kind = AST_BODY);
 	if (!is_arrow && !is_arrow_eq)
 		expect(peek(p), TOK_OBRA);
 	next(p);
@@ -509,7 +501,6 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 				.kind = AST_FUNC_RET,
 				.as.func_ret.expr = en,
 				.as.func_ret.type = et));
-
 		goto done;
 	}
 
