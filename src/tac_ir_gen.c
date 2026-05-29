@@ -26,9 +26,9 @@ static TAC_Operand NULL_OPR = {.kind = OPR_NULL};
 
 void calc_var_interval(TAC_Func *func, size_t idx, TAC_Operand opr) {
 	if (
-		opr.as.var.kind == VAR_STACK ||
+		opr.as.var.kind == VAR_LOCAL ||
 		opr.as.var.kind == VAR_ADDR  &&
-		opr.as.var.addr_kind == VAR_STACK
+		opr.as.var.addr_kind == VAR_LOCAL
 	) {
 		TAC_VarInterval *inter = TAC_VarIntervals_get(
 			&func->var_ints,
@@ -108,7 +108,7 @@ TAC_Operand tac_ir_gen_deref(IRGenExprCtx *ctx, TAC_Func *func, Type type, TAC_O
 			.args[0] = var,
 			.dst = (TAC_Operand) {
 				.kind = OPR_VAR,
-				.as.var.kind = VAR_STACK,
+				.as.var.kind = VAR_LOCAL,
 				.as.var.type = type,
 				.as.var.addr_id = var_id++,
 			}
@@ -179,7 +179,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 					.as.pointer.base = &TU8
 				},
 				.as.var.addr_id = data_id++,
-				.as.var.addr_kind = VAR_DATA,
+				.as.var.addr_kind = VAR_GLOBAL,
 			};
 		}
 
@@ -296,7 +296,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			.dst = (TAC_Operand){
 				.kind = OPR_VAR,
 				.as.var.type = exp_type,
-				.as.var.kind = VAR_STACK,
+				.as.var.kind = VAR_LOCAL,
 				.as.var.addr_id = var_id++,
 			},
 		};
@@ -504,7 +504,7 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 			.args[0] = res,
 			.dst = (TAC_Operand) {
 				.kind = OPR_VAR,
-				.as.var.kind = VAR_STACK,
+				.as.var.kind = VAR_LOCAL,
 				.as.var.type = cn->as.var_def.type,
 				.as.var.addr_id = var_id++,
 			},
@@ -515,7 +515,7 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	} else {
 		TAC_Operand opr = {
 			.kind = OPR_VAR,
-			.as.var.kind = VAR_STACK,
+			.as.var.kind = VAR_LOCAL,
 			.as.var.type = cn->as.var_def.type,
 			.as.var.addr_id = ctx.last_var,
 		};
@@ -547,7 +547,7 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 				},
 				.dst = (TAC_Operand){
 					.kind = OPR_VAR,
-					.as.var.kind = VAR_STACK,
+					.as.var.kind = VAR_LOCAL,
 					.as.var.type = TUPTR,
 					.as.var.addr_id = var_id++,
 				},
@@ -561,7 +561,7 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 				.args[1] = mult.dst,
 				.dst = (TAC_Operand){
 					.kind = OPR_VAR,
-					.as.var.kind = VAR_STACK,
+					.as.var.kind = VAR_LOCAL,
 					.as.var.type = TUPTR,
 					.as.var.addr_id = var_id++,
 				},
@@ -961,7 +961,7 @@ void tac_ir_gen_func(TAC_Program *prog, AST_Node *fn) {
 			},
 			.dst = (TAC_Operand) {
 				.kind = OPR_VAR,
-				.as.var.kind = VAR_STACK,
+				.as.var.kind = VAR_LOCAL,
 				.as.var.type = cn->as.func_def_arg.type,
 				.as.var.addr_id = var_id++,
 			},
@@ -1139,7 +1139,7 @@ TAC_Program tac_ir_gen_prog(Parser *p, int _opt_level) {
 
 			ASTVarTable_add(&avt, cn->as.var_def.uid, (TAC_Operand){
 				.kind = OPR_VAR,
-				.as.var.kind = VAR_DATA,
+				.as.var.kind = VAR_GLOBAL,
 				.as.var.type = cn->as.var_def.type,
 				.as.var.addr_id = data_id++,
 			});

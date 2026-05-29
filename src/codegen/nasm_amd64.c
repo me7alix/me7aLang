@@ -207,7 +207,7 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 		char ts[32]; opr_type_to_stack(opr, ts);
 		if (opr_kind) *opr_kind = MEM;
 
-		if (opr.as.var.kind == VAR_STACK) {
+		if (opr.as.var.kind == VAR_LOCAL) {
 			uint *off = OffTable_get(&stack_table, opr.as.var.addr_id);
 			if (off) {
 				sprintf(rbuf, "%s[rbp - %u]", ts, *off - field_off);
@@ -218,7 +218,7 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 				if (opr_kind) *opr_kind = REG;
 			}
 		} else if (opr.as.var.kind == VAR_ADDR) {
-			if (opr.as.var.addr_kind == VAR_STACK) {
+			if (opr.as.var.addr_kind == VAR_LOCAL) {
 				uint *off = OffTable_get(&stack_table, opr.as.var.addr_id);
 				if (off) {
 					sb_appendf(&body, "  mov rax, qword[rbp - %u]\n", *off);
@@ -228,11 +228,11 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 				}
 				if (field_off) sprintf(rbuf, "%s[rax + %u]", ts, field_off);
 				else           sprintf(rbuf, "%s[rax]", ts);
-			} else if (opr.as.var.addr_kind == VAR_DATA) {
+			} else if (opr.as.var.addr_kind == VAR_GLOBAL) {
 				if (field_off) sprintf(rbuf, "%s[rel D%u + %lu]", ts, opr.as.var.addr_id, field_off);
 				else           sprintf(rbuf, "%s[rel D%u]", ts, opr.as.var.addr_id);
 			} else UNREACHABLE;
-		} else if (opr.as.var.kind == VAR_DATA) {
+		} else if (opr.as.var.kind == VAR_GLOBAL) {
 			if (field_off) sprintf(rbuf, "%s[rel D%u + %u]", ts, opr.as.var.addr_id, field_off);
 			else           sprintf(rbuf, "%s[rel D%u]", ts, opr.as.var.addr_id);
 		}
@@ -652,7 +652,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 
 		case OP_ASSIGN: {
 			bool fst_asg = false;
-			if (ci.dst.as.var.kind == VAR_STACK) {
+			if (ci.dst.as.var.kind == VAR_LOCAL) {
 				uint *off = OffTable_get(&stack_table, ci.dst.as.var.addr_id);
 				Register *reg = RegTable_get(&used_regs, ci.dst.as.var.addr_id);
 				if (!off && !reg) {
@@ -722,18 +722,18 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			size_t field_off = get_struct_offset(ci.args[0]);
 
 			if (ci.args[0].as.var.kind == VAR_ADDR) {
-				if (ci.args[0].as.var.addr_kind == VAR_STACK) {
+				if (ci.args[0].as.var.addr_kind == VAR_LOCAL) {
 					uint off = *OffTable_get(&stack_table, ci.args[0].as.var.addr_id);
 					sb_appendf(&body, "  mov rax, [rbp - %u]\n", off);
 					sb_appendf(&body, "  add rax, %zu\n", field_off);
-				} else if (ci.args[0].as.var.addr_kind == VAR_DATA) {
+				} else if (ci.args[0].as.var.addr_kind == VAR_GLOBAL) {
 					sb_appendf(&body, "  lea rax, [rel D%u]\n", ci.args[0].as.var.addr_id);
 					sb_appendf(&body, "  add rax, %zu\n", field_off);
 				}
-			} else if (ci.args[0].as.var.kind == VAR_STACK) {
+			} else if (ci.args[0].as.var.kind == VAR_LOCAL) {
 				uint off = *OffTable_get(&stack_table, ci.args[0].as.var.addr_id);
 				sb_appendf(&body, "  lea rax, [rbp - %u]\n", off - field_off);
-			} else if (ci.args[0].as.var.kind == VAR_DATA) {
+			} else if (ci.args[0].as.var.kind == VAR_GLOBAL) {
 				sb_appendf(&body, "  lea rax, [rel D%u]\n", ci.args[0].as.var.addr_id);
 				sb_appendf(&body, "  add rax, %zu\n", field_off);
 			}

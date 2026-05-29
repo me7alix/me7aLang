@@ -35,9 +35,9 @@ typedef enum {
 } TAC_OperandKind;
 
 typedef enum {
-	VAR_STACK,
+	VAR_LOCAL,
 	VAR_ADDR,
-	VAR_DATA,
+	VAR_GLOBAL,
 } TAC_VarKind;
 
 typedef struct {

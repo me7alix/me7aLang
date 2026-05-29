@@ -34,27 +34,27 @@ char *tac_ir_dump_opr_type(TAC_Operand op) {
 void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 	switch (opr.kind) {
 	case OPR_FUNC_INP: sprintf(buf, "FI(%u):%d", opr.as.func_inp.arg_id,
-							                     opr.as.func_inp.type.kind);    break;
+							                     opr.as.func_inp.type.kind);  break;
 	case OPR_SIZEOF:   sprintf(buf, "sizeof:%s", tac_ir_dump_opr_type(opr)); break;
 	case OPR_FUNC_RET: sprintf(buf, "FR:%s",     tac_ir_dump_opr_type(opr)); break;
-	case OPR_NAME:     sprintf(buf, "\"%s\"",    opr.as.name);                  break;
-	case OPR_LABEL:    sprintf(buf, ".L%u",      opr.as.label_id);              break;
-	case OPR_FIELD:    sprintf(buf, ">%s",       opr.as.field_id);              break;
+	case OPR_NAME:     sprintf(buf, "\"%s\"",    opr.as.name);               break;
+	case OPR_LABEL:    sprintf(buf, ".L%u",      opr.as.label_id);           break;
+	case OPR_FIELD:    sprintf(buf, ">%s",       opr.as.field_id);           break;
 	case OPR_NULL:     sprintf(buf, "NULL");                                 break;
 
 	case OPR_VAR: {
 		switch (opr.as.var.kind) {
-		case VAR_STACK:
+		case VAR_LOCAL:
 			sprintf(buf, "(%u)", opr.as.var.addr_id);
 			break;
 		case VAR_ADDR:;
 			int id = opr.as.var.addr_id;
 			switch (opr.as.var.addr_kind) {
-			case VAR_STACK: sprintf(buf, "[(%u)]", id); break;
-			case VAR_DATA:  sprintf(buf, "[{%u}]", id); break;
-			case VAR_ADDR:  sprintf(buf, "[[%u]]", id); break;
+			case VAR_LOCAL:  sprintf(buf, "[(%u)]", id); break;
+			case VAR_GLOBAL: sprintf(buf, "[{%u}]", id); break;
+			case VAR_ADDR:   sprintf(buf, "[[%u]]", id); break;
 			} break;
-		case VAR_DATA:
+		case VAR_GLOBAL:
 			sprintf(buf, "{%u}", opr.as.var.addr_id);
 			break;
 		}
