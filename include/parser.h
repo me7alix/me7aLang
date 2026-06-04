@@ -238,14 +238,4 @@ AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart);
 AST_Node *parse_func_call(Parser *parser);
 AST_Node *parse_method_call(Parser *parser);
 
-#define UNREACHABLE \
-	do { \
-		fprintf( \
-			stderr, \
-			"%s:%d: unreachable\n", \
-			__FILE__, __LINE__ \
-		); \
-		exit(1); \
-	} while(0)
-
 #endif

@@ -9,9 +9,9 @@
 #include "../include/parser.h"
 #include "tac_ir_calc.c"
 
-uint data_id  = 1;
-uint var_id   = 1;
-uint label_id = 1;
+static uint data_id  = 1;
+static uint var_id   = 1;
+static uint label_id = 1;
 
 HT_DECL(ASTVarTable, uint, TAC_Operand)
 HT_IMPL_NUM(ASTVarTable, uint, TAC_Operand)
@@ -58,6 +58,10 @@ void calc_inst_intervals(TAC_Func *func, TAC_Instruction *inst, size_t idx) {
 	for (size_t i = 0; i < 16; i++) {
 		calc_var_interval(func, idx, inst->args[i]);
 	}
+}
+
+void append_inst(TAC_Func *func, TAC_Instruction inst) {
+	da_append(&func->body, inst);
 }
 
 Type tac_ir_get_opr_type(TAC_Operand op) {
@@ -114,7 +118,7 @@ TAC_Operand tac_ir_gen_deref(IRGenExprCtx *ctx, TAC_Func *func, Type type, TAC_O
 			}
 		};
 
-		da_append(&func->body, inst);
+		append_inst(func, inst);
 		return inst.dst;
 	}
 
@@ -140,7 +144,7 @@ TAC_Operand tac_ir_gen_deref(IRGenExprCtx *ctx, TAC_Func *func, Type type, TAC_O
 			}
 		};
 
-		da_append(&func->body, asn);
+		append_inst(func, asn);
 		return da_last(&func->body).dst;
 	}
 }
@@ -225,7 +229,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		};
 
 		ctx->last_var = inst.dst.as.var.addr_id;
-		da_append(&func->body, inst);
+		append_inst(func, inst);
 		return inst.dst;
 	} break;
 
@@ -248,7 +252,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		};
 
 		ctx->last_var = inst.dst.as.var.addr_id;
-		da_append(&func->body, inst);
+		append_inst(func, inst);
 		return inst.dst;
 	} break;
 
@@ -370,14 +374,14 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 						},
 					};
 
-					da_append(&func->body, sf);
+					append_inst(func, sf);
 
 					if      (is_pointer(rt)) inst.args[0] = sf.dst;
 					else if (is_pointer(lt)) inst.args[1] = sf.dst;
 
 					if (en->as.ebin.op == AST_OP_ARR) {
 						inst.op = OP_ADD;
-						da_append(&func->body, inst);
+						append_inst(func, inst);
 						return tac_ir_gen_deref(ctx, func, *exp_type.as.pointer.base, inst.dst);
 					}
 				} else {
@@ -396,7 +400,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 						},
 					};
 
-					da_append(&func->body, sf);
+					append_inst(func, sf);
 
 					if      (is_pointer(lt)) inst.args[0] = sf.dst;
 					else if (is_pointer(rt)) inst.args[1] = sf.dst;
@@ -418,10 +422,10 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 						},
 					};
 
-					da_append(&func->body, inst);
+					append_inst(func, inst);
 
 					ctx->last_var = sf.dst.as.var.addr_id;
-					da_append(&func->body, sf);
+					append_inst(func, sf);
 
 					return sf.dst;
 				}
@@ -429,7 +433,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		}
 
 		ctx->last_var = inst.dst.as.var.addr_id;
-		da_append(&func->body, inst);
+		append_inst(func, inst);
 		return inst.dst;
 	} break;
 
@@ -483,7 +487,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		}
 
 		ctx->last_var = inst.dst.as.var.addr_id;
-		da_append(&func->body, inst);
+		append_inst(func, inst);
 		return inst.dst;
 	} break;
 
@@ -510,7 +514,7 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 			},
 		};
 
-		da_append(&func->body, inst);
+		append_inst(func, inst);
 		ASTVarTable_add(&avt, cn->as.var_def.uid, inst.dst);
 	} else {
 		TAC_Operand opr = {
@@ -553,7 +557,7 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 				},
 			};
 
-			da_append(&func->body, mult);
+			append_inst(func, mult);
 
 			TAC_Instruction add = {
 				.op = OP_ADD,
@@ -567,15 +571,12 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 				},
 			};
 
-			da_append(&func->body, add);
-
-			TAC_Instruction asg = {
+			append_inst(func, add);
+			append_inst(func, (TAC_Instruction){
 				.op = OP_ASSIGN,
 				.args[0] = tac_ir_gen_expr(&ctx2, prog, func, cn->as.var_def.expr->as.array.items[i]),
 				.dst = tac_ir_gen_deref(&ctx, func, base_type, add.dst),
-			};
-
-			da_append(&func->body, asg);
+			});
 		}
 	}
 }
@@ -619,23 +620,18 @@ void tac_ir_gen_var_mut(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 			},
 		};
 
-		da_append(&func->body, op_eq_res);
-
-		TAC_Instruction asg = {
+		append_inst(func, op_eq_res);
+		append_inst(func, (TAC_Instruction){
 			.op = OP_ASSIGN,
 			.args[0] = op_eq_res.dst,
 			.dst = dst,
-		};
-
-		da_append(&func->body, asg);
+		});
 	} else {
-		TAC_Instruction inst = {
+		append_inst(func, (TAC_Instruction){
 			.op = OP_ASSIGN,
 			.args[0] = res,
 			.dst = dst,
-		};
-
-		da_append(&func->body, inst);
+		});
 	}
 }
 
@@ -656,7 +652,7 @@ void tac_ir_gen_func_call(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	}
 
 	func_call.args[cn->as.func_call.args.count] = NULL_OPR;
-	da_append(&func->body, func_call);
+	append_inst(func, func_call);
 }
 
 void tac_ir_gen_method_call(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
@@ -679,7 +675,7 @@ void tac_ir_gen_method_call(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	}
 
 	method_call.args[cn->as.method_call.args.count] = NULL_OPR;
-	da_append(&func->body, method_call);
+	append_inst(func, method_call);
 }
 
 typedef struct {
@@ -697,36 +693,34 @@ void tac_ir_gen_if_chain(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, A
 	uint label_start = label_id++;
 	uint label_end = label_id++;
 
-	TAC_Instruction inst = {
+	append_inst(func, (TAC_Instruction){
 		.op = OP_JUMP_IF_NOT,
 		.args[0] = res,
-		.dst = (TAC_Operand) {
+		.dst = (TAC_Operand){
 			.kind = OPR_LABEL,
 			.as.label_id = label_start,
 		},
-	};
-
-	da_append(&func->body, inst);
+	});
 
 	tac_ir_gen_body(ctx, prog, func, cn->as.stmt_if.body);
 
 	if (cn->as.stmt_if.next) {
-		da_append(&func->body, ((TAC_Instruction){
+		append_inst(func, (TAC_Instruction){
 			.op = OP_JUMP,
 			.dst = (TAC_Operand) {
 				.kind = OPR_LABEL,
 				.as.label_id = label_end,
 			},
-		}));
+		});
 	}
 
-	da_append(&func->body, ((TAC_Instruction){
+	append_inst(func, (TAC_Instruction){
 		.op = OP_LABEL,
 		.args[0] = (TAC_Operand) {
 			.kind = OPR_LABEL,
 			.as.label_id = label_start,
 		},
-	}));
+	});
 
 	if (cn->as.stmt_if.next) {
 		if (cn->as.stmt_if.next->kind == AST_IF_STMT) {
@@ -735,7 +729,7 @@ void tac_ir_gen_if_chain(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, A
 			tac_ir_gen_body(ctx, prog, func, cn->as.stmt_if.next->as.stmt_else.body);
 		} else UNREACHABLE;
 
-		da_append(&func->body, ((TAC_Instruction){
+		append_inst(func, ((TAC_Instruction){
 			.op = OP_LABEL,
 			.args[0] = (TAC_Operand) {
 				.kind = OPR_LABEL,
@@ -758,7 +752,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 
 		case AST_FUNC_RET: {
 			if (cn->as.func_ret.type.kind == TYPE_NULL) {
-				da_append(&func->body, ((TAC_Instruction){
+				append_inst(func, ((TAC_Instruction){
 					.op = OP_RETURN,
 					.args[0] = NULL_OPR,
 				}));
@@ -773,22 +767,20 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 
 			switch (res.kind) {
 			case OPR_LITERAL:
-				da_append(&func->body, ((TAC_Instruction){
+				append_inst(func, ((TAC_Instruction){
 					.op = OP_RETURN,
 					.args[0] = res,
 				}));
 				break;
-			case OPR_VAR:;
-				TAC_Instruction inst = {
+			case OPR_VAR:
+				append_inst(func, (TAC_Instruction){
 					.op = OP_RETURN,
-					.args[0] = (TAC_Operand) {
+					.args[0] = (TAC_Operand){
 						.kind = OPR_VAR,
 						.as.var.type = cn->as.func_ret.type,
 						.as.var.addr_id = res.as.var.addr_id,
 					},
-				};
-
-				da_append(&func->body, inst);
+				});
 				break;
 			default:
 				UNREACHABLE;
@@ -796,8 +788,10 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 		} break;
 
 		case AST_LOOP_BREAK:
-			if (ctx->loop_gen <= 0) throw_error(cn->loc, "break outside of loop");
-			da_append(&func->body, ((TAC_Instruction){
+			if (ctx->loop_gen <= 0)
+				throw_error(cn->loc, "break outside of loop");
+
+			append_inst(func, ((TAC_Instruction){
 				.op = OP_JUMP,
 				.dst = (TAC_Operand) {
 					.kind = OPR_LABEL,
@@ -807,16 +801,19 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 			break;
 
 		case AST_LOOP_CONTINUE:
-			if (ctx->loop_gen <= 0) throw_error(cn->loc, "continue outside of loop");
-			if (ctx->for_var_mut) tac_ir_gen_var_mut(prog, func, ctx->for_var_mut);
+			if (ctx->loop_gen <= 0)
+				throw_error(cn->loc, "continue outside of loop");
 
-			da_append(&func->body, ((TAC_Instruction){
+			if (ctx->for_var_mut)
+				tac_ir_gen_var_mut(prog, func, ctx->for_var_mut);
+
+			append_inst(func, (TAC_Instruction){
 				.op = OP_JUMP,
-				.dst = (TAC_Operand) {
+				.dst = (TAC_Operand){
 					.kind = OPR_LABEL,
 					.as.label_id = ctx->label_start,
 				},
-			}));
+			});
 			break;
 
 		case AST_WHILE_STMT: {
@@ -828,7 +825,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 			ctx->label_start = label_id++;
 			ctx->label_end = label_id++;
 
-			da_append(&func->body, ((TAC_Instruction){
+			append_inst(func, ((TAC_Instruction){
 				.op = OP_LABEL,
 				.args[0] = (TAC_Operand) {
 					.kind = OPR_LABEL,
@@ -848,25 +845,25 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 				},
 			};
 
-			da_append(&func->body, jin);
+			append_inst(func, jin);
 
 			tac_ir_gen_body(ctx, prog, func, cn->as.stmt_while.body);
 
-			da_append(&func->body, ((TAC_Instruction){
+			append_inst(func, (TAC_Instruction){
 				.op = OP_JUMP,
 				.dst = (TAC_Operand) {
 					.kind = OPR_LABEL,
 					.as.label_id = ctx->label_start,
 				},
-			}));
+			});
 
-			da_append(&func->body, ((TAC_Instruction){
+			append_inst(func, (TAC_Instruction){
 				.op = OP_LABEL,
 				.args[0] = (TAC_Operand) {
 					.kind = OPR_LABEL,
 					.as.label_id = ctx->label_end,
 				},
-			}));
+			});
 
 			ctx->label_start = saved_label_start;
 			ctx->label_end = saved_label_end;
@@ -888,13 +885,13 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 			ctx->label_start = label_id++;
 			ctx->label_end = label_id++;
 
-			da_append(&func->body, ((TAC_Instruction){
+			append_inst(func, (TAC_Instruction){
 				.op = OP_LABEL,
 				.args[0] = (TAC_Operand) {
 					.kind = OPR_LABEL,
 					.as.label_id = ctx->label_start,
 				},
-			}));
+			});
 
 			IRGenExprCtx ectx = {0};
 			TAC_Operand res = tac_ir_gen_expr(&ectx, prog, func, cn->as.stmt_for.expr);
@@ -908,27 +905,27 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 				},
 			};
 
-			da_append(&func->body, jin);
+			append_inst(func, jin);
 
 			ctx->for_var_mut = cn->as.stmt_for.mut;
 			tac_ir_gen_body(ctx, prog, func, cn->as.stmt_for.body);
 			tac_ir_gen_var_mut(prog, func, cn->as.stmt_for.mut);
 
-			da_append(&func->body, ((TAC_Instruction){
+			append_inst(func, (TAC_Instruction){
 				.op = OP_JUMP,
 				.dst = (TAC_Operand) {
 					.kind = OPR_LABEL,
 					.as.label_id = ctx->label_start,
 				},
-			}));
+			});
 
-			da_append(&func->body, ((TAC_Instruction){
+			append_inst(func, (TAC_Instruction){
 				.op = OP_LABEL,
 				.args[0] = (TAC_Operand) {
 					.kind = OPR_LABEL,
 					.as.label_id = ctx->label_end,
 				},
-			}));
+			});
 
 			ctx->label_start = saved_label_start;
 			ctx->label_end = saved_label_end;
@@ -946,8 +943,8 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 void tac_ir_gen_func(TAC_Program *prog, AST_Node *fn) {
 	TAC_Func func = {
 		.name = fn->as.func_def.id,
+		.type = fn->as.func_def.type,
 		.is_static = fn->as.func_def.is_static,
-		.ret_type = fn->as.func_def.type
 	};
 
 	for (size_t i = 0; i < fn->as.func_def.args.count; i++) {
@@ -1075,8 +1072,8 @@ TAC_Program tac_ir_gen_prog(Parser *p, int _opt_level) {
 						tac_ir_gen_func(&prog, member->as.method.func);
 					} else {
 						da_append(&prog.externs, ((TAC_Extern){
-							.name     = name,
-							.ret_type = member->as.method.func->as.func_def.type,
+							.name = name,
+							.type = member->as.method.func->as.func_def.type,
 						}));
 					}
 				}
@@ -1088,15 +1085,15 @@ TAC_Program tac_ir_gen_prog(Parser *p, int _opt_level) {
 		switch (n->key.kind) {
 		case SBL_FUNC_EXTERN:
 			da_append(&prog.externs, ((TAC_Extern){
-				.name     = n->val.func_extern.extern_smb,
-				.ret_type = n->val.func_extern.type,
+				.name = n->val.func_extern.extern_smb,
+				.type = n->val.func_extern.type,
 			}));
 			break;
 		case SBL_FUNC_DEF:
 			if (!n->val.func_def.is_def) {
 				da_append(&prog.externs, ((TAC_Extern){
-					.name     = n->key.id,
-					.ret_type = n->val.func_def.type,
+					.name = n->key.id,
+					.type = n->val.func_def.type,
 				}));
 			}
 		}

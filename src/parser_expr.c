@@ -7,12 +7,12 @@
 
 #include "../include/parser.h"
 
-Type TUPTR = {.kind = TYPE_UPTR};
+static Type TUPTR = {.kind = TYPE_UPTR};
+Symbol *sbltbl_get(Parser *p, SymbolKind st, char *id);
 
-static Token peek(Parser *p)  { return *p->cur_token;       }
-static Token peek2(Parser *p) { return *(p->cur_token + 1); }
-static Token next(Parser *p)  { return *p->cur_token++;     }
-Symbol *smbt_get(Parser *p, SymbolKind st, char *id);
+#define peek(p) (*(p)->cur_token)
+#define peek2(p) (*((p)->cur_token+1))
+#define next(p) (*((p)->cur_token++))
 
 double parse_float(char *data) {
 	return atof(data);
@@ -217,7 +217,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *vart) {
 		return expr->as.func_call.type;
 
 	case AST_VID: {
-		Symbol *var = smbt_get(p, SBL_VAR, expr->as.vid.id);
+		Symbol *var = sbltbl_get(p, SBL_VAR, expr->as.vid.id);
 		if (!var) throw_error(expr->loc, "no such variable in the scope");
 		return var->variable.type;
 	} break;
@@ -568,14 +568,13 @@ AST_Node *parse_expr(Parser *p, ExprParsingType type, Type *vart) {
 
 				da_append(&nodes, parse_func_call(p));
 			} else {
-				Symbol *var = smbt_get(p, SBL_VAR, peek(p).data);
+				Symbol *var = sbltbl_get(p, SBL_VAR, peek(p).data);
 				da_append(&nodes, new(AST_Node,
 					.kind = AST_VID,
 					.loc = peek(p).loc,
 					.as.vid.id = peek(p).data,
 					.as.vid.uid = var ? var->variable.uid : 0,
 				));
-
 			}
 			break;
 

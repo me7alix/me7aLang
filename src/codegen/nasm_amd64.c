@@ -174,13 +174,14 @@ void reg_allocator_free() {
 }
 
 void opr_type_to_stack(TAC_Operand t, char *buf) {
+	static char *types[] = {"byte", "word", "dword", "qword"};
 	switch (tac_ir_get_opr_type(t).kind) {
 	case TYPE_STRUCT:
 		sprintf(buf, "");
 		break;
 	default:;
 		uint reg_size = get_reg_size(tac_ir_get_opr_type(t));
-		sprintf(buf, "%s", (char*[]){"byte", "word", "dword", "qword"}[reg_size]);
+		sprintf(buf, "%s", types[reg_size]);
 	}
 }
 
@@ -582,7 +583,8 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			nasm_gen_new_var(ci, dst, NULL);
 			load_reserved_regs(ci, arg1, arg2);
 
-			if (dst_type.kind == arg1_type.kind) { UNREACHABLE; }
+			if (dst_type.kind == arg1_type.kind)
+				UNREACHABLE;
 
 			int dsz = 0;
 			int ssz = 0;
@@ -614,24 +616,24 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				default: UNREACHABLE;
 			}
 
-			const char *ext_inst = ssig ? "movsx" : "movzx";
-			const char *dst_reg = NULL;
-			const char *src_reg = NULL;
-			const char *low_reg = NULL;
+			const char *ext_inst = ssig ? "movsx" : "movzx"; // ext inst
+			const char *DR = NULL; // dst
+			const char *SR = NULL; // src
+			const char *LR = NULL; // low
 
 			switch (dsz) {
-				case 1: dst_reg = "al";  low_reg = "al";  break;
-				case 2: dst_reg = "ax";  low_reg = "ax";  break;
-				case 4: dst_reg = "eax"; low_reg = "eax"; break;
-				case 8: dst_reg = "rax"; low_reg = "eax"; break;
+				case 1: DR = "al";  LR = "al";  break;
+				case 2: DR = "ax";  LR = "ax";  break;
+				case 4: DR = "eax"; LR = "eax"; break;
+				case 8: DR = "rax"; LR = "eax"; break;
 				default: UNREACHABLE;
 			}
 
 			switch (ssz) {
-				case 1: src_reg = "al";  break;
-				case 2: src_reg = "ax";  break;
-				case 4: src_reg = "eax"; break;
-				case 8: src_reg = "rax"; break;
+				case 1: SR = "al";  break;
+				case 2: SR = "ax";  break;
+				case 4: SR = "eax"; break;
+				case 8: SR = "rax"; break;
 				default: UNREACHABLE;
 			}
 
@@ -639,14 +641,14 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				bool is_32_to_64_signed = (ssz == 4 && dsz == 8 && ssig);
 				if (is_32_to_64_signed)
 					ext_inst = "movsxd";
-				sb_appendf(&body, "  %s %s, %s\n", ext_inst, dst_reg, opr_to_nasm(ci.args[0], NULL));
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), dst_reg);
+				sb_appendf(&body, "  %s %s, %s\n", ext_inst, DR, opr_to_nasm(ci.args[0], NULL));
+				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), DR);
 			} else if (dsz < ssz) {
-				sb_appendf(&body, "  mov %s, %s\n", src_reg, opr_to_nasm(ci.args[0], NULL));
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), low_reg);
+				sb_appendf(&body, "  mov %s, %s\n", SR, opr_to_nasm(ci.args[0], NULL));
+				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), LR);
 			} else {
-				sb_appendf(&body, "  mov %s, %s\n", dst_reg, opr_to_nasm(ci.args[0], NULL));
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), dst_reg);
+				sb_appendf(&body, "  mov %s, %s\n", DR, opr_to_nasm(ci.args[0], NULL));
+				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), DR);
 			}
 		} break;
 
@@ -758,12 +760,12 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 
 		case OP_RETURN: {
 			if (ci.args[0].kind != OPR_NULL) {
-				switch (func.ret_type.kind) {
+				switch (func.type.kind) {
 				case TYPE_STRUCT:
 				case TYPE_ARRAY:
 					assert(!"error: returning arrays/structs isn't supported yet\n");
 				default:;
-					uint reg_size = get_reg_size(func.ret_type);
+					uint reg_size = get_reg_size(func.type);
 					sb_appendf(&body, "  mov %s, %s\n", reg_forms[RAX][reg_size], opr_to_nasm(ci.args[0], NULL));
 				}
 			}

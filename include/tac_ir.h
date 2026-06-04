@@ -90,8 +90,8 @@ typedef struct {
 
 typedef struct {
 	char *name;
+	Type type;
 	bool is_static;
-	Type ret_type;
 	DA(TAC_FuncArg) args;
 	DA(TAC_Instruction) body;
 	TAC_VarIntervals var_ints;
@@ -99,7 +99,7 @@ typedef struct {
 
 typedef struct {
 	char *name;
-	Type ret_type;
+	Type type;
 	DA(TAC_FuncArg) args;
 } TAC_Extern;
 

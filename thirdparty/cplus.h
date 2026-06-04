@@ -53,6 +53,18 @@
 #define ARR_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
 #endif
 
+#ifndef UNREACHABLE
+#define UNREACHABLE \
+	do { \
+		fprintf( \
+			stderr, \
+			"%s:%d: unreachable\n", \
+			__FILE__, __LINE__ \
+		); \
+		exit(1); \
+	} while(0)
+#endif
+
 #define new(T, ...) ((T*)new_impl(sizeof(T), &(T){__VA_ARGS__}))
 static inline void* new_impl(size_t size, void *init) {
     void* p = malloc(size);

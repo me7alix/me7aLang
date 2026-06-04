@@ -8,13 +8,14 @@
 
 #include "../include/parser.h"
 
-static Token peek(Parser *p)  { return *p->cur_token;       }
-static Token peek2(Parser *p) { return *(p->cur_token + 1); }
-static Token next(Parser *p)  { return *(p->cur_token++);   }
 static uint VUID = 1;
 
 HT_IMPL_STR(UserTypes, UserType*)
 HT_IMPL(SymbolTable, SymbolKey, Symbol)
+
+#define peek(p) (*(p)->cur_token)
+#define peek2(p) (*((p)->cur_token+1))
+#define next(p) (*((p)->cur_token++))
 
 u32 SymbolTable_hashf(SymbolKey key) {
 	return hash_combine(hash_str(key.id), hash_num(key.kind));
@@ -33,19 +34,19 @@ void pop_scope(Parser *p) {
 	p->sss.count--;
 }
 
-bool smbt_glob_add(Parser *p, SymbolKind st, char *id, Symbol smbl) {
-	if (SymbolTable_get(&da_first(&p->sss), (SymbolKey) { st, id })) return true;
-	SymbolTable_add(&da_first(&p->sss), (SymbolKey) { st, id }, smbl);
+bool sbltbl_glob_add(Parser *p, SymbolKind st, char *id, Symbol smbl) {
+	if (SymbolTable_get(&da_first(&p->sss), (SymbolKey){st, id})) return true;
+	SymbolTable_add(&da_first(&p->sss), (SymbolKey){st, id}, smbl);
 	return false;
 }
 
-bool smbt_add(Parser *p, SymbolKind st, char *id, Symbol smbl) {
-	if (SymbolTable_get(&da_last(&p->sss), (SymbolKey) { st, id })) return true;
-	SymbolTable_add(&da_last(&p->sss), (SymbolKey) { st, id }, smbl);
+bool sbltbl_add(Parser *p, SymbolKind st, char *id, Symbol smbl) {
+	if (SymbolTable_get(&da_last(&p->sss), (SymbolKey){st, id})) return true;
+	SymbolTable_add(&da_last(&p->sss), (SymbolKey){st, id}, smbl);
 	return false;
 }
 
-Symbol *smbt_get(Parser *p, SymbolKind st, char *id) {
+Symbol *sbltbl_get(Parser *p, SymbolKind st, char *id) {
 	SymbolKey key = {st, id};
 
 	for (int i = p->sss.count - 1; i >= 0; i--) {
@@ -73,7 +74,7 @@ Type parser_get_type(Parser *p, AST_Node *n) {
 	case AST_METHOD_CALL:
 		return n->as.method_call.type;
 	case AST_VID:
-		return smbt_get(p, SBL_VAR, n->as.vid.id)->variable.type;
+		return sbltbl_get(p, SBL_VAR, n->as.vid.id)->variable.type;
 	default:
 		UNREACHABLE;
 	}
@@ -241,8 +242,8 @@ AST_Node *parse_func_call(Parser *p) {
 	expect(peek(p), TOK_OPAR);
 	next(p);
 
-	Symbol *fcf = smbt_get(p, SBL_FUNC_DEF,    fcn->as.func_call.id);
-	Symbol *fce = smbt_get(p, SBL_FUNC_EXTERN, fcn->as.func_call.id);
+	Symbol *fcf = sbltbl_get(p, SBL_FUNC_DEF,    fcn->as.func_call.id);
+	Symbol *fce = sbltbl_get(p, SBL_FUNC_EXTERN, fcn->as.func_call.id);
 	if (!fcf && !fce) throw_error(fcn->loc, "calling an undeclared function");
 
 	AST_Nodes fargs;
@@ -318,7 +319,7 @@ AST_Node *parse_var_def(Parser *p) {
 			vdn->as.var_def.type.as.array.length = expr->as.array.count;
 	}
 
-	if (smbt_add(p, SBL_VAR, vdn->as.var_def.id, (Symbol) {
+	if (sbltbl_add(p, SBL_VAR, vdn->as.var_def.id, (Symbol) {
 		.variable.type = vdn->as.var_def.type,
 		.variable.uid = vdn->as.var_def.uid,
 	})) throw_error(vdn->loc, "redifinition of the variable");
@@ -353,7 +354,7 @@ AST_Node *parse_var_assign(Parser *p) {
 		vdn->as.var_def.type = expr->as.func_call.type;
 		break;
 	case AST_VID:;
-		Symbol *s = smbt_get(
+		Symbol *s = sbltbl_get(
 			p, SBL_VAR, expr->as.vid.id);
 		vdn->as.var_def.type = s->variable.type;
 		break;
@@ -361,7 +362,7 @@ AST_Node *parse_var_assign(Parser *p) {
 		UNREACHABLE;
 	}
 
-	if (smbt_add(p, SBL_VAR, vdn->as.var_def.id, (Symbol) {
+	if (sbltbl_add(p, SBL_VAR, vdn->as.var_def.id, (Symbol) {
 		.variable.type = vdn->as.var_def.type,
 		.variable.uid  = vdn->as.var_def.uid,
 	})) throw_error(vdn->loc, "redifinition of the variable");
@@ -597,7 +598,7 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 			arg->as.func_def_arg.type = *parse_type(p);
 			da_append(fargs, arg);
 
-			if (smbt_add(p, SBL_VAR, arg->as.func_def_arg.id, (Symbol) {
+			if (sbltbl_add(p, SBL_VAR, arg->as.func_def_arg.id, (Symbol) {
 				.variable.type = arg->as.func_def_arg.type,
 				.variable.uid = arg->as.func_def_arg.uid,
 			})) throw_error(arg->loc, "redifinition of the variable");
@@ -651,7 +652,7 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 
 	if (self) {
 		da_append(&fdn->as.func_def.args, self);
-		smbt_add(p, SBL_VAR, self->as.func_def_arg.id, (Symbol) {
+		sbltbl_add(p, SBL_VAR, self->as.func_def_arg.id, (Symbol) {
 			.variable.type = self->as.func_def_arg.type,
 			.variable.uid = self->as.func_def_arg.uid,
 		});
@@ -681,9 +682,9 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 	for (size_t i = 0; i < fdn->as.func_def.args.count; i++)
 		da_append(&fds.func_def.args, da_get(&fdn->as.func_def.args, i));
 
-	Symbol *seu = smbt_get(p, SBL_FUNC_EX_USED, fdn->as.func_def.id);
-	Symbol *se  = smbt_get(p, SBL_FUNC_EXTERN,  fdn->as.func_def.id);
-	Symbol *sf  = smbt_get(p, SBL_FUNC_DEF,     fdn->as.func_def.id);
+	Symbol *seu = sbltbl_get(p, SBL_FUNC_EX_USED, fdn->as.func_def.id);
+	Symbol *se  = sbltbl_get(p, SBL_FUNC_EXTERN,  fdn->as.func_def.id);
+	Symbol *sf  = sbltbl_get(p, SBL_FUNC_DEF,     fdn->as.func_def.id);
 
 	if (se || seu) throw_error(fdn->loc, "the symbol is already in use");
 	else if (sf) {
@@ -708,10 +709,10 @@ AST_Node *parse_function(Parser *p, AST_Node *self) {
 		if (peek(p).kind == TOK_SEMI) {
 			pop_scope(p);
 			fds.func_def.is_def = false;
-			smbt_add(p, SBL_FUNC_DEF, fdn->as.func_def.id, fds);
+			sbltbl_add(p, SBL_FUNC_DEF, fdn->as.func_def.id, fds);
 			return NULL;
 		} else {
-			smbt_glob_add(p, SBL_FUNC_DEF, fdn->as.func_def.id, fds);
+			sbltbl_glob_add(p, SBL_FUNC_DEF, fdn->as.func_def.id, fds);
 			fdn->as.func_def.body = parse_body(p, fdn, true);
 			pop_scope(p);
 			return fdn;
@@ -748,15 +749,15 @@ void parse_extern(Parser *p) {
 		fes.func_extern.type = (Type) {.kind = TYPE_NULL};
 	}
 
-	Symbol *sf  = smbt_get(p, SBL_FUNC_DEF,     id);
-	Symbol *se  = smbt_get(p, SBL_FUNC_EXTERN,  id);
-	Symbol *seu = smbt_get(p, SBL_FUNC_EX_USED, id);
+	Symbol *sf  = sbltbl_get(p, SBL_FUNC_DEF,     id);
+	Symbol *se  = sbltbl_get(p, SBL_FUNC_EXTERN,  id);
+	Symbol *seu = sbltbl_get(p, SBL_FUNC_EX_USED, id);
 
 	if (sf || se || seu)
 		throw_error(loc, "the symbol is already in use");
 
-	smbt_add(p, SBL_FUNC_EXTERN, id, fes);
-	smbt_add(p, SBL_FUNC_EX_USED, extern_smb, (Symbol){0});
+	sbltbl_add(p, SBL_FUNC_EXTERN, id, fes);
+	sbltbl_add(p, SBL_FUNC_EX_USED, extern_smb, (Symbol){0});
 	expect(peek(p), TOK_SEMI);
 }
 
