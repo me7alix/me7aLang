@@ -24,8 +24,6 @@ arr: []int = {
 	2410, 56, 8,
 };
 
-fn add(a: int, b: int): int => a + b
-
 fn main() {
 	bubble_sort(arr, arr_len(arr))
 	for i: uptr = 0; i < 10; i+=1 {

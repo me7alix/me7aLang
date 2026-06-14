@@ -315,8 +315,8 @@ AST_Node *parse_var_def(Parser *p) {
 		vdn->as.var_def.expr = expr;
 		if (expr->kind == AST_ARRAY &&
 			vdn->as.var_def.type.kind == TYPE_ARRAY &&
-			vdn->as.var_def.type.as.array.length == 0)
-			vdn->as.var_def.type.as.array.length = expr->as.array.count;
+			vdn->as.var_def.type.as.array.length == 0
+		) vdn->as.var_def.type.as.array.length = expr->as.array.count;
 	}
 
 	if (sbltbl_add(p, SBL_VAR, vdn->as.var_def.id, (Symbol) {
@@ -338,29 +338,8 @@ AST_Node *parse_var_assign(Parser *p) {
 		.loc = loc,
 		.as.var_def.id = id,
 		.as.var_def.uid = VUID++,
+		.as.var_def.type = parser_get_type(p, expr),
 		.as.var_def.expr = expr);
-
-	switch (expr->kind) {
-	case AST_BIN_EXP:
-		vdn->as.var_def.type = expr->as.ebin.type;
-		break;
-	case AST_UN_EXP:
-		vdn->as.var_def.type = expr->as.eun.type;
-		break;
-	case AST_LITERAL:
-		vdn->as.var_def.type = expr->as.literal.type;
-		break;
-	case AST_FUNC_CALL:
-		vdn->as.var_def.type = expr->as.func_call.type;
-		break;
-	case AST_VID:;
-		Symbol *s = sbltbl_get(
-			p, SBL_VAR, expr->as.vid.id);
-		vdn->as.var_def.type = s->variable.type;
-		break;
-	default:
-		UNREACHABLE;
-	}
 
 	if (sbltbl_add(p, SBL_VAR, vdn->as.var_def.id, (Symbol) {
 		.variable.type = vdn->as.var_def.type,
