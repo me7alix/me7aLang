@@ -11,7 +11,7 @@ syn match m7Bracket /\v[\[\]]/
 syn match m7Number /\v\<\d+(\.\d+)?([eE][+-]?\d+)?\>/
 syn match m7Func /\v\w+\ze\s*\(/
 syn match m7Operator /[-+*\/=<>!&|]+/
-syn match m7Type /\v:\s*\zs((\*|\[\d*\]|\[\])\s*)*[A-Za-z_]\w*\ze/
+syn match m7Type /\v:\s*\zs((\*|\[[^]]*\])\s*)*[A-Za-z_]\w*\ze/
 
 hi def link m7Comment Comment
 hi def link m7String String
