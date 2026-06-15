@@ -1,0 +1,107 @@
+def AF_INET  2
+def AF_INET6 10
+def AF_UNIX  1
+
+def SOCK_STREAM 1
+def SOCK_DGRAM  2
+def SOCK_RAW    3
+
+def IPPROTO_IP   0
+def IPPROTO_ICMP 1
+def IPPROTO_TCP  6
+def IPPROTO_UDP  17
+
+def INADDR_ANY 0
+
+struct SockAddr {
+    sa_family: u16
+    sa_data:   [14]u8
+}
+
+struct SockAddrIn {
+    sin_family: u16
+    sin_port:   u16
+    sin_addr:   u32
+    sin_zero:   [8]u8
+}
+
+extern socket(
+	af:       int,
+	type:     int,
+	protocol: int,
+): int
+
+extern bind(
+	sockfd: int
+	name:   *SockAddr,
+	size:   u32,
+): int
+
+extern recvfrom(
+    sockfd:   int,
+    buf:      *u0,
+    len:      uptr,
+    flags:    int,
+    src_addr: *SockAddr,
+    addrlen:  *u32,
+): iptr
+
+extern sendto(
+    sockfd:    int,
+    buf:       *u0,
+    len:       uptr,
+    flags:     int,
+    dest_addr: *SockAddr,
+    addrlen:   u32,
+): iptr
+
+extern inet_pton(
+    af:  int,
+    src: *u8,
+    dst: *u32,
+): int
+
+extern inet_addr(cp: *u8): u32
+extern close(fd: int): int
+extern htons(hostshort: u16): u16
+extern ntohs(netshort: u16): u16
+extern ntohl(netlong: u32): u32
+
+extern listen(
+    sockfd:  int,
+    backlog: int,
+): int
+
+extern accept(
+    sockfd:  int,
+    addr:    *SockAddr,
+    addrlen: *u32,
+): int
+
+extern connect(
+    sockfd:  int,
+    addr:    *SockAddr,
+    addrlen: u32,
+): int
+
+extern send(
+    sockfd: int,
+    buf:    *u0,
+    len:    uptr,
+    flags:  int
+): iptr
+
+extern recv(
+    sockfd: int,
+    buf:    *u0,
+    len:    uptr,
+    flags:  int,
+): iptr
+
+impl SockAddrIn {
+	static fn set(host: *u8, port: u16) {
+		self.sin_family = AF_INET
+		self.sin_port = htons(port)
+		self.sin_addr = inet_addr(host)
+	}
+}
