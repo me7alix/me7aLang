@@ -1,0 +1,22 @@
+import "std/libc.m7"
+import "std/net/udp.m7"
+
+extern fdopen(fd: int, fl: *u8): *u0
+extern fgets(str: *u8, count: int, st: *u0): *u8
+
+fn main() {
+	sock: UdpSocket
+	sock.init()
+
+	serv: SockAddrIn
+	serv.set("127.0.0.1", 12345)
+
+	stdin: *u0 = fdopen(0, "r")
+	while true {
+		msg: [1024]u8
+		fgets(msg, sizeof(msg):int, stdin)
+		sock.send_to(msg, strlen(msg), 0, &serv)
+	}
+
+	sock.close()
+}

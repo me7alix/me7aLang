@@ -1,0 +1,32 @@
+import "std/libc.m7"
+import "std/net/udp.m7"
+
+fn main() {
+	addr: SockAddrIn
+	addr.set("0.0.0.0", 12345)
+
+	sock: UdpSocket
+	sock.init()
+	sock.bind(&addr)
+
+	buf:    [1024]u8
+	client: SockAddrIn
+
+	while true {
+		len := sizeof(buf) - 1
+		n := sock.recv_from(buf, len, 0, &client);
+		buf[n] = '\0'
+
+		ip   := ntohl(client.sin_addr)
+		port := ntohs(client.sin_port):u32
+
+		printf("From: %u.%u.%u.%u:%u\n",
+			(ip >> 24) & 0xFF,
+			(ip >> 16) & 0xFF,
+			(ip >> 8)  & 0xFF,
+			(ip >> 0)  & 0xFF,
+			port)
+
+		printf("Received: %s", buf)
+	}
+}
