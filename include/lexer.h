@@ -30,7 +30,7 @@ typedef enum {
 	TOK_INT, TOK_FLOAT,
 	TOK_TRUE, TOK_FALSE,
 	TOK_CHAR, TOK_STRING,
-	TOK_NULL,	
+	TOK_NULL,
 
 	TOK_PLUS, TOK_MINUS,
 	TOK_FOR_SYM, TOK_RET,
@@ -48,13 +48,41 @@ typedef enum {
 	TOK_BREAK, TOK_CONTINUE,
 	TOK_IMPORT, TOK_MACRO_OBJ,
 	TOK_ANY, TOK_MACRO_FUNC,
-	TOK_TO_STR,
-	
+	TOK_TO_STR, TOK_IFDEF,
+	TOK_UNDEF,
+
 	TOK_PS, TOK_BLOCK,
 	TOK_LEFT_SHIFT, TOK_RIGHT_SHIFT,
 	TOK_TILDA, TOK_XOR, TOK_ID_CONCAT,
 	TOK_ARROW, TOK_ARROW_EQ,
 } TokenKind;
+
+static struct {
+	const char *id;
+	TokenKind kind;
+} keywordPairs[] = {
+	{ "for",      TOK_FOR_SYM    },
+	{ "while",    TOK_WHILE_SYM  },
+	{ "if",       TOK_IF_SYM     },
+	{ "else",     TOK_ELSE_SYM   },
+	{ "struct",   TOK_STRUCT     },
+	{ "impl",     TOK_IMPL       },
+	{ "extern",   TOK_EXTERN     },
+	{ "true",     TOK_TRUE       },
+	{ "false",    TOK_FALSE      },
+	{ "break",    TOK_BREAK      },
+	{ "continue", TOK_CONTINUE   },
+	{ "null",     TOK_NULL       },
+	{ "sizeof",   TOK_SIZEOF     },
+	{ "return",   TOK_RET        },
+	{ "import",   TOK_IMPORT     },
+	{ "fn",       TOK_FUNC       },
+	{ "static",   TOK_STATIC     },
+	{ "block",    TOK_BLOCK      },
+	{ "do",       TOK_ARROW      },
+	{ "def",      TOK_MACRO_OBJ  },
+	{ "macro",    TOK_MACRO_FUNC },
+};
 
 typedef struct {
 	char *file;
@@ -71,8 +99,8 @@ typedef struct {
 
 typedef struct {
 	DA(Token) tokens;
-	char *cur_char;
-	Location cur_loc;
+	char *stream;
+	Location loc;
 } Lexer;
 
 void throw_error(Location loc, char *error);

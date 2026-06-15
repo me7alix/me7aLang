@@ -33,7 +33,7 @@ typedef struct {
 	MacroTable mt;
 	Imports *imports;
 	Lexer *lexer;
-	size_t cur_tok;	
+	size_t count;
 } PreprocCtx;
 
 char *read_file(const char *filename);

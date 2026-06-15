@@ -9,32 +9,12 @@
 HT_IMPL(ImportedTable, char*, bool)
 HT_IMPL_STR(MacroTable, Macro)
 
-StringBuilder path = {0};
+#define next(p)  (da_get(&(p)->lexer->tokens, (p)->count++))
+#define peek(p)  (da_get(&(p)->lexer->tokens, (p)->count))
+#define peek2(p) (da_get(&(p)->lexer->tokens, (p)->count+1))
 
-static Token peek(PreprocCtx *p) {
-	return da_get(&p->lexer->tokens, p->cur_tok);
-}
-
-static Token peek2(PreprocCtx *p) {
-	p->cur_tok++;
-	Token tok = peek(p);
-	p->cur_tok--;
-	return tok;
-}
-
-static Token next(PreprocCtx *p) {
-	Token tok = peek(p);
-	p->cur_tok++;
-	return tok;
-}
-
-static void insert(PreprocCtx *p, Token tok) {
-	da_insert(&p->lexer->tokens, p->cur_tok, tok);
-}
-
-void remove_tok(PreprocCtx *p) {
-	da_remove_ordered(&p->lexer->tokens, p->cur_tok);
-}
+#define insert(p, tok) da_insert(&(p)->lexer->tokens, (p)->count, tok)
+#define remove_tok(p)  da_remove_ordered(&(p)->lexer->tokens, (p)->count)
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -77,6 +57,7 @@ int ImportedTable_compare(char *cur_str, char *str) {
 	return pathcmp(cur_str, str);
 }
 
+StringBuilder path = {0};
 Lexer *get_lexer(PreprocCtx *p, char *file, bool *isImported) {
 	*isImported = false;
 
@@ -116,7 +97,7 @@ void resolve_pars(PreprocCtx *p, Tokens *arg) {
 		if (peek(p).kind == TOK_OPAR) {
 			resolve_pars(p, arg);
 		} else if (peek(p).kind == TOK_EOF) {
-			p->cur_tok--;
+			p->count--;
 			throw_error(peek(p).loc, "TOK_CPAR expected");
 		}
 
@@ -132,7 +113,7 @@ void resolve_bras(PreprocCtx *p, Tokens *arg) {
 		if (peek(p).kind == TOK_OBRA) {
 			resolve_bras(p, arg);
 		} else if (peek(p).kind == TOK_EOF) {
-			p->cur_tok--;
+			p->count--;
 			throw_error(peek(p).loc, "TOK_CBRA expected");
 		}
 
@@ -142,6 +123,7 @@ void resolve_bras(PreprocCtx *p, Tokens *arg) {
 }
 
 bool insert_macro(PreprocCtx *p) {
+	if (peek(p).kind != TOK_ID) return false;
 	Macro *macro = MacroTable_get(&p->mt, peek(p).data);
 	Location savedLoc = peek(p).loc;
 	if (!macro) return false;
@@ -157,7 +139,7 @@ bool insert_macro(PreprocCtx *p) {
 
 	case MACRO_FUNC:;
 		DA(Tokens) args = {0};
-		size_t savedInd = p->cur_tok;
+		size_t savedInd = p->count;
 
 		if (peek(p).kind != TOK_OPAR)
 			throw_error(peek(p).loc, "TOK_OPAR expected");
@@ -189,29 +171,25 @@ bool insert_macro(PreprocCtx *p) {
 			throw_error(peek(p).loc, "arguments count mismatching");
 		}
 
-		size_t toDelete = p->cur_tok - savedInd;
+		size_t toDelete = p->count - savedInd;
 		for (size_t i = 0; i < toDelete; i++) {
 			da_remove_ordered(&p->lexer->tokens, savedInd);
-			p->cur_tok--;
+			p->count--;
 		}
 
-		savedInd = p->cur_tok;
-
+		savedInd = p->count;
 		da_foreach (Token, tok, &macro->as.func.body) {
 			if (tok->kind == TOK_ID) {
 				for (size_t j = 0; j < macro->as.func.args.count; j++) {
 					char *arg = macro->as.func.args.items[j];
-
 					if (strcmp(arg, tok->data) == 0) {
 						da_foreach (Token, argTok, &da_get(&args, j)) {
 							insert(p, *argTok);
 							next(p);
 						}
-
 						goto found;
 					}
 				}
-
 				Token itk = *tok;
 				itk.loc = savedLoc;
 				insert(p, itk);
@@ -225,9 +203,9 @@ bool insert_macro(PreprocCtx *p) {
 			}
 		}
 
-		p->cur_tok = savedInd;
+		p->count = savedInd;
 		preprocessor(p, true);
-		p->cur_tok--;
+		p->count--;
 		da_free(&args);
 	}
 
@@ -237,15 +215,16 @@ bool insert_macro(PreprocCtx *p) {
 void preprocessor(PreprocCtx *p, bool skip) {
 	if (!skip) {
 		char *cur_folder = malloc(256);
-		get_folder(cur_folder, p->lexer->cur_loc.file);
+		get_folder(cur_folder, p->lexer->loc.file);
 		da_get(p->imports, 0) = cur_folder;
-		ImportedTable_add(&p->it, p->lexer->cur_loc.file, true);
+		ImportedTable_add(&p->it, p->lexer->loc.file, true);
 	}
 
 	while (peek(p).kind != TOK_EOF) {
 		switch (peek(p).kind) {
 		case TOK_IMPORT: {
 			next(p);
+			if (insert_macro(p)) p->count--;
 			if (peek(p).kind != TOK_STRING)
 				throw_error(peek(p).loc, "filepath expected");
 
@@ -262,29 +241,27 @@ void preprocessor(PreprocCtx *p, bool skip) {
 			if (!isImported) {
 				char *savedCurFolder = p->imports->items[0];
 				Lexer *savedLexer = p->lexer;
-				size_t savedCurTok = p->cur_tok;
+				size_t savedCurTok = p->count;
 
 				p->lexer = impLexer;
-				p->cur_tok = 0;
+				p->count = 0;
 				preprocessor(p, false);
 				impLexer = p->lexer;
 
 				p->imports->items[0] = savedCurFolder;
 				p->lexer = savedLexer;
-				p->cur_tok = savedCurTok;
+				p->count = savedCurTok;
 
 				for (size_t j = 0; j < impLexer->tokens.count - 1; j++) {
-					insert(p, da_get(&impLexer->tokens, j));
+					insert(p, (da_get(&impLexer->tokens, j)));
 					next(p);
 				}
 			}
-
-			p->cur_tok--;
+			p->count--;
 		} break;
 
 		case TOK_MACRO_FUNC: {
 			next(p);
-
 			if (peek(p).kind != TOK_ID)
 				throw_error(peek(p).loc, "TOK_ID expected");
 			char *id = peek(p).data;
@@ -301,8 +278,9 @@ void preprocessor(PreprocCtx *p, bool skip) {
 				da_append(&macro.as.func.args, peek(p).data);
 				next(p);
 
-				if (peek(p).kind == TOK_COM)
+				if (peek(p).kind == TOK_COM) {
 					next(p);
+				}
 			}
 			next(p);
 
@@ -344,15 +322,12 @@ void preprocessor(PreprocCtx *p, bool skip) {
 
 		case TOK_ID:
 			insert_macro(p);
-			break;
-
-		default:;
 		}
 
 		next(p);
 	}
 
-	p->cur_tok = 0;
+	p->count = 0;
 	while (peek(p).kind != TOK_EOF) {
 		if (
 			peek(p).kind == TOK_TO_STR &&
@@ -362,10 +337,10 @@ void preprocessor(PreprocCtx *p, bool skip) {
 			char *id = peek(p).data;
 			remove_tok(p);
 
-			insert(p, (Token){
+			insert(p, ((Token){
 				.kind = TOK_STRING,
 				.data = id,
-			});
+			}));
 
 			next(p);
 		} else if (
@@ -385,13 +360,14 @@ void preprocessor(PreprocCtx *p, bool skip) {
 			char *nid = malloc(strlen(id1) + strlen(id2) + 1);
 			sprintf(nid, "%s%s", id1, id2);
 
-			insert(p, (Token){
+			insert(p, ((Token){
 				.kind = TOK_ID,
 				.data = nid,
-			});
+			}));
 
-			if (peek2(p).kind != TOK_ID_CONCAT)
+			if (peek2(p).kind != TOK_ID_CONCAT) {
 				next(p);
+			}
 		} else if (
 			peek(p).kind  == TOK_STRING &&
 			peek2(p).kind == TOK_STRING
@@ -404,13 +380,14 @@ void preprocessor(PreprocCtx *p, bool skip) {
 			char *nstr = malloc(strlen(str1) + strlen(str2) + 1);
 			sprintf(nstr, "%s%s", str1, str2);
 
-			insert(p, (Token){
+			insert(p, ((Token){
 				.kind = TOK_STRING,
 				.data = nstr,
-			});
+			}));
 
-			if (peek2(p).kind != TOK_STRING)
+			if (peek2(p).kind != TOK_STRING) {
 				next(p);
+			}
 		} else {
 			next(p);
 		}

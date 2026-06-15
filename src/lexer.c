@@ -7,16 +7,15 @@
 #include "../include/lexer.h"
 
 char *get_id(Lexer *l) {
-	char *start = l->cur_char;
-
-	while (isalpha(*l->cur_char) ||
-		isdigit(*l->cur_char) ||
-		*l->cur_char == '_')
-		l->cur_char++;
-	l->cur_char--;
-
-	size_t len = l->cur_char - start + 1;
-	char *word = malloc(sizeof(char) * (len+1));
+	char *start = l->stream;
+	while (
+		isalpha(*l->stream) ||
+		isdigit(*l->stream) ||
+		*l->stream == '_'
+	) l->stream++;
+	l->stream--;
+	size_t len = l->stream - start + 1;
+	char *word = malloc(len + 1);
 	memcpy(word, start, len);
 	word[len] = '\0';
 	return word;
@@ -26,11 +25,11 @@ void add_token(Lexer *l, TokenKind type, char *data) {
 	da_append(&l->tokens, ((Token) {
 		.kind = type,
 		.data = data,
-		.loc = l->cur_loc,
+		.loc = l->loc,
 	}));
 }
 
-bool is_keyword(Lexer *l, char *tok, TokenKind type, char *str) {
+bool is_keyword(Lexer *l, const char *tok, TokenKind type, char *str) {
 	for (size_t i = 0; i < strlen(tok); i++) {
 		if (tok[i] != str[i]) return false;
 	}
@@ -38,23 +37,23 @@ bool is_keyword(Lexer *l, char *tok, TokenKind type, char *str) {
 	if (isalpha(str[strlen(tok)]) || str[strlen(tok)] == '_')
 		return false;
 
-	add_token(l, type, tok);
+	add_token(l, type, (char*)tok);
 
 	for (size_t i = 0; i < strlen(tok) - 1; i++)
-		l->cur_char++;
+		l->stream++;
 
 	return true;
 }
 
 Lexer lexer_lex(char *file, char *code) {
 	Lexer l = {0};
-	l.cur_loc.file = file;
-	l.cur_char = code;
-	l.cur_loc.line_start = code;
+	l.loc.file = file;
+	l.stream = code;
+	l.loc.line_start = code;
 
-	while (*l.cur_char != '\0') {
-		l.cur_loc.line_char = l.cur_char;
-		switch (*l.cur_char) {
+	while (*l.stream != '\0') {
+		l.loc.line_char = l.stream;
+		switch (*l.stream) {
 		case ' ': case '\\': case '\t':          break;
 		case '{': add_token(&l, TOK_OBRA,  "{"); break;
 		case '}': add_token(&l, TOK_CBRA,  "}"); break;
@@ -69,108 +68,108 @@ Lexer lexer_lex(char *file, char *code) {
 		case '~': add_token(&l, TOK_TILDA, "~"); break;
 
 		case '#': {
-			if (l.cur_char[1] == '#') {
+			if (l.stream[1] == '#') {
 				add_token(&l, TOK_ID_CONCAT, "##");
-				l.cur_char++;
+				l.stream++;
 			} else add_token(&l, TOK_TO_STR, "#");
 		} break;
 
 		case '.': {
-			if (l.cur_char[1] == '.' && l.cur_char[2] == '.') {
+			if (l.stream[1] == '.' && l.stream[2] == '.') {
 				add_token(&l, TOK_ANY,   "...");
-				l.cur_char += 2;
+				l.stream += 2;
 			} else add_token(&l, TOK_DOT,   ".");
 		} break;
 
 		case '+': {
-			if (l.cur_char[1] == '=') {
+			if (l.stream[1] == '=') {
 				add_token(&l, TOK_PLUS_EQ, "+=");
-				l.cur_char++;
+				l.stream++;
 			} else add_token(&l, TOK_PLUS, "+");
 		} break;
 
 		case '-': {
-			if (l.cur_char[1] == '=') {
+			if (l.stream[1] == '=') {
 				add_token(&l, TOK_MINUS_EQ, "-=");
-				l.cur_char++;
+				l.stream++;
 			} else add_token(&l, TOK_MINUS, "-");
 		} break;
 
 		case '*': {
-			if (l.cur_char[1] == '=') {
+			if (l.stream[1] == '=') {
 				add_token(&l, TOK_STAR_EQ, "*=");
-				l.cur_char++;
+				l.stream++;
 			} else add_token(&l, TOK_STAR, "*");
 		} break;
 
 		case '/': {
-			if (l.cur_char[1] == '/') {
-				while (l.cur_char[1] != '\n')
-					l.cur_char++;
-			} else if (l.cur_char[1] == '=') {
+			if (l.stream[1] == '/') {
+				while (l.stream[1] != '\n')
+					l.stream++;
+			} else if (l.stream[1] == '=') {
 				add_token(&l, TOK_SLASH_EQ, "/=");
-				l.cur_char++;
+				l.stream++;
 			} else add_token(&l, TOK_SLASH, "/");
 		} break;
 
 		case '!': {
-			if (l.cur_char[1] == '=') {
+			if (l.stream[1] == '=') {
 				add_token(&l, TOK_NOT_EQ, "!=");
-				l.cur_char++;
+				l.stream++;
 			} else {
 				add_token(&l, TOK_EXC, "!");
 			}
 		} break;
 
 		case '&': {
-			if (l.cur_char[1] == '&') {
+			if (l.stream[1] == '&') {
 				add_token(&l, TOK_AND, "&&");
-				l.cur_char++;
+				l.stream++;
 			} else {
 				add_token(&l, TOK_AMP, "&");
 			}
 		} break;
 
 		case '|': {
-			if (l.cur_char[1] == '|') {
+			if (l.stream[1] == '|') {
 				add_token(&l, TOK_OR, "||");
-				l.cur_char++;
+				l.stream++;
 			} else {
 				add_token(&l, TOK_PIPE, "|");
 			}
 		} break;
 
 		case '>': {
-			if (l.cur_char[1] == '=') {
+			if (l.stream[1] == '=') {
 				add_token(&l, TOK_GREAT_EQ, ">=");
-				l.cur_char++;
-			} else if (l.cur_char[1] == '>') {
+				l.stream++;
+			} else if (l.stream[1] == '>') {
 				add_token(&l, TOK_RIGHT_SHIFT, ">>");
-				l.cur_char++;
+				l.stream++;
 			} else {
 				add_token(&l, TOK_GREAT, ">");
 			}
 		} break;
 
 		case '<': {
-			if (l.cur_char[1] == '=') {
+			if (l.stream[1] == '=') {
 				add_token(&l, TOK_LESS_EQ, "<=");
-				l.cur_char++;
-			} else if (l.cur_char[1] == '<') {
+				l.stream++;
+			} else if (l.stream[1] == '<') {
 				add_token(&l, TOK_LEFT_SHIFT, "<<");
-				l.cur_char++;
+				l.stream++;
 			} else {
 				add_token(&l, TOK_LESS, "<");
 			}
 		} break;
 
 		case '=': {
-			if (l.cur_char[1] == '=') {
+			if (l.stream[1] == '=') {
 				add_token(&l, TOK_EQ_EQ, "==");
-				l.cur_char++;
-			} else if (l.cur_char[1] == '>') {
+				l.stream++;
+			} else if (l.stream[1] == '>') {
 				add_token(&l, TOK_ARROW_EQ, "=>");
-				l.cur_char++;
+				l.stream++;
 			} else add_token(&l, TOK_EQ, "=");
 		} break;
 
@@ -183,124 +182,116 @@ Lexer lexer_lex(char *file, char *code) {
 				case TOK_OBRA:  case TOK_COM:
 				case TOK_ARROW: case TOK_ARROW_EQ: break;
 				default:
-					if (l.cur_char[-1] != '\\') {
+					if (l.stream[-1] != '\\') {
 						add_token(&l, TOK_SEMI, ";");
 					}
 				}
 			}
 
-			if (l.cur_char[0] == '\r' && l.cur_char[1] == '\n')
-				l.cur_char++;
+			if (l.stream[0] == '\r' && l.stream[1] == '\n')
+				l.stream++;
 
-			l.cur_loc.line_num++;
-			l.cur_loc.line_start = l.cur_char + 1;
+			l.loc.line_num++;
+			l.loc.line_start = l.stream + 1;
 		} break;
 
 		case ':': {
-			if (l.cur_char[1] == '=') {
+			if (l.stream[1] == '=') {
 				add_token(&l, TOK_ASSIGN, ":=");
-				l.cur_char++;
+				l.stream++;
 			} else {
 				add_token(&l, TOK_COL, ":");
 			}
 		} break;
 
 		default:
-			if (isdigit(*l.cur_char)) {
-				char *start = l.cur_char;
+			if (isdigit(*l.stream)) {
+				char *start = l.stream;
 				bool isFloat = 0;
 				while (true) {
-					if (*l.cur_char == '.')
+					if (*l.stream == '.')
 						isFloat = 1;
-					if (!(isdigit(l.cur_char[1]) ||
-						isalpha(l.cur_char[1]) ||
-						l.cur_char[1] == '.')) break;
-					l.cur_char++;
+					if (
+						!(isdigit(l.stream[1]) ||
+						isalpha(l.stream[1]) ||
+						l.stream[1] == '.')
+					) break;
+					l.stream++;
 				}
 
-				size_t len = l.cur_char - start + 1;
+				size_t len = l.stream - start + 1;
 				char *num = malloc(sizeof(char) * (len+1));
 				memcpy(num, start, len); num[len] = '\0';
 				if (isFloat) add_token(&l, TOK_FLOAT, num);
 				else add_token(&l, TOK_INT, num);
+				goto done;
 			}
 
-			else if (*(l.cur_char) == '"') {
+			if (*(l.stream) == '"') {
 				StringBuilder sb = {0};
-				l.cur_char++;
+				l.stream++;
 
-				while (!(l.cur_char[0] == '\"' && l.cur_char[-1] != '\\')) {
-					if (l.cur_char[0] == '\\') {
-						switch (l.cur_char[1]) {
+				while (!(l.stream[0] == '\"' && l.stream[-1] != '\\')) {
+					if (l.stream[0] == '\\') {
+						switch (l.stream[1]) {
 						case '\\': sb_append(&sb, '\\'); break;
 						case '0':  sb_append(&sb, '\0'); break;
 						case 'n':  sb_append(&sb, '\n'); break;
 						case 't':  sb_append(&sb, '\t'); break;
 						case 'r':  sb_append(&sb, '\r'); break;
 						case '\"': sb_append(&sb, '\"'); break;
-						default: throw_error(l.cur_loc, "wrong character");}
-						l.cur_char++;
-					} else if (l.cur_char[0] == '\0') {
-						throw_error(l.cur_loc, "unclosed string");
+						default: throw_error(l.loc, "wrong character");}
+						l.stream++;
+					} else if (l.stream[0] == '\0') {
+						throw_error(l.loc, "unclosed string");
 					} else {
-						sb_append(&sb, l.cur_char[0]);
+						sb_append(&sb, l.stream[0]);
 					}
 
-					l.cur_char++;
+					l.stream++;
 				}
 
 				sb_append(&sb, '\0');
 				add_token(&l, TOK_STRING, sb.items);
+				goto done;
 			}
 
-			else if (*l.cur_char == '\'') {
-				l.cur_char++;
-				if (*l.cur_char == '\\') {
-					l.cur_char++;
-					switch (*l.cur_char) {
+			if (*l.stream == '\'') {
+				l.stream++;
+				if (*l.stream == '\\') {
+					l.stream++;
+					switch (*l.stream) {
 					case '0':  add_token(&l, TOK_CHAR, "\0"); break;
 					case 'n':  add_token(&l, TOK_CHAR, "\n"); break;
 					case 'r':  add_token(&l, TOK_CHAR, "\r"); break;
 					case 't':  add_token(&l, TOK_CHAR, "\t"); break;
 					case '\\': add_token(&l, TOK_CHAR, "\\"); break;
 					case '\'': add_token(&l, TOK_CHAR, "'");  break;
-					default: throw_error(l.cur_loc, "wrong character");}
-				} else add_token(&l, TOK_CHAR, l.cur_char);
+					default: throw_error(l.loc, "wrong character");}
+				} else add_token(&l, TOK_CHAR, l.stream);
 
-				l.cur_char++;
-				if (*l.cur_char != '\'') {
-					throw_error(l.cur_loc, "' expected");
+				l.stream++;
+				if (*l.stream != '\'')
+					throw_error(l.loc, "' expected");
+				goto done;
+			}
+
+			for (size_t i = 0; i < ARR_LEN(keywordPairs); i++) {
+				if (is_keyword(&l, keywordPairs[i].id, keywordPairs[i].kind, l.stream)) {
+					goto done;
 				}
 			}
 
-			else if   (is_keyword(&l, "for",      TOK_FOR_SYM,    l.cur_char)) {
-			} else if (is_keyword(&l, "while",    TOK_WHILE_SYM,  l.cur_char)) {
-			} else if (is_keyword(&l, "if",       TOK_IF_SYM,     l.cur_char)) {
-			} else if (is_keyword(&l, "else",     TOK_ELSE_SYM,   l.cur_char)) {
-			} else if (is_keyword(&l, "struct",   TOK_STRUCT,     l.cur_char)) {
-			} else if (is_keyword(&l, "impl",     TOK_IMPL,       l.cur_char)) {
-			} else if (is_keyword(&l, "extern",   TOK_EXTERN,     l.cur_char)) {
-			} else if (is_keyword(&l, "true",     TOK_TRUE,       l.cur_char)) {
-			} else if (is_keyword(&l, "false",    TOK_FALSE,      l.cur_char)) {
-			} else if (is_keyword(&l, "break",    TOK_BREAK,      l.cur_char)) {
-			} else if (is_keyword(&l, "continue", TOK_CONTINUE,   l.cur_char)) {
-			} else if (is_keyword(&l, "null",     TOK_NULL,       l.cur_char)) {
-			} else if (is_keyword(&l, "sizeof",   TOK_SIZEOF,     l.cur_char)) {
-			} else if (is_keyword(&l, "return",   TOK_RET,        l.cur_char)) {
-			} else if (is_keyword(&l, "import",   TOK_IMPORT,     l.cur_char)) {
-			} else if (is_keyword(&l, "fn",       TOK_FUNC,       l.cur_char)) {
-			} else if (is_keyword(&l, "static",   TOK_STATIC,     l.cur_char)) {
-			} else if (is_keyword(&l, "block",    TOK_BLOCK,      l.cur_char)) {
-			} else if (is_keyword(&l, "def",      TOK_MACRO_OBJ,  l.cur_char)) {
-			} else if (is_keyword(&l, "do",       TOK_ARROW,      l.cur_char)) {
-			} else if (is_keyword(&l, "macro",    TOK_MACRO_FUNC, l.cur_char)) {}
-
-			else if (isalpha(*l.cur_char) || *l.cur_char == '_')
+			if (isalpha(*l.stream) || *l.stream == '_') {
 				add_token(&l, TOK_ID, get_id(&l));
-			else throw_error(l.cur_loc, "unknown token");
+				goto done;
+			}
+
+			throw_error(l.loc, "unknown token");
 		}
 
-		l.cur_char++;
+	done:
+		l.stream++;
 	}
 
 	add_token(&l, TOK_EOF, "EOF");
