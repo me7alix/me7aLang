@@ -127,17 +127,21 @@ bool insert_macro(PreprocCtx *p) {
 	Macro *macro = MacroTable_get(&p->mt, peek(p).data);
 	Location savedLoc = peek(p).loc;
 	if (!macro) return false;
-	remove_tok(p);
 
 	switch (macro->kind) {
 	case MACRO_OBJ:
+		remove_tok(p);
 		da_foreach (Token, tok, &macro->as.obj.body) {
 			insert(p, *tok);
 			if (!insert_macro(p)) next(p);
 		}
 		break;
 
-	case MACRO_FUNC:;
+	case MACRO_FUNC:
+		if (peek2(p).kind != TOK_OPAR)
+			break;
+		remove_tok(p);
+
 		DA(Tokens) args = {0};
 		size_t savedInd = p->count;
 
