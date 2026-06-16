@@ -124,16 +124,13 @@ Type *parse_type_r(Parser *p) {
 
 	if (peek(p).kind == TOK_STAR) {
 		next(p);
-
 		type = new(Type,
 			.kind = TYPE_POINTER,
 			.as.pointer.base = parse_type_r(p));
-
 		return type;
 	} else if (peek(p).kind == TOK_OSQBRA) {
 		type = new(Type, .kind = TYPE_ARRAY);
 		next(p);
-
 		AST_Node *arrLenExpr = parse_expr(p, EXPAR_SQBRA, &TUPTR);
 		if (arrLenExpr) {
 			long long calculatedArrLen = calc_arr_len(arrLenExpr);
@@ -143,7 +140,6 @@ Type *parse_type_r(Parser *p) {
 		} else {
 			type->as.array.length = 0;
 		}
-
 		type->as.array.elem = parse_type_r(p);
 		return type;
 	}
@@ -152,7 +148,6 @@ Type *parse_type_r(Parser *p) {
 	if (peek(p).kind == TOK_FUNC) {
 		type->kind = TYPE_FUNCTION;
 		next(p);
-
 		expect(next(p), TOK_OPAR);
 		while (true) {
 			Type *arg = parse_type_r(p); next(p);
@@ -165,7 +160,6 @@ Type *parse_type_r(Parser *p) {
 				break;
 			}
 		}
-
 		if (peek(p).kind == TOK_COL) {
 			type->as.func.ret = parse_type(p);
 		} else {
@@ -173,34 +167,45 @@ Type *parse_type_r(Parser *p) {
 			type->as.func.ret = &TU0;
 			p->cur_token--;
 		}
-
 		return type;
 	}
 
-	char *tn = peek(p).data;
-	if      (!strcmp(tn, "int"))   type->kind = TYPE_INT;
-	else if (!strcmp(tn, "uint"))  type->kind = TYPE_UINT;
-	else if (!strcmp(tn, "float")) type->kind = TYPE_FLOAT;
-	else if (!strcmp(tn, "bool"))  type->kind = TYPE_BOOL;
-	else if (!strcmp(tn, "i16"))   type->kind = TYPE_I16;
-	else if (!strcmp(tn, "i8"))    type->kind = TYPE_I8;
-	else if (!strcmp(tn, "i64"))   type->kind = TYPE_I64;
-	else if (!strcmp(tn, "u16"))   type->kind = TYPE_U16;
-	else if (!strcmp(tn, "u8"))    type->kind = TYPE_U8;
-	else if (!strcmp(tn, "u64"))   type->kind = TYPE_U64;
-	else if (!strcmp(tn, "u32"))   type->kind = TYPE_U32;
-	else if (!strcmp(tn, "i32"))   type->kind = TYPE_I32;
-	else if (!strcmp(tn, "iptr"))  type->kind = TYPE_IPTR;
-	else if (!strcmp(tn, "uptr"))  type->kind = TYPE_UPTR;
-	else if (!strcmp(tn, "u0"))    type->kind = TYPE_NULL;
-	else {
-		UserType **user_type = UserTypes_get(&p->ut, tn);
-		if (user_type) {
-			type->kind = (*user_type)->kind;
-			type->as.user = *user_type;
-		} else throw_error(loc, "incorrect type");
+	static struct {
+		const char *str;
+		TypeKind kind;
+	} types[] = {
+		{ "int",   TYPE_INT   },
+		{ "uint",  TYPE_UINT  },
+		{ "float", TYPE_FLOAT },
+		{ "bool",  TYPE_BOOL  },
+		{ "i16",   TYPE_I16   },
+		{ "i8",    TYPE_I8    },
+		{ "i64",   TYPE_I64   },
+		{ "u16",   TYPE_U16   },
+		{ "u8",    TYPE_U8    },
+		{ "u64",   TYPE_U64   },
+		{ "u32",   TYPE_U32   },
+		{ "i32",   TYPE_I32   },
+		{ "iptr",  TYPE_IPTR  },
+		{ "uptr",  TYPE_UPTR  },
+		{ "u0",    TYPE_NULL  },
+	};
+
+	for (size_t i = 0; i < ARR_LEN(types); i++) {
+		if (strcmp(peek(p).data, types[i].str) == 0) {
+			type->kind = types[i].kind;
+			return type;
+		}
 	}
 
+	UserType **user_type = UserTypes_get(&p->ut, peek(p).data);
+	if (user_type) {
+		type->kind = (*user_type)->kind;
+		type->as.user = *user_type;
+		return type;
+	}
+
+	throw_error(loc, "incorrect type");
 	return type;
 }
 
@@ -742,8 +747,7 @@ void parse_extern(Parser *p) {
 void parse_method(Parser *p, UserType *st, bool is_static) {
 	Type *ut = new(Type,
 		.kind = TYPE_STRUCT,
-		.as.user = st
-	);
+		.as.user = st);
 
 	AST_Node *self = new(AST_Node,
 		.kind = AST_FUNC_DEF_ARG,
@@ -802,9 +806,7 @@ void parse_struct(Parser *p) {
 
 	UserType *st = new(UserType,
 		.kind = TYPE_STRUCT,
-		.id = peek(p).data,
-	);
-
+		.id = peek(p).data);
 	UserTypes_add(&p->ut, next(p).data, st);
 
 	expect(next(p), TOK_OBRA);
@@ -858,7 +860,6 @@ void parse_impl(Parser *p) {
 		default:
 			throw_error(peek(p).loc, "unexpected token");
 		}
-
 		next(p);
 		if (peek(p).kind == TOK_SEMI) {
 			next(p);

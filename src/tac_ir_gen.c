@@ -9,16 +9,16 @@
 #include "../include/parser.h"
 #include "tac_ir_calc.c"
 
-static uint data_id  = 1;
-static uint var_id   = 1;
-static uint label_id = 1;
-
 HT_DECL(ASTVarTable, uint, TAC_Operand)
 HT_IMPL_NUM(ASTVarTable, uint, TAC_Operand)
 HT_IMPL_NUM(TAC_VarIntervals, uint, TAC_VarInterval)
 
-TAC_VarIntervals vit = {0};
-ASTVarTable avt = {0};
+static uint data_id  = 1;
+static uint var_id   = 1;
+static uint label_id = 1;
+
+static TAC_VarIntervals vit = {0};
+static ASTVarTable avt = {0};
 
 static int opt_level;
 static Type TUPTR = {.kind = TYPE_UPTR};
@@ -1033,13 +1033,6 @@ void tac_ir_gen_calc_inters(TAC_Program *prog) {
 					n->val.to_spill = true;
 				}
 			}
-
-			/*da_foreach (size_t, func_call, &func_calls) {
-				if (n->val.start <= *func_call && n->val.end >= *func_call) {
-					n->val.to_spill = true;
-				}
-			}*/
-
 			da_foreach (Interval, loop_int, &loop_ints) {
 				if (n->val.start <= loop_int->end && n->val.end >= loop_int->start) {
 					if (
