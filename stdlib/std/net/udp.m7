@@ -2,25 +2,27 @@ import "std/net/socket.m7"
 
 struct UdpSocket {
 	fd: int
+}
 
-	static fn init() {
+static impl UdpSocket {
+	fn init() {
 		self.fd = socket(AF_INET, SOCK_DGRAM, 0)
 	}
 
-	static fn bind(addr: *SockAddrIn): int {
+	fn bind(addr: *SockAddrIn): int {
 		return bind(self.fd, addr:*SockAddr, sizeof(*addr):u32)
 	}
 
-	static fn send_to(buf: *u0, len: uptr, flags: int, dst: *SockAddrIn): iptr {
+	fn send_to(buf: *u0, len: uptr, flags: int, dst: *SockAddrIn): iptr {
 		return sendto(self.fd, buf, len, flags, dst, sizeof(*dst):u32)
 	}
 
-	static fn recv_from(buf: *u0, len: uptr, flags: int, src: *SockAddrIn): iptr {
+	fn recv_from(buf: *u0, len: uptr, flags: int, src: *SockAddrIn): iptr {
 		al: u32 = sizeof(*src):u32
 		return recvfrom(self.fd, buf, len, flags, src, &al)
 	}
 
-	static fn close(): int {
+	fn close(): int {
 		return close(self.fd)
 	}
 }

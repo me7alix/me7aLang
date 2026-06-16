@@ -606,8 +606,7 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 	next(p);
 }
 
-AST_Node *parse_function(Parser *p, AST_Node *self) {
-	bool is_static = false;
+AST_Node *parse_function(Parser *p, AST_Node *self, bool is_static) {
 	if (next(p).kind == TOK_STATIC) {
 		is_static = true;
 		expect(next(p), TOK_FUNC);
@@ -740,7 +739,7 @@ void parse_extern(Parser *p) {
 	expect(peek(p), TOK_SEMI);
 }
 
-void parse_method(Parser *p, UserType *st) {
+void parse_method(Parser *p, UserType *st, bool is_static) {
 	Type *ut = new(Type,
 		.kind = TYPE_STRUCT,
 		.as.user = st
@@ -756,7 +755,7 @@ void parse_method(Parser *p, UserType *st) {
 		},
 	);
 
-	AST_Node *func = parse_function(p, self);
+	AST_Node *func = parse_function(p, self, is_static);
 	da_foreach (Member, member, &st->as.ustruct.members) {
 		if (member->kind == MBR_METHOD) {
 			AST_Node *memb = member->as.method.func;
@@ -813,7 +812,7 @@ void parse_struct(Parser *p) {
 		switch (peek(p).kind) {
 		case TOK_STATIC:
 		case TOK_FUNC:
-			parse_method(p, st);
+			parse_method(p, st, false);
 			break;
 
 		case TOK_ID: {
@@ -838,7 +837,11 @@ void parse_struct(Parser *p) {
 }
 
 void parse_impl(Parser *p) {
-	next(p);
+	bool is_static = false;
+	if (next(p).kind == TOK_STATIC) {
+		is_static = true;
+		expect(next(p), TOK_IMPL);
+	}
 
 	Location snl = peek(p).loc;
 	UserType **stc = UserTypes_get(&p->ut, next(p).data);
@@ -850,7 +853,7 @@ void parse_impl(Parser *p) {
 		switch (peek(p).kind) {
 		case TOK_STATIC:
 		case TOK_FUNC:
-			parse_method(p, st);
+			parse_method(p, st, is_static);
 			break;
 		default:
 			throw_error(peek(p).loc, "unexpected token");
@@ -905,9 +908,17 @@ Parser parser_parse(Token *tokens) {
 			}
 			break;
 
-		case TOK_STATIC:
+		case TOK_STATIC: {
+			if (peek2(&p).kind == TOK_FUNC) {
+				AST_Node *func = parse_function(&p, NULL, true);
+				if (func) da_append(&prog->as.program.stmts, func);
+			} else if (peek2(&p).kind == TOK_IMPL) {
+				parse_impl(&p);
+			}
+		} break;
+
 		case TOK_FUNC: {
-			AST_Node *func = parse_function(&p, NULL);
+			AST_Node *func = parse_function(&p, NULL, false);
 			if (func) da_append(&prog->as.program.stmts, func);
 		} break;
 
