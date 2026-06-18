@@ -182,10 +182,11 @@ int main(int argc, char **argv) {
 		da_append(&imports, std.items);
 	}
 
+	Codegen codegen = CG_FASM_AMD64;
+
 	DA(char*) src_files = {0};
 	DA(char*) obj_files = {0};
 
-	Codegen codegen = CG_FASM_AMD64;
 	char *output_bin       = "a.out";
 	char *link_dynamically = "";
 	bool compile_to_obj    = false;
@@ -334,7 +335,14 @@ int main(int argc, char **argv) {
 				output_file);
 			break;
 		case CG_FASM_AMD64:
-			systemf("fasm %s %s.o > /dev/null", output_file, srcs.items[i]);
+			switch (tp) {
+			case TP_WINDOWS:
+				systemf("fasm %s %s.o > NUL", output_file, srcs.items[i]);
+				break;
+			case TP_LINUX:
+			case TP_MACOS:
+				systemf("fasm %s %s.o > /dev/null", output_file, srcs.items[i]);
+			}
 		}
 	}
 
