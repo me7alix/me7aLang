@@ -5,10 +5,10 @@ extern fdopen(fd: int, fl: *u8): *u0
 extern fgets(str: *u8, count: int, st: *u0): *u8
 
 fn main() {
-	sock: UdpSocket
+	sock: UdpSocketV4
 	sock.init()
 
-	serv: SockAddrIn
+	serv: SockAddrV4
 	serv.set("127.0.0.1", 12345)
 
 	stdin: *u0 = fdopen(0, "r")

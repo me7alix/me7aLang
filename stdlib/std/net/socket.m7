@@ -18,7 +18,7 @@ struct SockAddr {
     sa_data:   [14]u8
 }
 
-struct SockAddrIn {
+struct SockAddrV4 {
     sin_family: u16
     sin_port:   u16
     sin_addr:   u32
@@ -98,7 +98,7 @@ extern recv(
     flags:  int,
 ): iptr
 
-impl SockAddrIn {
+impl SockAddrV4 {
 	static fn set(host: *u8, port: u16) {
 		self.sin_family = AF_INET
 		self.sin_port = htons(port)
