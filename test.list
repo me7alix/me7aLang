@@ -1,13 +1,26 @@
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/ifchain.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/dynarr_test.m7 && ./build/prog
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/hashmap_test.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/hashmap_test.m7 && ./build/prog
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/pointers.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/pointers.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/bwops.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/structs.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/fib.m7 && echo '10' | ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/snake.m7 -lf /usr/lib/libraylib.so
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/transunits/a.m7 examples/transunits/b.m7 && ./build/prog
+./build/release/m7c -tc nasm64 -O0 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
+./build/release/m7c -tc nasm64 -O1 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
+./build/release/m7c -tc nasm64 -O1 -I ./stdlib -o build/prog examples/ifchain.m7 && ./build/prog
+./build/release/m7c -tc nasm64 -O1 -I ./stdlib -o build/prog examples/dynarr_test.m7 && ./build/prog
+./build/release/m7c -tc nasm64 -O0 -I ./stdlib -o build/prog examples/hashmap_test.m7 && ./build/prog
+./build/release/m7c -tc nasm64 -O1 -I ./stdlib -o build/prog examples/hashmap_test.m7 && ./build/prog
+./build/release/m7c -tc nasm64 -O0 -I ./stdlib -o build/prog examples/pointers.m7 && ./build/prog
+./build/release/m7c -tc nasm64 -O1 -I ./stdlib -o build/prog examples/pointers.m7 && ./build/prog
+./build/release/m7c -tc nasm64 -O1 -I ./stdlib -o build/prog examples/bwops.m7 && ./build/prog
+./build/release/m7c -tc nasm64 -O1 -I ./stdlib -o build/prog examples/structs.m7 && ./build/prog
+./build/release/m7c -tc nasm64 -O1 -I ./stdlib -o build/prog examples/fib.m7 && echo '10' | ./build/prog
+./build/release/m7c -tc nasm64 -O1 -I ./stdlib -o build/prog examples/snake.m7 -lf /usr/lib/libraylib.so
+./build/release/m7c -tc nasm64 -O1 -I ./stdlib -o build/prog examples/transunits/a.m7 examples/transunits/b.m7 && ./build/prog
+./build/release/m7c -tc fasm64 -O0 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
+./build/release/m7c -tc fasm64 -O1 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
+./build/release/m7c -tc fasm64 -O1 -I ./stdlib -o build/prog examples/ifchain.m7 && ./build/prog
+./build/release/m7c -tc fasm64 -O1 -I ./stdlib -o build/prog examples/dynarr_test.m7 && ./build/prog
+./build/release/m7c -tc fasm64 -O0 -I ./stdlib -o build/prog examples/hashmap_test.m7 && ./build/prog
+./build/release/m7c -tc fasm64 -O1 -I ./stdlib -o build/prog examples/hashmap_test.m7 && ./build/prog
+./build/release/m7c -tc fasm64 -O0 -I ./stdlib -o build/prog examples/pointers.m7 && ./build/prog
+./build/release/m7c -tc fasm64 -O1 -I ./stdlib -o build/prog examples/pointers.m7 && ./build/prog
+./build/release/m7c -tc fasm64 -O1 -I ./stdlib -o build/prog examples/bwops.m7 && ./build/prog
+./build/release/m7c -tc fasm64 -O1 -I ./stdlib -o build/prog examples/structs.m7 && ./build/prog
+./build/release/m7c -tc fasm64 -O1 -I ./stdlib -o build/prog examples/fib.m7 && echo '10' | ./build/prog
+./build/release/m7c -tc fasm64 -O1 -I ./stdlib -o build/prog examples/snake.m7 -lf /usr/lib/libraylib.so
+./build/release/m7c -tc fasm64 -O1 -I ./stdlib -o build/prog examples/transunits/a.m7 examples/transunits/b.m7 && ./build/prog

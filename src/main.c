@@ -8,8 +8,22 @@
 #include "../include/parser.h"
 #include "../include/tac_ir.h"
 
-// codegens
-char *nasm_gen_prog(TAC_Program *prog, TargetPlatform tp, int opt_lvl);
+/* Codegens */
+char *nasm_gen_prog(TAC_Program *prog, TargetPlatform tp, int ol);
+char *fasm_gen_prog(TAC_Program *prog, TargetPlatform tp, int ol);
+
+typedef enum {
+	CG_NASM_AMD64,
+	CG_FASM_AMD64,
+} Codegen;
+
+struct {
+	const char *str;
+	Codegen cg;
+} codegens[] = {
+	{ "fasm64", CG_FASM_AMD64 },
+	{ "nasm64", CG_NASM_AMD64 },
+};
 
 #if defined(_WIN32)
 TargetPlatform tp = TP_WINDOWS;
@@ -113,7 +127,9 @@ void print_usage() {
 		"  -O0  Disable optimizations\n"
 		"  -O1  Enable basic optimizations\n"
 		"  -asm Save assembler output\n"
-		"  -ir  Save IR output\n");
+		"  -ir  Save IR output\n"
+		"  -tc  Set target codegen\n"
+		"  -tl  List of targets\n");
 }
 
 bool is_src_file(char *str) {
@@ -169,6 +185,7 @@ int main(int argc, char **argv) {
 	DA(char*) src_files = {0};
 	DA(char*) obj_files = {0};
 
+	Codegen codegen = CG_FASM_AMD64;
 	char *output_bin       = "a.out";
 	char *link_dynamically = "";
 	bool compile_to_obj    = false;
@@ -187,22 +204,42 @@ int main(int argc, char **argv) {
 				fprintf(stderr, "invalid -o argument\n");
 				return 1;
 			}
-
 			output_bin = argv[++i];
 		} else if (strcmp(argv[i], "-lf") == 0) {
 			if (i >= argc) {
 				fprintf(stderr, "invalid -lf argument\n");
 				return 1;
 			}
-
 			link_dynamically = argv[++i];
 		} else if (strcmp(argv[i], "-I") == 0) {
 			if (i >= argc) {
 				fprintf(stderr, "invalid -I argument\n");
 				return 1;
 			}
-
 			da_append(&imports, argv[++i]);
+		} else if (strcmp(argv[i], "-tc") == 0) {
+			if (i >= argc) {
+				fprintf(stderr, "invalid -tc argument\n");
+				return 1;
+			}
+			i++;
+			bool found = false;
+			for (size_t j = 0; j < ARR_LEN(codegens); j++) {
+				if (strcmp(codegens[j].str, argv[i]) == 0) {
+					codegen = codegens[j].cg;
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				fprintf(stderr, "invalid option %s\n", argv[i]);
+				return 1;
+			}
+		} else if (strcmp(argv[i], "-tl") == 0) {
+			for (size_t j = 0; j < ARR_LEN(codegens); j++) {
+				printf(" - %s\n", codegens[j].str);
+			}
+			return 0;
 		} else if (strcmp(argv[i], "-asm") == 0) {
 			save_asm_output = true;
 		} else if (strcmp(argv[i], "-ir") == 0) {
@@ -215,7 +252,6 @@ int main(int argc, char **argv) {
 				fprintf(stderr, "invalid option %s\n", argv[i]);
 				return 1;
 			}
-
 			opt_level = argv[i][2] - '0';
 			if (opt_level < 0 || opt_level > 1) {
 				fprintf(stderr, "no such optimization level %s\n", argv[i]);
@@ -231,7 +267,6 @@ int main(int argc, char **argv) {
 				fprintf(stderr, "invalid option %s\n", argv[i]);
 				return 1;
 			}
-
 			if (is_src_file(argv[i])) {
 				da_append(&src_files, argv[i]);
 			} else {
@@ -277,26 +312,37 @@ int main(int argc, char **argv) {
 			tac_ir_dump_prog(&prog, buf);
 		}
 
-		char *cg = nasm_gen_prog(&prog, tp, opt_level);
+		char *cg = NULL;
+		switch (codegen) {
+		case CG_FASM_AMD64:
+			cg = fasm_gen_prog(&prog, tp, opt_level);
+			break;
+		case CG_NASM_AMD64:
+			cg = nasm_gen_prog(&prog, tp, opt_level);
+		}
 		sprintf(output_file, "%s.asm", srcs.items[i]);
 		write_to_file(output_file, cg);
 
-		systemf(
-			"nasm -f %s %s",
-			(match(tp),
-				when(TP_WINDOWS, "win64")
-				when(TP_LINUX,   "elf64")
-				when(TP_MACOS,   "macho64")
-				                 "err"),
-			output_file);
+		switch (codegen) {
+		case CG_NASM_AMD64:
+			systemf(
+				"nasm -f %s %s",
+				(match(tp),
+					when(TP_WINDOWS, "win64")
+					when(TP_LINUX,   "elf64")
+					when(TP_MACOS,   "macho64") "err"),
+				output_file);
+			break;
+		case CG_FASM_AMD64:
+			systemf("fasm %s %s.o > /dev/null", output_file, srcs.items[i]);
+		}
 	}
 
 	char *obj_ext =
 		(match(tp),
 			when(TP_WINDOWS, "obj")
 			when(TP_LINUX,   "o")
-			when(TP_MACOS,   "o")
-			                 "err");
+			when(TP_MACOS,   "o") "err");
 
 	if (!save_asm_output) {
 		switch (tp) {
@@ -305,7 +351,6 @@ int main(int argc, char **argv) {
 			da_foreach (char*, src, &srcs) {
 				systemf("rm %s.asm", *src);
 			} break;
-
 		case TP_WINDOWS:
 			da_foreach (char*, src, &srcs) {
 				systemf("del /F /Q %s.asm", *src);
@@ -316,16 +361,12 @@ int main(int argc, char **argv) {
 	if (!compile_to_obj) {
 		StringBuilder cmd = {0};
 		sb_appendf(&cmd, "gcc -no-pie -o \"%s\"", output_bin);
-
 		da_foreach (char*, src, &srcs)
 			sb_appendf(&cmd, " %s.%s", *src, obj_ext);
-
 		da_foreach (char*, obj_file, &obj_files)
 			sb_appendf(&cmd, " %s", *obj_file);
-
 		sb_appendf(&cmd, " %s", link_dynamically);
 		system(cmd.items);
-
 		switch (tp) {
 		case TP_MACOS:
 		case TP_LINUX:

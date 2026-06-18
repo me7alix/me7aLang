@@ -59,6 +59,15 @@ fn main() {
 ```
 Check the [examples](./examples) directory to see what’s currently implemented.
 
+## Platform Support
+
+The compiler supports **Linux**, **Windows**, and **macOS**, and has been tested on Linux and Windows.
+
+## Supported Assemblers
+
+- [FASM](https://flatassembler.net)
+- [NASM](https://nasm.us)
+
 ## License
 
 This project is released under the MIT License.

@@ -111,7 +111,7 @@ static void opr_type_to_stack(TAC_Operand t, char *buf) {
 	}
 }
 
-char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
+char *opr_to_fasm(TAC_Operand opr, OprKind *opr_kind) {
 	static char rbuf[64];
 	switch (opr.kind) {
 	case OPR_SIZEOF: {
@@ -156,12 +156,12 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 				if (field_off) sprintf(rbuf, "%s[rax + %u]", ts, field_off);
 				else           sprintf(rbuf, "%s[rax]", ts);
 			} else if (opr.as.var.addr_kind == VAR_GLOBAL) {
-				if (field_off) sprintf(rbuf, "%s[rel D%u + %lu]", ts, opr.as.var.addr_id, field_off);
-				else           sprintf(rbuf, "%s[rel D%u]", ts, opr.as.var.addr_id);
+				if (field_off) sprintf(rbuf, "%s[D%u + %lu]", ts, opr.as.var.addr_id, field_off);
+				else           sprintf(rbuf, "%s[D%u]", ts, opr.as.var.addr_id);
 			} else UNREACHABLE;
 		} else if (opr.as.var.kind == VAR_GLOBAL) {
-			if (field_off) sprintf(rbuf, "%s[rel D%u + %u]", ts, opr.as.var.addr_id, field_off);
-			else           sprintf(rbuf, "%s[rel D%u]", ts, opr.as.var.addr_id);
+			if (field_off) sprintf(rbuf, "%s[D%u + %u]", ts, opr.as.var.addr_id, field_off);
+			else           sprintf(rbuf, "%s[D%u]", ts, opr.as.var.addr_id);
 		}
 	} break;
 
@@ -280,10 +280,12 @@ static void load_reserved_regs(TAC_Instruction inst, char *arg1, char *arg2) {
 		type_to_reg(inst.dst, arg1, arg2);
 		return;
 	}
+
 	if (inst.dst.as.var.type.kind == TYPE_BOOL) {
 		type_to_reg(inst.args[0], arg1, arg2);
 		return;
 	}
+
 	type_to_reg(inst.dst, arg1, arg2);
 }
 
@@ -292,7 +294,7 @@ static void stack_offset_add(uint off) {
 	align_up(&stack_offset, 8);
 }
 
-void nasm_gen_new_var(TAC_Instruction ci, char *dst, OprKind *opr_kind) {
+void fasm_gen_new_var(TAC_Instruction ci, char *dst, OprKind *opr_kind) {
 	if (opt_level > 0) {
 		reg_allocator_free(&var_ints, &free_regs, &used_regs, inst_idx);
 		if (ci.dst.as.var.type.kind != TYPE_STRUCT) {
@@ -317,9 +319,9 @@ void nasm_gen_new_var(TAC_Instruction ci, char *dst, OprKind *opr_kind) {
 	sprintf(dst, "%s[rbp - %u]", ts, stack_offset);
 }
 
-void nasm_gen_func(StringBuilder *code, TAC_Func func) {
+void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 	if (!func.is_static)
-		sb_appendf(code, "global %s\n", func.name);
+		sb_appendf(code, "public %s\n", func.name);
 	sb_appendf(code, "%s%s:\n", (tp == TP_MACOS ? "_" : ""), func.name);
 
 	if (func.body.count == 0) {
@@ -358,18 +360,18 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		case OP_LESS_EQ: case OP_GREAT_EQ:
 		case OP_GREAT:   case OP_LESS:
 		case OP_EQ:      case OP_NOT_EQ: {
-			nasm_gen_new_var(ci, dst, NULL);
+			fasm_gen_new_var(ci, dst, NULL);
 			load_reserved_regs(ci, arg1, arg2);
 
 			OprKind opr1_kind, opr2_kind;
 			char opr1[64], opr2[64];
 
-			sprintf(opr1, opr_to_nasm(ci.args[0], &opr1_kind));
+			sprintf(opr1, opr_to_fasm(ci.args[0], &opr1_kind));
 			if (opr1_kind != REG) {
 				sb_appendf(&body, "  mov %s, %s\n", arg1, opr1);
 			} else sprintf(arg1, opr1);
 
-			sprintf(opr2, opr_to_nasm(ci.args[1], &opr2_kind));
+			sprintf(opr2, opr_to_fasm(ci.args[1], &opr2_kind));
 			if (opr2_kind != REG) {
 				sb_appendf(&body, "  mov %s, %s\n", arg2, opr2);
 			} else sprintf(arg2, opr2);
@@ -405,16 +407,16 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		case OP_BW_XOR: case OP_MOD: {
 			OprKind opr1_kind, opr2_kind, dst_kind;
 			char opr1[64], opr2[64];
-			nasm_gen_new_var(ci, dst, &dst_kind);
+			fasm_gen_new_var(ci, dst, &dst_kind);
 			load_reserved_regs(ci, arg1, arg2);
 
-			sprintf(opr1, opr_to_nasm(ci.args[0], &opr1_kind));
+			sprintf(opr1, opr_to_fasm(ci.args[0], &opr1_kind));
 			if (dst_kind != REG) {
 				sb_appendf(&body, "  mov %s, %s\n", arg1, opr1);
 			} else sprintf(arg1, opr1);
 
 			bool is_div = ci.op == OP_DIV || ci.op == OP_MOD;
-			sprintf(opr2, opr_to_nasm(ci.args[1], &opr2_kind));
+			sprintf(opr2, opr_to_fasm(ci.args[1], &opr2_kind));
 			if (is_div || (opr2_kind != REG && dst_kind != REG)) {
 				sb_appendf(&body, "  mov %s, %s\n", arg2, opr2);
 			} else sprintf(arg2, opr2);
@@ -480,10 +482,9 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 
 		case OP_BW_NOT:
 		case OP_NOT: case OP_NEG: {
-			nasm_gen_new_var(ci, dst, NULL);
+			fasm_gen_new_var(ci, dst, NULL);
 			load_reserved_regs(ci, arg1, arg2);
-			sb_appendf(&body, "  mov %s, %s\n", arg1, opr_to_nasm(ci.args[0], NULL));
-
+			sb_appendf(&body, "  mov %s, %s\n", arg1, opr_to_fasm(ci.args[0], NULL));
 			if      (ci.op == OP_NEG)    sb_appendf(&body, "  neg %s\n", arg1);
 			else if (ci.op == OP_BW_NOT) sb_appendf(&body, "  not %s\n", arg1);
 			else if (ci.op == OP_NOT) {
@@ -491,7 +492,6 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "  setz al\n");
 				sprintf(arg1, "al");
 			}
-
 			sb_appendf(&body, "  mov %s, %s\n", dst, arg1);
 		} break;
 
@@ -504,7 +504,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				default: UNREACHABLE;
 			}
 
-			nasm_gen_new_var(ci, dst, NULL);
+			fasm_gen_new_var(ci, dst, NULL);
 			load_reserved_regs(ci, arg1, arg2);
 
 			if (dst_type.kind == arg1_type.kind)
@@ -564,20 +564,20 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			if (dsz > ssz) {
 				if (ssz == 4 && dsz == 8) {
 					if (ssig) {
-						sb_appendf(&body, "  movsxd %s, %s\n", DR, opr_to_nasm(ci.args[0], NULL));
+						sb_appendf(&body, "  movsxd %s, %s\n", DR, opr_to_fasm(ci.args[0], NULL));
 					} else {
-						sb_appendf(&body, "  mov %s, %s\n", LR, opr_to_nasm(ci.args[0], NULL));
+						sb_appendf(&body, "  mov %s, %s\n", LR, opr_to_fasm(ci.args[0], NULL));
 					}
 				} else {
-					sb_appendf(&body, "  %s %s, %s\n", ext_inst, DR, opr_to_nasm(ci.args[0], NULL));
+					sb_appendf(&body, "  %s %s, %s\n", ext_inst, DR, opr_to_fasm(ci.args[0], NULL));
 				}
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), DR);
+				sb_appendf(&body, "  mov %s, %s\n", opr_to_fasm(ci.dst, NULL), DR);
 			} else if (dsz < ssz) {
-				sb_appendf(&body, "  mov %s, %s\n", SR, opr_to_nasm(ci.args[0], NULL));
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), LR);
+				sb_appendf(&body, "  mov %s, %s\n", SR, opr_to_fasm(ci.args[0], NULL));
+				sb_appendf(&body, "  mov %s, %s\n", opr_to_fasm(ci.dst, NULL), LR);
 			} else {
-				sb_appendf(&body, "  mov %s, %s\n", DR, opr_to_nasm(ci.args[0], NULL));
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), DR);
+				sb_appendf(&body, "  mov %s, %s\n", DR, opr_to_fasm(ci.args[0], NULL));
+				sb_appendf(&body, "  mov %s, %s\n", opr_to_fasm(ci.dst, NULL), DR);
 			}
 		} break;
 
@@ -588,7 +588,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				Register *reg = (Register*)RegTable_get(&used_regs, ci.dst.as.var.addr_id);
 				if (!off && !reg) {
 					fst_asg = true;
-					nasm_gen_new_var(ci, dst, NULL);
+					fasm_gen_new_var(ci, dst, NULL);
 				}
 			}
 
@@ -599,31 +599,31 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					ci.dst.as.var.type.as.array.length);
 
 				sb_appendf(&body, "  lea %s, [rbp - %u]\n", arg1, stack_offset);
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), arg1);
+				sb_appendf(&body, "  mov %s, %s\n", opr_to_fasm(ci.dst, NULL), arg1);
 			}
 
 			if (ci.args[0].kind != OPR_NULL) {
 				if (tac_ir_get_opr_type(ci.dst).kind == TYPE_STRUCT) {
-					sb_appendf(&body, "  lea rsi, %s\n", opr_to_nasm(ci.args[0], NULL));
-					sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst, NULL));
+					sb_appendf(&body, "  lea rsi, %s\n", opr_to_fasm(ci.args[0], NULL));
+					sb_appendf(&body, "  lea rdi, %s\n", opr_to_fasm(ci.dst, NULL));
 					sb_appendf(&body, "  mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
 					sb_appendf(&body, "  cld\n");
 					sb_appendf(&body, "  rep movsb\n");
 				} else {
 					load_reserved_regs(ci, arg1, arg2);
 					OprKind dst_kind;
-					sprintf(dst, "%s", opr_to_nasm(ci.dst, &dst_kind));
+					sprintf(dst, "%s", opr_to_fasm(ci.dst, &dst_kind));
 					if (dst_kind != REG) {
-						sb_appendf(&body, "  mov %s, %s\n", arg2, opr_to_nasm(ci.args[0], NULL));
+						sb_appendf(&body, "  mov %s, %s\n", arg2, opr_to_fasm(ci.args[0], NULL));
 						sb_appendf(&body, "  mov %s, %s\n", dst, arg2);
 					} else {
-						sb_appendf(&body, "  mov %s, %s\n", dst, opr_to_nasm(ci.args[0], NULL));
+						sb_appendf(&body, "  mov %s, %s\n", dst, opr_to_fasm(ci.args[0], NULL));
 					}
 				}
 			} else {
 				if (tac_ir_get_opr_type(ci.dst).kind == TYPE_STRUCT) {
 					sb_appendf(&body, "  xor rax, rax\n");
-					sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst, NULL));
+					sb_appendf(&body, "  lea rdi, %s\n", opr_to_fasm(ci.dst, NULL));
 					sb_appendf(&body, "  mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
 					sb_appendf(&body, "  rep stosb\n");
 				}
@@ -631,17 +631,17 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		} break;
 
 		case OP_DEREF: {
-			nasm_gen_new_var(ci, dst, NULL);
+			fasm_gen_new_var(ci, dst, NULL);
 			char ts[32]; opr_type_to_stack(ci.dst, ts);
 
 			if (ci.dst.as.var.type.kind != TYPE_STRUCT) {
 				load_reserved_regs(ci, arg1, arg2);
-				sb_appendf(&body, "  mov rax, %s\n",     opr_to_nasm(ci.args[0], NULL));
+				sb_appendf(&body, "  mov rax, %s\n",     opr_to_fasm(ci.args[0], NULL));
 				sb_appendf(&body, "  mov %s, %s[rax]\n", arg1, ts);
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), arg1);
+				sb_appendf(&body, "  mov %s, %s\n", opr_to_fasm(ci.dst, NULL), arg1);
 			} else {
-				sb_appendf(&body, "  mov rsi, %s\n", opr_to_nasm(ci.args[0], NULL));
-				sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst, NULL));
+				sb_appendf(&body, "  mov rsi, %s\n", opr_to_fasm(ci.args[0], NULL));
+				sb_appendf(&body, "  lea rdi, %s\n", opr_to_fasm(ci.dst, NULL));
 				sb_appendf(&body, "  mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
 				sb_appendf(&body, "  cld\n");
 				sb_appendf(&body, "  rep movsb\n");
@@ -649,7 +649,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		} break;
 
 		case OP_REF: {
-			nasm_gen_new_var(ci, dst, NULL);
+			fasm_gen_new_var(ci, dst, NULL);
 			size_t field_off = get_struct_offset(ci.args[0]);
 
 			if (ci.args[0].as.var.kind == VAR_ADDR) {
@@ -658,33 +658,33 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					sb_appendf(&body, "  mov rax, [rbp - %u]\n", off);
 					sb_appendf(&body, "  add rax, %zu\n", field_off);
 				} else if (ci.args[0].as.var.addr_kind == VAR_GLOBAL) {
-					sb_appendf(&body, "  lea rax, [rel D%u]\n", ci.args[0].as.var.addr_id);
+					sb_appendf(&body, "  lea rax, [D%u]\n", ci.args[0].as.var.addr_id);
 					sb_appendf(&body, "  add rax, %zu\n", field_off);
 				}
 			} else if (ci.args[0].as.var.kind == VAR_LOCAL) {
 				uint off = *OffTable_get(&stack_table, ci.args[0].as.var.addr_id);
 				sb_appendf(&body, "  lea rax, [rbp - %u]\n", off - field_off);
 			} else if (ci.args[0].as.var.kind == VAR_GLOBAL) {
-				sb_appendf(&body, "  lea rax, [rel D%u]\n", ci.args[0].as.var.addr_id);
+				sb_appendf(&body, "  lea rax, [D%u]\n", ci.args[0].as.var.addr_id);
 				sb_appendf(&body, "  add rax, %zu\n", field_off);
 			}
 
-			sb_appendf(&body, "  mov %s, rax\n", opr_to_nasm(ci.dst, NULL));
+			sb_appendf(&body, "  mov %s, rax\n", opr_to_fasm(ci.dst, NULL));
 		} break;
 
 		case OP_JUMP_IF_NOT: {
 			load_reserved_regs(ci, arg1, arg2);
-			sb_appendf(&body, "  mov %s, %s\n", arg1, opr_to_nasm(ci.args[0], NULL));
+			sb_appendf(&body, "  mov %s, %s\n", arg1, opr_to_fasm(ci.args[0], NULL));
 			sb_appendf(&body, "  cmp %s, 0\n", arg1);
-			sb_appendf(&body, "  je %s\n", opr_to_nasm(ci.dst, NULL));
+			sb_appendf(&body, "  je %s\n", opr_to_fasm(ci.dst, NULL));
 		} break;
 
 		case OP_LABEL: {
-			sb_appendf(&body, "%s:\n", opr_to_nasm(ci.args[0], NULL));
+			sb_appendf(&body, "%s:\n", opr_to_fasm(ci.args[0], NULL));
 		} break;
 
 		case OP_JUMP: {
-			sb_appendf(&body, "  jmp %s\n", opr_to_nasm(ci.dst, NULL));
+			sb_appendf(&body, "  jmp %s\n", opr_to_fasm(ci.dst, NULL));
 		} break;
 
 		case OP_RETURN: {
@@ -695,7 +695,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					assert(!"error: returning arrays/structs isn't supported yet\n");
 				default:;
 					uint reg_size = get_reg_size(func.type);
-					sb_appendf(&body, "  mov %s, %s\n", reg_forms[RAX][reg_size], opr_to_nasm(ci.args[0], NULL));
+					sb_appendf(&body, "  mov %s, %s\n", reg_forms[RAX][reg_size], opr_to_fasm(ci.args[0], NULL));
 				}
 			}
 
@@ -716,20 +716,20 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				case TP_LINUX:
 					if (i >= ARR_LEN(sysv_regs)) {
 						shadow_space = true;
-						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[R10][arg_size], opr_to_nasm(ci.args[i], NULL));
+						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[R10][arg_size], opr_to_fasm(ci.args[i], NULL));
 						uint shadow_space = (i - ARR_LEN(sysv_regs)) * 8 + 32;
 						sb_appendf(&fc, "  mov %s[rsp + %u], %s\n", ts, shadow_space, reg_forms[R10][arg_size]);
 					} else {
-						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[sysv_regs[i]][arg_size], opr_to_nasm(ci.args[i], NULL));
+						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[sysv_regs[i]][arg_size], opr_to_fasm(ci.args[i], NULL));
 					} break;
 				case TP_WINDOWS:
 					if (i >= ARR_LEN(win_regs)) {
 						shadow_space = true;
-						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[R10][arg_size], opr_to_nasm(ci.args[i], NULL));
+						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[R10][arg_size], opr_to_fasm(ci.args[i], NULL));
 						uint shadow_space = (i - ARR_LEN(win_regs)) * 8 + 32;
 						sb_appendf(&fc, "  mov %s[rsp + %u], %s\n", ts, shadow_space, reg_forms[R10][arg_size]);
 					} else {
-						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[win_regs[i]][arg_size], opr_to_nasm(ci.args[i], NULL));
+						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[win_regs[i]][arg_size], opr_to_fasm(ci.args[i], NULL));
 					}
 				}
 			}
@@ -785,27 +785,34 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 	sb_appendf(code, "  ret\n\n");
 }
 
-char *nasm_gen_prog(TAC_Program *prog, TargetPlatform _tp, int _opt_level) {
+char *fasm_gen_prog(TAC_Program *prog, TargetPlatform _tp, int _opt_level) {
 	StringBuilder code = {0};
 	opt_level = _opt_level;
 	tp = _tp;
 
+	switch (tp) {
+		case TP_LINUX:   sb_appendf(&code, "format ELF64\n");  break;
+		case TP_WINDOWS: sb_appendf(&code, "format PE\n");     break;
+		case TP_MACOS:   sb_appendf(&code, "format MACH64\n"); break;
+	}
+
+	sb_appendf(&code, "\n");
 	da_foreach(TAC_Extern, ext, &prog->externs)
-		sb_appendf(&code, "extern %s\n", ext->name);
+		sb_appendf(&code, "extrn %s\n", ext->name);
 	sb_appendf(&code, "\n");
 
-	sb_appendf(&code, "section .data\n");
+	sb_appendf(&code, "section '.data'\n");
 	uint uniq_data_off = 0;
 
 	da_foreach (TAC_GlobalVar, g, &prog->globals) {
 		if (g->type.kind == TYPE_ARRAY && g->is_none) {
 			uint arr_size = get_type_size(*g->type.as.array.elem) * g->type.as.array.length;
-			sb_appendf(&code, "  U%u times %u db 0\n", uniq_data_off, arr_size);
+			sb_appendf(&code, "  U%u db %u dup (0)\n", uniq_data_off, arr_size);
 			sb_appendf(&code, "  align 8\n");
 			sb_appendf(&code, "  D%u dq U%u\n", g->index, uniq_data_off++);
 		} else {
 			if (g->is_none) {
-				sb_appendf(&code, "  D%u times %u db 0\n", g->index, get_type_size(g->type));
+				sb_appendf(&code, "  D%u db %u dup (0)\n", g->index, get_type_size(g->type));
 			} else {
 				if (g->data.kind == LIT_ARR) {
 					sb_appendf(&code, "  U%u db ", uniq_data_off);
@@ -850,9 +857,9 @@ char *nasm_gen_prog(TAC_Program *prog, TargetPlatform _tp, int _opt_level) {
 	sb_appendf(&code, "  align 8\n");
 	sb_appendf(&code, "\n");
 
-	sb_appendf(&code, "section .text\n");
+	sb_appendf(&code, "section '.text'\n");
 	for (size_t i = 0; i < prog->funcs.count; i++) {
-		nasm_gen_func(&code, da_get(&prog->funcs, i));
+		fasm_gen_func(&code, da_get(&prog->funcs, i));
 	}
 
 	return code.items;

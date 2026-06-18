@@ -8,6 +8,9 @@ src/parser.c \
 src/parser_expr.c \
 src/tac_ir_dump.c \
 src/tac_ir_gen.c \
+src/codegen/amd64.c \
+src/codegen/reg_allocator.c \
+src/codegen/fasm_amd64.c \
 src/codegen/nasm_amd64.c
 
 ifeq ($(OS),Windows_NT)
