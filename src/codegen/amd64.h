@@ -10,6 +10,13 @@ typedef enum {
 	R8,  R9,
 	R10, R11, R12,
 	R13, R14, R15,
+
+	XMM0, XMM1, XMM2,
+	XMM3, XMM4, XMM5,
+	XMM6, XMM7, XMM8,
+	XMM9, XMM10, XMM11,
+	XMM12, XMM13, XMM14,
+	XMM15,
 } Register;
 
 static const char *reg_forms[][4] = {
@@ -29,8 +36,11 @@ static const char *reg_forms[][4] = {
 	[R15] = {"r15b", "r15w", "r15d", "r15"},
 };
 
-static Register sysv_regs[] = {RDI, RSI, RDX, RCX, R8, R9};
-static Register win_regs[] = {RCX, RDX, R8, R9};
+static Register callee_saved [] = {R15, R14, R13, R12, RBX};
+static Register sysv_gn_fa   [] = {RDI, RSI, RDX, RCX, R8, R9};
+static Register win_gn_fa    [] = {RCX, RDX, R8, R9};
+static Register sysv_fl_fa   [] = {XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6, XMM7};
+static Register win_fl_fa    [] = {XMM0, XMM1, XMM2, XMM3};
 
 HT_DECL(OffTable, uint, uint)
 

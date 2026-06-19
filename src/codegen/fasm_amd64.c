@@ -11,11 +11,6 @@
 #include "amd64.h"
 #include "reg_allocator.h"
 
-typedef enum {
-	REG, MEM,
-	IMM, LBL,
-} OprKind;
-
 static OffTable stack_table = {0};
 static OffTable data_table = {0};
 
@@ -23,10 +18,7 @@ static int opt_level;
 static TargetPlatform tp;
 
 // Function context
-static Registers regs_to_save;
-static Registers free_regs;
-static RegTable used_regs;
-static TAC_VarIntervals var_ints;
+static RegAllocator regal = {0};
 static StringBuilder body = {0};
 static bool is_there_return;
 static uint stack_offset;
@@ -111,6 +103,7 @@ static void opr_type_to_stack(TAC_Operand t, char *buf) {
 	}
 }
 
+typedef enum { REG, MEM, IMM, LBL } OprKind;
 char *opr_to_fasm(TAC_Operand opr, OprKind *opr_kind) {
 	static char rbuf[64];
 	switch (opr.kind) {
@@ -140,7 +133,7 @@ char *opr_to_fasm(TAC_Operand opr, OprKind *opr_kind) {
 				sprintf(rbuf, "%s[rbp - %u]", ts, *off - field_off);
 			} else {
 				size_t row = get_reg_size(opr.as.var.type);
-				Register reg = *RegTable_get(&used_regs, opr.as.var.addr_id);
+				Register reg = *RegTable_get(&regal.allocated_regs, opr.as.var.addr_id);
 				sprintf(rbuf, "%s", reg_forms[reg][row]);
 				if (opr_kind) *opr_kind = REG;
 			}
@@ -150,7 +143,7 @@ char *opr_to_fasm(TAC_Operand opr, OprKind *opr_kind) {
 				if (off) {
 					sb_appendf(&body, "  mov rax, qword[rbp - %u]\n", *off);
 				} else {
-					Register reg = *RegTable_get(&used_regs, opr.as.var.addr_id);
+					Register reg = *RegTable_get(&regal.allocated_regs, opr.as.var.addr_id);
 					sb_appendf(&body, "  mov rax, %s\n", reg_forms[reg][3]);
 				}
 				if (field_off) sprintf(rbuf, "%s[rax + %u]", ts, field_off);
@@ -234,20 +227,20 @@ char *opr_to_fasm(TAC_Operand opr, OprKind *opr_kind) {
 		switch (tp) {
 		case TP_MACOS:
 		case TP_LINUX:
-			if (arg_id >= ARR_LEN(sysv_regs)) {
-				uint shadow_space = (arg_id - ARR_LEN(sysv_regs)) * 8 + 48;
+			if (arg_id >= ARR_LEN(sysv_gn_fa)) {
+				uint shadow_space = (arg_id - ARR_LEN(sysv_gn_fa)) * 8 + 48;
 				sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", reg_forms[R10][arg_size], ts, shadow_space);
 				sprintf(rbuf, "%s", reg_forms[R10][arg_size]);
 			} else {
-				sprintf(rbuf, "%s", reg_forms[sysv_regs[arg_id]][arg_size]);
+				sprintf(rbuf, "%s", reg_forms[sysv_gn_fa[arg_id]][arg_size]);
 			} break;
 		case TP_WINDOWS:
-			if (arg_id >= ARR_LEN(win_regs)) {
-				uint shadow_space = (arg_id - ARR_LEN(win_regs)) * 8 + 48;
+			if (arg_id >= ARR_LEN(win_gn_fa)) {
+				uint shadow_space = (arg_id - ARR_LEN(win_gn_fa)) * 8 + 48;
 				sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", reg_forms[R10][arg_size], ts, shadow_space);
 				sprintf(rbuf, "%s", reg_forms[R10][arg_size]);
 			} else {
-				sprintf(rbuf, "%s", reg_forms[win_regs[arg_id]][arg_size]);
+				sprintf(rbuf, "%s", reg_forms[win_gn_fa[arg_id]][arg_size]);
 			}
 		}
 	} break;
@@ -296,14 +289,10 @@ static void stack_offset_add(uint off) {
 
 void fasm_gen_new_var(TAC_Instruction ci, char *dst, OprKind *opr_kind) {
 	if (opt_level > 0) {
-		reg_allocator_free(&var_ints, &free_regs, &used_regs, inst_idx);
+		reg_allocator_free(&regal, inst_idx);
 		if (ci.dst.as.var.type.kind != TYPE_STRUCT) {
 			Register reg;
-			bool is_reg = reg_allocator_push(
-				&var_ints, &free_regs,
-				&used_regs, &regs_to_save,
-				ci.dst.as.var.addr_id, (int*)&reg);
-			if (is_reg) {
+			if (reg_allocator_push(&regal, ci.dst.as.var.addr_id, (int*)&reg)) {
 				if (opr_kind) *opr_kind = REG;
 				size_t row = get_reg_size(ci.dst.as.var.type);
 				sprintf(dst, "%s", reg_forms[reg][row]);
@@ -330,16 +319,14 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 	}
 
 	is_there_return = false;
-	RegTable_free(&used_regs);
-	used_regs = (RegTable){0};
-	var_ints = func.var_ints;
-	da_reset(&regs_to_save);
-	da_reset(&free_regs);
-	da_append(&free_regs, R15);
-	da_append(&free_regs, R14);
-	da_append(&free_regs, R13);
-	da_append(&free_regs, R12);
-	da_append(&free_regs, RBX);
+	RegTable_free(&regal.allocated_regs);
+	regal.allocated_regs = (RegTable){0};
+	regal.life_intervals = &func.var_ints;
+	da_reset(&regal.available_regs);
+	da_reset(&regal.callee_saved_regs);
+	for (size_t i = 0; i < ARR_LEN(callee_saved); i++) {
+		da_append(&regal.available_regs, callee_saved[i]);
+	}
 
 	sb_reset(&body);
 	stack_offset = 0;
@@ -585,7 +572,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 			bool fst_asg = false;
 			if (ci.dst.as.var.kind == VAR_LOCAL) {
 				uint *off = OffTable_get(&stack_table, ci.dst.as.var.addr_id);
-				Register *reg = (Register*)RegTable_get(&used_regs, ci.dst.as.var.addr_id);
+				Register *reg = (Register*)RegTable_get(&regal.allocated_regs, ci.dst.as.var.addr_id);
 				if (!off && !reg) {
 					fst_asg = true;
 					fasm_gen_new_var(ci, dst, NULL);
@@ -714,22 +701,22 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 				switch (tp) {
 				case TP_MACOS:
 				case TP_LINUX:
-					if (i >= ARR_LEN(sysv_regs)) {
+					if (i >= ARR_LEN(sysv_gn_fa)) {
 						shadow_space = true;
 						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[R10][arg_size], opr_to_fasm(ci.args[i], NULL));
-						uint shadow_space = (i - ARR_LEN(sysv_regs)) * 8 + 32;
+						uint shadow_space = (i - ARR_LEN(sysv_gn_fa)) * 8 + 32;
 						sb_appendf(&fc, "  mov %s[rsp + %u], %s\n", ts, shadow_space, reg_forms[R10][arg_size]);
 					} else {
-						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[sysv_regs[i]][arg_size], opr_to_fasm(ci.args[i], NULL));
+						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[sysv_gn_fa[i]][arg_size], opr_to_fasm(ci.args[i], NULL));
 					} break;
 				case TP_WINDOWS:
-					if (i >= ARR_LEN(win_regs)) {
+					if (i >= ARR_LEN(win_gn_fa)) {
 						shadow_space = true;
 						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[R10][arg_size], opr_to_fasm(ci.args[i], NULL));
-						uint shadow_space = (i - ARR_LEN(win_regs)) * 8 + 32;
+						uint shadow_space = (i - ARR_LEN(win_gn_fa)) * 8 + 32;
 						sb_appendf(&fc, "  mov %s[rsp + %u], %s\n", ts, shadow_space, reg_forms[R10][arg_size]);
 					} else {
-						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[win_regs[i]][arg_size], opr_to_fasm(ci.args[i], NULL));
+						sb_appendf(&fc, "  mov %s, %s\n", reg_forms[win_gn_fa[i]][arg_size], opr_to_fasm(ci.args[i], NULL));
 					}
 				}
 			}
@@ -751,9 +738,9 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 	align_up(&stack_offset, 16);
 
 	if (opt_level > 0) {
-		stack_offset += ((regs_to_save.count + is_stack_used) * 8 % 16 == 0) * 8;
-		for (size_t i = 0; i < regs_to_save.count; i++) {
-			sb_appendf(code, "  push %s\n", reg_forms[regs_to_save.items[i]][3]);
+		stack_offset += ((regal.callee_saved_regs.count + is_stack_used) * 8 % 16 == 0) * 8;
+		for (size_t i = 0; i < regal.callee_saved_regs.count; i++) {
+			sb_appendf(code, "  push %s\n", reg_forms[regal.callee_saved_regs.items[i]][3]);
 		}
 	}
 
@@ -762,7 +749,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 		sb_appendf(code, "  mov rbp, rsp\n");
 		sb_appendf(code, "  sub rsp, %u\n", stack_offset);
 	} else {
-		if (regs_to_save.count * 8 % 16 == 0) {
+		if (regal.callee_saved_regs.count * 8 % 16 == 0) {
 			sb_appendf(code, "  sub rsp, 8\n");
 		}
 	}
@@ -775,11 +762,11 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 		sb_appendf(code, ".L_func_exit:\n");
 	if (is_stack_used)
 		sb_appendf(code, "  leave\n");
-	else if (regs_to_save.count * 8 % 16 == 0)
+	else if (regal.callee_saved_regs.count * 8 % 16 == 0)
 		sb_appendf(code, "  add rsp, 8\n");
 	if (opt_level > 0) {
-		for (long i = (long)regs_to_save.count - 1; i >= 0; i--) {
-			sb_appendf(code, "  pop %s\n", reg_forms[regs_to_save.items[i]][3]);
+		for (long i = (long)regal.callee_saved_regs.count - 1; i >= 0; i--) {
+			sb_appendf(code, "  pop %s\n", reg_forms[regal.callee_saved_regs.items[i]][3]);
 		}
 	}
 	sb_appendf(code, "  ret\n\n");
@@ -790,11 +777,11 @@ char *fasm_gen_prog(TAC_Program *prog, TargetPlatform _tp, int _opt_level) {
 	opt_level = _opt_level;
 	tp = _tp;
 
-	switch (tp) {
-		case TP_LINUX:   sb_appendf(&code, "format ELF64\n");  break;
-		case TP_WINDOWS: sb_appendf(&code, "format PE\n");     break;
-		case TP_MACOS:   sb_appendf(&code, "format MACH64\n"); break;
-	}
+	const char *format = (match(tp),
+		when(TP_LINUX, "ELF64")
+		when(TP_WINDOWS, "PE")
+		when(TP_MACOS, "MACH64") NULL);
+	sb_appendf(&code, "format %s\n", format);
 
 	sb_appendf(&code, "\n");
 	da_foreach(TAC_Extern, ext, &prog->externs)

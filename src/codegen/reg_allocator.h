@@ -6,20 +6,16 @@
 #include "../../thirdparty/cplus.h"
 
 HT_DECL(RegTable, uint, int)
-
 typedef DA(int) Registers;
 
-void reg_allocator_free(
-	TAC_VarIntervals *var_ints,
-	Registers *free_regs,
-	RegTable *used_regs,
-	uint inst_idx);
+typedef struct {
+	TAC_VarIntervals *life_intervals;
+	RegTable allocated_regs;
+	Registers available_regs;
+	Registers callee_saved_regs;
+} RegAllocator;
 
-bool reg_allocator_push(
-	TAC_VarIntervals *var_ints,
-	Registers *free_regs,
-	RegTable *used_regs,
-	Registers *regs_to_save,
-	uint vid, int *reg);
+void reg_allocator_free(RegAllocator *a, uint inst_idx);
+bool reg_allocator_push(RegAllocator *a, uint vid, int *reg);
 
 #endif
