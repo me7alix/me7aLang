@@ -8,8 +8,6 @@
 
 #include "../include/parser.h"
 
-static uint VUID = 1;
-
 HT_IMPL_STR(UserTypes, UserType*)
 HT_IMPL(SymbolTable, SymbolKey, Symbol)
 
@@ -300,6 +298,8 @@ AST_Node *parse_func_call(Parser *p) {
 	return fcn;
 }
 
+static uint var_id_ctr = 1;
+
 AST_Node *parse_var_def(Parser *p) {
 	char *id = peek(p).data;
 	Location loc = next(p).loc;
@@ -310,7 +310,7 @@ AST_Node *parse_var_def(Parser *p) {
 		.kind = AST_VAR_DEF,
 		.loc = loc,
 		.as.var_def.id = id,
-		.as.var_def.uid = VUID++,
+		.as.var_def.uid = var_id_ctr++,
 		.as.var_def.type = type,
 		.as.var_def.expr = NULL);
 
@@ -342,7 +342,7 @@ AST_Node *parse_var_assign(Parser *p) {
 		.kind = AST_VAR_DEF,
 		.loc = loc,
 		.as.var_def.id = id,
-		.as.var_def.uid = VUID++,
+		.as.var_def.uid = var_id_ctr++,
 		.as.var_def.type = parser_get_type(p, expr),
 		.as.var_def.expr = expr);
 
@@ -575,7 +575,7 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 				.loc = peek(p).loc,
 				.kind = AST_FUNC_DEF_ARG,
 				.as.func_def_arg.id = peek(p).data,
-				.as.func_def_arg.uid = VUID++,
+				.as.func_def_arg.uid = var_id_ctr++,
 			);
 
 			next(p);
@@ -752,7 +752,7 @@ void parse_method(Parser *p, UserType *st, bool is_static) {
 	AST_Node *self = new(AST_Node,
 		.kind = AST_FUNC_DEF_ARG,
 		.as.func_def_arg.id = "self",
-		.as.func_def_arg.uid = VUID++,
+		.as.func_def_arg.uid = var_id_ctr++,
 		.as.func_def_arg.type = (Type){
 			.kind = TYPE_POINTER,
 			.as.pointer.base = ut,
