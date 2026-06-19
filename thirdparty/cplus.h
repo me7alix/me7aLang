@@ -155,8 +155,14 @@ static size_t match_val = 0;
         da_get(da, _idx) = (item); \
     } while (0)
 
+#ifdef _CP_RUNTIME_CHECKS
+static size_t _cp_da_get_index;
 #define da_get(da, index) \
-    (da)->items[CP_ASSERT((index) >= 0 && (index) < (da)->count), (index)]
+    (da)->items[_cp_da_get_index = index, CP_ASSERT(_cp_da_get_index >= 0 && _cp_da_get_index < (da)->count), _cp_da_get_index]
+#else
+#define da_get(da, index) \
+    (da)->items[index]
+#endif
 
 #define da_last(da) \
     (da)->items[CP_ASSERT((da)->count > 0), ((da)->count - 1)]
