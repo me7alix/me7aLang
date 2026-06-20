@@ -11,9 +11,8 @@
 #include "amd64.h"
 #include "reg_allocator.h"
 
+HT_DECL(OffTable, uint, uint)
 static OffTable stack_table = {0};
-static OffTable data_table = {0};
-
 static int opt_level;
 static TargetPlatform tp;
 
