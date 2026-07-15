@@ -22,11 +22,9 @@ struct Person {
 		printf(
 			"Name: %s\n" \
 			"Salary: %d\n",
-
 			self.name,
 			self.salary,
 		)
-
 		printf("Address: ")
 		self.addr.print()
 	}

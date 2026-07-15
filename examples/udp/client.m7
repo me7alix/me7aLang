@@ -1,8 +1,9 @@
 import "std/libc.m7"
 import "std/net/udp.m7"
 
-extern fdopen(fd: int, fl: *u8): *u0
-extern fgets(str: *u8, count: int, st: *u0): *u8
+struct FILE {}
+extern fdopen(fd: int, fl: *u8): *FILE
+extern fgets(str: *u8, count: int, st: *FILE): *u8
 
 fn main() {
 	sock: UdpSocketV4
