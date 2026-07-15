@@ -8,16 +8,6 @@
 #include "lexer.h"
 
 typedef enum {
-	EXPAR_VAR,
-	EXPAR_ARROW,
-	EXPAR_FUNCALL,
-	EXPAR_PAR,
-	EXPAR_STMT,
-	EXPAR_SQBRA,
-	EXPAR_ARRAY,
-} ExprParsingType;
-
-typedef enum {
 	LIT_INT,
 	LIT_CHAR,
 	LIT_FLOAT,
@@ -83,15 +73,40 @@ typedef enum {
 } AST_ExprOp;
 
 typedef enum {
-	AST_WHILE_STMT, AST_IF_STMT, AST_BIN_EXP,
-	AST_VAR_DEF, AST_VID, AST_LITERAL, AST_TYPE,
-	AST_FUNC_CALL_ARG, AST_FUNC_CALL, AST_BODY,
-	AST_FUNC_DEF, AST_FUNC_DEF_ARG, AST_FUNC_RET,
-	AST_STRING, AST_VAR_MUT, AST_FUNC_RET_TYPE,
-	AST_FOR_STMT, AST_UN_OP, AST_BIN_OP, AST_PROG,
-	AST_LOOP_BREAK, AST_LOOP_CONTINUE, AST_UN_EXP,
-	AST_ELSE_STMT, AST_FUNC_DEF_ARG_ANY,
-	AST_METHOD_CALL, AST_ARRAY,
+	AST_PROG,
+
+	AST_FOR_STMT,
+	AST_WHILE_STMT,
+	AST_IF_STMT,
+	AST_ELSE_STMT,
+
+	AST_BIN_EXP,
+	AST_UN_EXP,
+
+	AST_FUNC_DEF,
+	AST_VAR_DEF,
+	AST_VAR_MUT,
+
+	AST_VID,
+	AST_TYPE,
+	AST_LITERAL,
+	AST_ARRAY,
+
+	AST_FUNC_DEF_ARG,
+	AST_FUNC_DEF_ARG_ANY,
+	AST_FUNC_RET_TYPE,
+	AST_FUNC_RET,
+	AST_FUNC_CALL_ARG,
+	AST_FUNC_CALL,
+	AST_METHOD_CALL,
+
+	AST_BODY,
+
+	AST_LOOP_BREAK,
+	AST_LOOP_CONTINUE,
+
+/* Used only during parsing */
+	AST_OPERATOR,
 } AST_NodeKind;
 
 typedef DA(AST_Node*) AST_Nodes;
@@ -174,11 +189,14 @@ struct AST_Node {
 			Type type;
 		} func_ret;
 		struct {
+			Token tok;
+			Type *type;
+		} operator;
+		struct {
 			enum {
 				ID_VAR,
 				ID_FUNC,
 			} kind;
-
 			char *id;
 			uint uid;
 		} vid;
@@ -218,7 +236,7 @@ HT_DECL(SymbolTable, SymbolKey, Symbol)
 typedef DA(SymbolTable) SymbolScopeStack;
 
 typedef struct {
-	Token *cur_token;
+	Token *tokens;
 	SymbolTable st;
 	UserTypes ut;
 	SymbolScopeStack sss;
@@ -234,8 +252,11 @@ void expect_f(Token token, TokenKind type, char *ts);
 Parser parser_parse(Token *tokens);
 void parser_free(Parser parser);
 
-AST_Node *parse_expr(Parser *parser, ExprParsingType type, Type *vart);
+#define until(...) ((TokenKind[]){__VA_ARGS__,0})
+AST_Node *parse_expr(Parser *parser, TokenKind *until, Type *src_type);
 AST_Node *parse_func_call(Parser *parser);
 AST_Node *parse_method_call(Parser *parser);
+
+void throw_types_mismatch(Location loc, Type t1, Type t2);
 
 #endif

@@ -39,23 +39,19 @@ void throw_error(Location loc, char *error) {
 	size_t lines_num = loc.line_num + 1;
 	size_t chars_num = loc.line_char-loc.line_start + 1;
 	fprintf(stderr, "%s:%zu:%zu: %s\n", loc.file, lines_num, chars_num, error);
-
 	loc.line_char = loc.line_start;
-	char error_pointer[128];
+	char error_pointer[128] = {0};
 	size_t cnt = 0;
-
 	while (*loc.line_char != '\n' && *loc.line_char != '\0'){
 		fprintf(stderr, "%c", *loc.line_char);
 		if (cnt < chars_num - 1) {
-			if (*loc.line_char != '\t') error_pointer[cnt++] = ' ';
-			else                        error_pointer[cnt++] = '\t';
+			char ws = *loc.line_char == '\t' ? '\t' : ' ';
+			error_pointer[cnt++] = ws;
 		}
 		loc.line_char++;
 	}
-
 	fprintf(stderr, "\n");
 	error_pointer[cnt++] = '^';
-	error_pointer[cnt] = '\0';
 	fprintf(stderr, "%s\n", error_pointer);
 	exit(1);
 }

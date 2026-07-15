@@ -104,4 +104,43 @@ static bool compare_types(Type a, Type b) {
 	return true;
 }
 
+static void render_type(StringBuilder *sb, Type t) {
+	switch (t.kind) {
+	case TYPE_NULL:     sb_appendf (sb, "null");  break;
+	case TYPE_INT:      sb_appendf (sb, "int");   break;
+	case TYPE_UINT:     sb_appendf (sb, "uint");  break;
+	case TYPE_I8:       sb_appendf (sb, "i8");    break;
+	case TYPE_U8:       sb_appendf (sb, "u8");    break;
+	case TYPE_I16:      sb_appendf (sb, "i16");   break;
+	case TYPE_U16:      sb_appendf (sb, "u16");   break;
+	case TYPE_I32:      sb_appendf (sb, "i32");   break;
+	case TYPE_U32:      sb_appendf (sb, "u32");   break;
+	case TYPE_I64:      sb_appendf (sb, "i64");   break;
+	case TYPE_U64:      sb_appendf (sb, "u64");   break;
+	case TYPE_IPTR:     sb_appendf (sb, "iptr");  break;
+	case TYPE_UPTR:     sb_appendf (sb, "uptr");  break;
+	case TYPE_FLOAT:    sb_appendf (sb, "float"); break;
+	case TYPE_F16:      sb_appendf (sb, "f16");   break;
+	case TYPE_F32:      sb_appendf (sb, "f32");   break;
+	case TYPE_F64:      sb_appendf (sb, "f64");   break;
+	case TYPE_BOOL:     sb_appendf (sb, "bool");  break;
+	case TYPE_FUNCTION: sb_appendf (sb, "func");  break;
+
+	case TYPE_POINTER:
+		sb_appendf(sb, "*");
+		render_type(sb, *t.as.pointer.base);
+		break;
+	case TYPE_ARRAY:
+		sb_appendf(sb, "[%zu]", t.as.array.length);
+		render_type(sb, *t.as.array.elem);
+		break;
+	case TYPE_STRUCT:
+		sb_appendf(sb, "%s", t.as.user->id);
+	}
+}
+
+static Type TU8 = {.kind = TYPE_U8};
+static Type TU0 = {.kind = TYPE_NULL};
+static Type TUPTR = {.kind = TYPE_UPTR};
+
 #endif //TYPE_H

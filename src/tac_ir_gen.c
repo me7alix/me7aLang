@@ -21,7 +21,6 @@ static TAC_VarIntervals vit = {0};
 static ASTVarTable avt = {0};
 
 static int opt_level;
-static Type TUPTR = {.kind = TYPE_UPTR};
 static TAC_Operand NULL_OPR = {.kind = OPR_NULL};
 
 void calc_var_interval(TAC_Func *func, size_t idx, TAC_Operand opr) {
@@ -160,7 +159,6 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		return NULL_OPR;
 	}
 
-	static Type TU8 = {.kind = TYPE_U8};
 	switch (en->kind) {
 	case AST_LITERAL: {
 		ctx->last_var = 0;
@@ -439,10 +437,9 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 
 	case AST_UN_EXP: {
 		if (en->as.eun.op == AST_OP_SIZEOF) {
-			size_t savedCnt = func->body.count;
+			size_t saved = func->body.count;
 			TAC_Operand arg = tac_ir_gen_expr(ctx, prog, func, en->as.eun.v);
-			func->body.count = savedCnt;
-
+			func->body.count = saved;
 			ctx->last_var = 0;
 			return (TAC_Operand) {
 				.kind = OPR_SIZEOF,
@@ -471,12 +468,12 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		};
 
 		switch (en->as.eun.op) {
-		case AST_OP_CAST:   inst.op = OP_CAST;   break;
-		case AST_OP_NOT:    inst.op = OP_NOT;    break;
-		case AST_OP_NEG:    inst.op = OP_NEG;    break;
-		case AST_OP_REF:    inst.op = OP_REF;    break;
-		case AST_OP_BW_NOT: inst.op = OP_BW_NOT; break;
-		default: UNREACHABLE;
+			case AST_OP_CAST:   inst.op = OP_CAST;   break;
+			case AST_OP_NOT:    inst.op = OP_NOT;    break;
+			case AST_OP_NEG:    inst.op = OP_NEG;    break;
+			case AST_OP_REF:    inst.op = OP_REF;    break;
+			case AST_OP_BW_NOT: inst.op = OP_BW_NOT; break;
+			default: UNREACHABLE;
 		}
 
 		if (inst.op == OP_CAST) {

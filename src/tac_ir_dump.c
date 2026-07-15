@@ -7,34 +7,15 @@
 
 char *tac_ir_dump_opr_type(TAC_Operand op) {
 	Type type = tac_ir_get_opr_type(op);
-	switch (type.kind) {
-	case TYPE_INT:    return "int";
-	case TYPE_UINT:   return "uint";
-	case TYPE_I32:    return "i32";
-	case TYPE_I64:    return "i64";
-	case TYPE_U64:    return "u64";
-	case TYPE_I16:    return "i16";
-	case TYPE_U16:    return "u16";
-	case TYPE_I8:     return "i8";
-	case TYPE_U8:     return "u8";
-	case TYPE_BOOL:   return "bool";
-	case TYPE_UPTR:   return "uptr";
-	case TYPE_IPTR:   return "iptr";
-	case TYPE_POINTER:
-	case TYPE_ARRAY:  return "ptr";
-	case TYPE_STRUCT:;
-		char *ns = malloc(256);
-		sprintf(ns, "struct<%s>", type.as.user->id);
-		return ns;
-	default:
-		return "ERR";
-	}
+	StringBuilder sb = {0};
+	render_type(&sb, type);
+	return sb.items;
 }
 
 void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 	switch (opr.kind) {
 	case OPR_FUNC_INP: sprintf(buf, "FI(%u):%d", opr.as.func_inp.arg_id,
-							                     opr.as.func_inp.type.kind);  break;
+							                     opr.as.func_inp.type.kind); break;
 	case OPR_SIZEOF:   sprintf(buf, "sizeof:%s", tac_ir_dump_opr_type(opr)); break;
 	case OPR_FUNC_RET: sprintf(buf, "FR:%s",     tac_ir_dump_opr_type(opr)); break;
 	case OPR_NAME:     sprintf(buf, "\"%s\"",    opr.as.name);               break;
@@ -50,9 +31,9 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 		case VAR_ADDR:;
 			int id = opr.as.var.addr_id;
 			switch (opr.as.var.addr_kind) {
-			case VAR_LOCAL:  sprintf(buf, "[(%u)]", id); break;
-			case VAR_GLOBAL: sprintf(buf, "[{%u}]", id); break;
-			case VAR_ADDR:   sprintf(buf, "[[%u]]", id); break;
+				case VAR_LOCAL:  sprintf(buf, "[(%u)]", id); break;
+				case VAR_GLOBAL: sprintf(buf, "[{%u}]", id); break;
+				case VAR_ADDR:   sprintf(buf, "[[%u]]", id); break;
 			} break;
 		case VAR_GLOBAL:
 			sprintf(buf, "{%u}", opr.as.var.addr_id);

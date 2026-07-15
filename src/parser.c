@@ -11,9 +11,21 @@
 HT_IMPL_STR(UserTypes, UserType*)
 HT_IMPL(SymbolTable, SymbolKey, Symbol)
 
-#define peek(p) (*(p)->cur_token)
-#define peek2(p) (*((p)->cur_token+1))
-#define next(p) (*((p)->cur_token++))
+#define peek(p) (*(p)->tokens)
+#define peek2(p) (*((p)->tokens+1))
+#define next(p) (*((p)->tokens++))
+
+void throw_types_mismatch(Location loc, Type t1, Type t2) {
+	StringBuilder st1 = {0};
+	render_type(&st1, t1);
+	StringBuilder st2 = {0};
+	render_type(&st2, t2);
+	StringBuilder res = {0};
+	sb_appendf(&res, "types mismatch (%s and %s)", st1.items, st2.items);
+	sb_free(&st1);
+	sb_free(&st2);
+	throw_error(loc, res.items);
+}
 
 u32 SymbolTable_hashf(SymbolKey key) {
 	return hash_combine(hash_str(key.id), hash_num(key.kind));
@@ -56,54 +68,42 @@ Symbol *sbltbl_get(Parser *p, SymbolKind st, char *id) {
 }
 
 void ast_body_append(AST_Node *body, AST_Node *n) {
-	da_append (&body->as.body.stmts, n);
+	da_append(&body->as.body.stmts, n);
 }
 
 Type parser_get_type(Parser *p, AST_Node *n) {
 	switch (n->kind) {
-	case AST_BIN_EXP:
-		return n->as.ebin.type;
-	case AST_UN_EXP:
-		return n->as.eun.type;
-	case AST_LITERAL:
-		return n->as.literal.type;
-	case AST_FUNC_CALL:
-		return n->as.func_call.type;
-	case AST_METHOD_CALL:
-		return n->as.method_call.type;
-	case AST_VID:
-		return sbltbl_get(p, SBL_VAR, n->as.vid.id)->variable.type;
-	default:
-		UNREACHABLE;
+		case AST_BIN_EXP:     return n->as.ebin.type;
+		case AST_UN_EXP:      return n->as.eun.type;
+		case AST_LITERAL:     return n->as.literal.type;
+		case AST_FUNC_CALL:   return n->as.func_call.type;
+		case AST_METHOD_CALL: return n->as.method_call.type;
+		case AST_VID: return sbltbl_get(p, SBL_VAR, n->as.vid.id)->variable.type;
+		default: UNREACHABLE;
 	}
 }
 
 long long calc_arr_len(AST_Node *e) {
 	switch (e->kind) {
-	case AST_LITERAL: {
-		if (e->as.literal.kind != LIT_INT)
-			throw_error(e->loc, "expected integer literal");
-		return e->as.literal.as.lint;
-	} break;
+	case AST_LITERAL:
+		if (e->as.literal.kind == LIT_INT) return e->as.literal.as.lint;
+		else throw_error(e->loc, "expected integer literal");
 
-	case AST_UN_EXP: {
-		switch (e->as.eun.op) {
-			case AST_OP_NEG: return -calc_arr_len(e->as.eun.v);
-			default: throw_error(e->loc, "invalid unary operator in array size");
-		}
-	} break;
+	case AST_UN_EXP:
+		if (e->as.eun.op == AST_OP_NEG) return -calc_arr_len(e->as.eun.v);
+		else throw_error(e->loc, "invalid unary operator in array size");
 
 	case AST_BIN_EXP: {
 		size_t le = calc_arr_len(e->as.ebin.l);
 		size_t re = calc_arr_len(e->as.ebin.r);
 		switch (e->as.ebin.op) {
-		case AST_OP_ADD: return le + re;
-		case AST_OP_SUB: return le - re;
-		case AST_OP_MUL: return le * re;
-		case AST_OP_DIV: return le / re;
-		default: throw_error(e->loc, "invalid binary operator in array size");
+			case AST_OP_ADD: return le + re;
+			case AST_OP_SUB: return le - re;
+			case AST_OP_MUL: return le * re;
+			case AST_OP_DIV: return le / re;
+			default: throw_error(e->loc, "invalid binary operator in array size");
 		}
-	} break;
+	}
 
 	default:
 		throw_error(e->loc, "wrong expression");
@@ -112,7 +112,6 @@ long long calc_arr_len(AST_Node *e) {
 	return 0;
 }
 
-static Type TUPTR = {.kind = TYPE_UPTR};
 void parse_func_args(Parser *p, AST_Nodes *fargs);
 Type *parse_type(Parser *p);
 
@@ -129,7 +128,7 @@ Type *parse_type_r(Parser *p) {
 	} else if (peek(p).kind == TOK_OSQBRA) {
 		type = new(Type, .kind = TYPE_ARRAY);
 		next(p);
-		AST_Node *arrLenExpr = parse_expr(p, EXPAR_SQBRA, &TUPTR);
+		AST_Node *arrLenExpr = parse_expr(p, until(TOK_CSQBRA), &TUPTR); next(p);
 		if (arrLenExpr) {
 			long long calculatedArrLen = calc_arr_len(arrLenExpr);
 			if (calculatedArrLen <= 0)
@@ -161,9 +160,7 @@ Type *parse_type_r(Parser *p) {
 		if (peek(p).kind == TOK_COL) {
 			type->as.func.ret = parse_type(p);
 		} else {
-			static Type TU0 = {.kind = TYPE_NULL};
 			type->as.func.ret = &TU0;
-			p->cur_token--;
 		}
 		return type;
 	}
@@ -192,6 +189,7 @@ Type *parse_type_r(Parser *p) {
 	for (size_t i = 0; i < ARR_LEN(types); i++) {
 		if (strcmp(peek(p).data, types[i].str) == 0) {
 			type->kind = types[i].kind;
+			next(p);
 			return type;
 		}
 	}
@@ -200,6 +198,7 @@ Type *parse_type_r(Parser *p) {
 	if (user_type) {
 		type->kind = (*user_type)->kind;
 		type->as.user = *user_type;
+		next(p);
 		return type;
 	}
 
@@ -225,16 +224,16 @@ AST_Node *parse_method_call(Parser *p) {
 		.loc = peek(p).loc,
 		.as.method_call.id = next(p).data);
 
-	// the first argument of any method is reserved for "self"
+	// The first argument of any method is reserved for "self"
 	da_append(&metCall->as.method_call.args, NULL);
 
 	expect(next(p), TOK_OPAR);
 	while (peek(p).kind != TOK_CPAR) {
-		AST_Node *expr = parse_expr(p, EXPAR_FUNCALL, NULL);
+		AST_Node *expr = parse_expr(p, until(TOK_COM, TOK_CPAR), NULL);
+		if (peek(p).kind == TOK_COM) next(p);
 		da_append(&metCall->as.method_call.args, expr);
-		next(p);
 	}
-
+	next(p);
 	return metCall;
 }
 
@@ -265,36 +264,42 @@ AST_Node *parse_func_call(Parser *p) {
 	AST_Node *expr;
 
 	while (peek(p).kind != TOK_CPAR) {
-		if (!met_any)
-			if (arg_cnt >= fargs.count)
+		if (!met_any) {
+			if (arg_cnt >= fargs.count) {
 				throw_error(fcn->loc, "too many arguments");
+			}
+		}
 
-		if (fargs.items[arg_cnt]->kind == AST_FUNC_DEF_ARG_ANY)
+		if (fargs.items[arg_cnt]->kind == AST_FUNC_DEF_ARG_ANY) {
 			met_any = true;
+		}
 
-		if (arg_cnt < fargs.count - 1)
-			if (fargs.items[arg_cnt + 1]->kind == AST_FUNC_DEF_ARG_ANY)
+		if (arg_cnt < fargs.count - 1) {
+			if (fargs.items[arg_cnt + 1]->kind == AST_FUNC_DEF_ARG_ANY) {
 				is_next_any = true;
+			}
+		}
 
 		if (!met_any) {
 			Type farg_type = fargs.items[arg_cnt++]->as.func_def_arg.type;
-			expr = parse_expr(p, EXPAR_FUNCALL, &farg_type);
+			expr = parse_expr(p, until(TOK_CPAR, TOK_COM), &farg_type);
 			Type expr_type = parser_get_type(p, expr);
-
 			if (!compare_types(expr_type, farg_type)) {
-				throw_error(expr->loc, "types mismatch");
+				throw_types_mismatch(expr->loc, expr_type, farg_type);
 			}
 		} else {
-			expr = parse_expr(p, EXPAR_FUNCALL, NULL);
+			expr = parse_expr(p, until(TOK_CPAR, TOK_COM), NULL);
 		}
 
 		da_append(&fcn->as.func_call.args, expr);
-		next(p);
+		if (peek(p).kind == TOK_COM) next(p);
 	}
 
-	if (!met_any && !is_next_any && arg_cnt < fargs.count)
+	if (!met_any && !is_next_any && arg_cnt < fargs.count) {
 		throw_error(fcn->loc, "not enough arguments");
+	}
 
+	next(p);
 	return fcn;
 }
 
@@ -304,7 +309,6 @@ AST_Node *parse_var_def(Parser *p) {
 	char *id = peek(p).data;
 	Location loc = next(p).loc;
 	Type type = *parse_type(p);
-	next(p);
 
 	AST_Node *vdn = new(AST_Node,
 		.kind = AST_VAR_DEF,
@@ -316,7 +320,7 @@ AST_Node *parse_var_def(Parser *p) {
 
 	if (peek(p).kind == TOK_EQ) {
 		next(p);
-		AST_Node *expr = parse_expr(p, EXPAR_VAR, &type);
+		AST_Node *expr = parse_expr(p, until(TOK_SEMI), &type); next(p);
 		vdn->as.var_def.expr = expr;
 		if (expr->kind == AST_ARRAY &&
 			vdn->as.var_def.type.kind == TYPE_ARRAY &&
@@ -337,7 +341,7 @@ AST_Node *parse_var_assign(Parser *p) {
 	Location loc = next(p).loc;
 	next(p);
 
-	AST_Node *expr = parse_expr(p, EXPAR_VAR, NULL);
+	AST_Node *expr = parse_expr(p, until(TOK_SEMI), NULL); next(p);
 	AST_Node *vdn = new(AST_Node,
 		.kind = AST_VAR_DEF,
 		.loc = loc,
@@ -354,8 +358,8 @@ AST_Node *parse_var_assign(Parser *p) {
 	return vdn;
 }
 
-AST_Node *parse_var_mut(Parser *p, ExprParsingType pt) {
-	AST_Node *exp = parse_expr(p, pt, NULL);
+AST_Node *parse_var_mut(Parser *p, TokenKind *until) {
+	AST_Node *exp = parse_expr(p, until, NULL); next(p);
 	return new(AST_Node,
 		.kind = AST_VAR_MUT,
 		.loc = exp->loc,
@@ -376,9 +380,13 @@ AST_Node *parse_func_return(Parser *p, AST_Node *func) {
 			throw_error(ret->loc, "you must return something");
 		ret->as.func_ret.type = (Type) {.kind = TYPE_NULL};
 	} else {
-		ret->as.func_ret.expr = parse_expr(p, EXPAR_VAR, NULL);
+		ret->as.func_ret.expr = parse_expr(p, until(TOK_SEMI), NULL); next(p);
 		if (!compare_types(parser_get_type(p, ret->as.func_ret.expr), ret->as.func_ret.type)) {
-			throw_error(ret->as.func_ret.expr->loc, "types mismatch");
+			throw_types_mismatch(
+				ret->as.func_ret.expr->loc,
+				parser_get_type(p, ret->as.func_ret.expr),
+				ret->as.func_ret.type
+			);
 		}
 	}
 
@@ -392,22 +400,19 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 		.kind = AST_IF_STMT,
 		.loc = next(p).loc);
 
-	r->as.stmt_if.expr = parse_expr(p, EXPAR_STMT, NULL);
+	r->as.stmt_if.expr = parse_expr(p, until(TOK_OBRA, TOK_ARROW, TOK_ARROW_EQ), NULL);
 	if (parser_get_type(p, r->as.stmt_if.expr).kind != TYPE_BOOL)
 		throw_error(r->as.stmt_while.expr->loc, "bool expected");
-
-	next(p);
 	r->as.stmt_if.body = parse_body(p, func, false);
 
-	if (peek2(p).kind == TOK_ELSE_SYM) {
+	if (peek(p).kind == TOK_ELSE_SYM) {
 		next(p);
-		if (peek2(p).kind == TOK_IF_SYM) {
-			next(p);
+		if (peek(p).kind == TOK_IF_SYM) {
 			r->as.stmt_if.next = parse_if_stmt(p, func);
 		} else {
 			r->as.stmt_if.next = new(AST_Node,
 				.kind = AST_ELSE_STMT,
-				.loc = next(p).loc);
+				.loc = peek(p).loc);
 			r->as.stmt_if.next->as.stmt_else.body = parse_body(p, func, false);
 		}
 	} else {
@@ -420,14 +425,10 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 AST_Node *parse_while_stmt(Parser *p, AST_Node *func) {
 	next(p);
 	AST_Node *r = new(AST_Node, .kind = AST_WHILE_STMT);
-
-	r->as.stmt_while.expr = parse_expr(p, EXPAR_STMT, NULL);
+	r->as.stmt_while.expr = parse_expr(p, until(TOK_OBRA, TOK_ARROW, TOK_ARROW_EQ), NULL);
 	if (parser_get_type(p, r->as.stmt_while.expr).kind != TYPE_BOOL)
 		throw_error(r->as.stmt_while.expr->loc, "bool expected");
-
-	next(p);
 	r->as.stmt_while.body = parse_body(p, func, false);
-
 	return r;
 }
 
@@ -435,28 +436,21 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 	AST_Node *r = new(AST_Node,
 		.kind = AST_FOR_STMT,
 		.loc = next(p).loc);
-
 	push_scope(p);
-
 	if (peek2(p).kind == TOK_COL) {
 		r->as.stmt_for.var = parse_var_def(p);
 	} else if (peek2(p).kind == TOK_EQ) {
-		r->as.stmt_for.var = parse_var_mut(p, EXPAR_VAR);
+		r->as.stmt_for.var = parse_var_mut(p, until(TOK_SEMI));
 	} else if (peek2(p).kind == TOK_ASSIGN) {
 		r->as.stmt_for.var = parse_var_assign(p);
 	}
-	next(p);
-
-	r->as.stmt_for.expr = parse_expr(p, EXPAR_VAR, &r->as.stmt_for.var->as.var_def.type);
+	r->as.stmt_for.expr = parse_expr(p, until(TOK_SEMI), &r->as.stmt_for.var->as.var_def.type);
 	if (parser_get_type(p, r->as.stmt_for.expr).kind != TYPE_BOOL)
 		throw_error(r->as.stmt_while.expr->loc, "bool expected");
 	next(p);
-
-	r->as.stmt_for.mut = parse_var_mut(p, EXPAR_STMT);
-	next(p);
-
+	r->as.stmt_for.mut = parse_var_mut(p, until(TOK_OBRA, TOK_ARROW, TOK_ARROW_EQ));
+	p->tokens--;
 	r->as.stmt_for.body = parse_body(p, func, true);
-
 	pop_scope(p);
 	return r;
 }
@@ -464,10 +458,8 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 	if (!skip) push_scope(p);
 
-	bool is_arrow    = false;
-	bool is_arrow_eq = false;
-	if (peek(p).kind == TOK_ARROW)    is_arrow    = true;
-	if (peek(p).kind == TOK_ARROW_EQ) is_arrow_eq = true;
+	bool is_arrow    = peek(p).kind == TOK_ARROW;
+	bool is_arrow_eq = peek(p).kind == TOK_ARROW_EQ;
 
 	AST_Node *body = new(AST_Node, .kind = AST_BODY);
 	if (!is_arrow && !is_arrow_eq)
@@ -476,11 +468,10 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 
 	if (is_arrow_eq) {
 		Type ft = func->as.func_def.type;
-		AST_Node *en = parse_expr(p, EXPAR_VAR, &ft);
+		AST_Node *en = parse_expr(p, until(TOK_SEMI), &ft);
 		Type et = parser_get_type(p, en);
 		if (!compare_types(ft, et))
-			throw_error(en->loc, "types mismatch");
-
+			throw_types_mismatch(en->loc, ft, et);
 		da_append(&body->as.body.stmts,
 			new(AST_Node,
 				.kind = AST_FUNC_RET,
@@ -492,7 +483,7 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 	while (true) {
 		switch (peek(p).kind) {
 		case TOK_CBRA: goto done;
-		case TOK_SEMI: break;
+		case TOK_SEMI: next(p); break;
 
 		case TOK_OBRA:
 			ast_body_append(body, parse_body(p, func, false));
@@ -508,10 +499,11 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 				break;
 			case TOK_OPAR:
 				ast_body_append(body, parse_func_call(p));
-				next(p); expect(peek(p), TOK_SEMI);
+				expect(peek(p), TOK_SEMI);
+				next(p);
 				break;
 			default:
-				ast_body_append(body, parse_var_mut(p, EXPAR_VAR));
+				ast_body_append(body, parse_var_mut(p, until(TOK_SEMI)));
 			}
 		} break;
 
@@ -520,7 +512,7 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 				.kind = AST_LOOP_BREAK,
 				.loc = next(p).loc,
 			));
-			expect(peek(p), TOK_SEMI);
+			expect(next(p), TOK_SEMI);
 			break;
 
 		case TOK_CONTINUE:
@@ -528,7 +520,7 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 				.kind = AST_LOOP_CONTINUE,
 				.loc = next(p).loc,
 			));
-			expect(peek(p), TOK_SEMI);
+			expect(next(p), TOK_SEMI);
 			break;
 
 		case TOK_BLOCK:
@@ -553,15 +545,17 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 			break;
 
 		default:
-			ast_body_append(body, parse_var_mut(p, EXPAR_VAR));
+			ast_body_append(body, parse_var_mut(p, until(TOK_SEMI)));
 		}
 
-		if (is_arrow)
+		if (is_arrow) {
+			p->tokens--;
 			goto done;
-		next(p);
+		}
 	}
 
 done:
+	next(p);
 	if (!skip) pop_scope(p);
 	return body;
 }
@@ -569,6 +563,10 @@ done:
 void parse_func_args(Parser *p, AST_Nodes *fargs) {
 	while (peek(p).kind != TOK_CPAR) {
 		switch (peek(p).kind) {
+		case TOK_COM:
+			next(p);
+			break;
+
 		case TOK_ID: {
 			expect(peek2(p), TOK_COL);
 			AST_Node *arg = new(AST_Node,
@@ -577,37 +575,25 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 				.as.func_def_arg.id = peek(p).data,
 				.as.func_def_arg.uid = var_id_ctr++,
 			);
-
 			next(p);
 			arg->as.func_def_arg.type = *parse_type(p);
 			da_append(fargs, arg);
-
 			if (sbltbl_add(p, SBL_VAR, arg->as.func_def_arg.id, (Symbol) {
 				.variable.type = arg->as.func_def_arg.type,
 				.variable.uid = arg->as.func_def_arg.uid,
 			})) throw_error(arg->loc, "redifinition of the variable");
-
-			if (peek2(p).kind == TOK_COM)
-				expect(peek2(p), TOK_COM);
-			next(p);
 		} break;
 
 		case TOK_ANY:;
 			AST_Node *arg = new(AST_Node, .kind = AST_FUNC_DEF_ARG_ANY);
-			da_append(fargs, arg);
-			if (peek2(p).kind == TOK_COM)
-				expect(peek2(p), TOK_COM);
 			next(p);
+			da_append(fargs, arg);
 			break;
 
 		default:
 			throw_error(peek(p).loc, "unexpected token");
 		}
-
-		if (peek(p).kind != TOK_CPAR)
-			next(p);
 	}
-
 	next(p);
 }
 
@@ -645,7 +631,6 @@ AST_Node *parse_function(Parser *p, AST_Node *self, bool is_static) {
 
 	if (peek(p).kind == TOK_COL) {
 		fdn->as.func_def.type = *parse_type(p);
-		next(p);
 	} else {
 		fdn->as.func_def.type = (Type) {.kind = TYPE_NULL};
 	}
@@ -705,15 +690,12 @@ AST_Node *parse_function(Parser *p, AST_Node *self, bool is_static) {
 
 void parse_extern(Parser *p) {
 	next(p);
-
 	expect(peek(p), TOK_ID);
 	char *extern_smb = peek(p).data;
-
 	if (peek2(p).kind == TOK_ID)
 		next(p);
 
 	expect(peek(p), TOK_ID);
-
 	char *id = peek(p).data;
 	Symbol fes = { .func_extern.extern_smb = extern_smb };
 	Location loc = peek(p).loc;
@@ -729,7 +711,7 @@ void parse_extern(Parser *p) {
 		fes.func_extern.type = *parse_type(p);
 		next(p);
 	} else {
-		fes.func_extern.type = (Type) {.kind = TYPE_NULL};
+		fes.func_extern.type = (Type){.kind = TYPE_NULL};
 	}
 
 	Symbol *sf  = sbltbl_get(p, SBL_FUNC_DEF,     id);
@@ -741,7 +723,6 @@ void parse_extern(Parser *p) {
 
 	sbltbl_add(p, SBL_FUNC_EXTERN, id, fes);
 	sbltbl_add(p, SBL_FUNC_EX_USED, extern_smb, (Symbol){0});
-	expect(peek(p), TOK_SEMI);
 }
 
 void parse_method(Parser *p, UserType *st, bool is_static) {
@@ -763,28 +744,23 @@ void parse_method(Parser *p, UserType *st, bool is_static) {
 	da_foreach (Member, member, &st->as.ustruct.members) {
 		if (member->kind == MBR_METHOD) {
 			AST_Node *memb = member->as.method.func;
-
 			if (strcmp(memb->as.func_def.id, func->as.func_def.id) != 0)
 				continue;
-
 			if (memb->as.func_def.body)
 				throw_error(func->loc, "redefinition of method");
-
 			if (!compare_types(memb->as.func_def.type, func->as.func_def.type))
 				throw_error(func->loc,
 					"return type mismatch between declaration and definition");
-
 			for (size_t i = 0; i < memb->as.func_def.args.count; i++) {
 				Type a = memb->as.func_def.args.items[i]->as.func_def_arg.type;
 				Type b = func->as.func_def.args.items[i]->as.func_def_arg.type;
-
 				if (!compare_types(a, b)) {
 					throw_error(func->loc,
 						"argument type mismatch "
-						"between declaration and definition");
+						"between declaration and definition"
+					);
 				}
 			}
-
 			da_remove_ordered(
 				&st->as.ustruct.members,
 				(size_t)(member - st->as.ustruct.members.items));
@@ -800,9 +776,9 @@ void parse_method(Parser *p, UserType *st, bool is_static) {
 
 void parse_struct(Parser *p) {
 	next(p);
-
-	if (UserTypes_get(&p->ut, peek(p).data))
+	if (UserTypes_get(&p->ut, peek(p).data)) {
 		throw_error(peek(p).loc, "redefinition of the struct");
+	}
 
 	UserType *st = new(UserType,
 		.kind = TYPE_STRUCT,
@@ -812,12 +788,14 @@ void parse_struct(Parser *p) {
 	expect(next(p), TOK_OBRA);
 	while (peek(p).kind != TOK_CBRA) {
 		switch (peek(p).kind) {
+		case TOK_SEMI:
+			next(p);
+			break;
 		case TOK_STATIC:
 		case TOK_FUNC:
 			parse_method(p, st, false);
 			break;
-
-		case TOK_ID: {
+		case TOK_ID:;
 			char *id = next(p).data;
 			Type type = *parse_type(p);
 			da_append(&st->as.ustruct.members, ((Member){
@@ -825,17 +803,12 @@ void parse_struct(Parser *p) {
 				.as.field.type = type,
 				.as.field.id = id,
 			}));
-		} break;
-
+			break;
 		default:
 			throw_error(peek(p).loc, "unexpected token");
 		}
-
-		next(p);
-		if (peek(p).kind == TOK_SEMI) {
-			next(p);
-		}
 	}
+	next(p);
 }
 
 void parse_impl(Parser *p) {
@@ -853,6 +826,9 @@ void parse_impl(Parser *p) {
 	expect(next(p), TOK_OBRA);
 	while (peek(p).kind != TOK_CBRA) {
 		switch (peek(p).kind) {
+		case TOK_SEMI:
+			next(p);
+			break;
 		case TOK_STATIC:
 		case TOK_FUNC:
 			parse_method(p, st, is_static);
@@ -860,32 +836,46 @@ void parse_impl(Parser *p) {
 		default:
 			throw_error(peek(p).loc, "unexpected token");
 		}
-		next(p);
-		if (peek(p).kind == TOK_SEMI) {
-			next(p);
-		}
 	}
+	next(p);
 }
 
 Parser parser_parse(Token *tokens) {
 	Parser p = {0};
 	AST_Node *prog = new(AST_Node, .kind = AST_PROG);
 	p.program = prog;
-	p.cur_token = tokens;
+	p.tokens = tokens;
 
 	push_scope(&p);
 
 	while (peek(&p).kind != TOK_EOF) {
 		switch (peek(&p).kind) {
-		case TOK_SEMI:                       break;
-		case TOK_STRUCT: parse_struct(&p);   break;
-		case TOK_IMPL:   parse_impl(&p);     break;
-		case TOK_EXTERN: parse_extern(&p);   break;
-		case TOK_IMPORT: next(&p); next(&p); break;
+		case TOK_SEMI:
+			next(&p);
+			break;
+
+		case TOK_STRUCT:
+			parse_struct(&p);
+			break;
+
+		case TOK_IMPL:
+			parse_impl(&p);
+			break;
+
+		case TOK_EXTERN:
+			parse_extern(&p);
+			break;
+
+		case TOK_IMPORT:
+			next(&p);
+			next(&p);
+			next(&p);
+			break;
 
 		case TOK_MACRO_OBJ:
 			while (peek(&p).kind != TOK_SEMI)
 				next(&p);
+			next(&p);
 			break;
 
 		case TOK_MACRO_FUNC:
@@ -894,7 +884,6 @@ Parser parser_parse(Token *tokens) {
 			expect(next(&p), TOK_OPAR);
 			while (peek(&p).kind != TOK_CPAR)
 				next(&p);
-
 			next(&p);
 			expect(next(&p), TOK_OBRA);
 			int braCnt = 1;
@@ -907,6 +896,7 @@ Parser parser_parse(Token *tokens) {
 					braCnt++;
 				}
 			}
+			next(&p);
 			break;
 
 		case TOK_STATIC: {
@@ -934,8 +924,6 @@ Parser parser_parse(Token *tokens) {
 		default:
 			throw_error(peek(&p).loc, "unexpected top level declaration");
 		}
-
-		next(&p);
 	}
 
 	return p;
