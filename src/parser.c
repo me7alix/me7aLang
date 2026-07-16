@@ -15,18 +15,6 @@ HT_IMPL(SymbolTable, SymbolKey, Symbol)
 #define peek2(p) (*((p)->tokens+1))
 #define next(p) (*((p)->tokens++))
 
-void throw_types_mismatch(Location loc, Type t1, Type t2) {
-	StringBuilder st1 = {0};
-	render_type(&st1, t1);
-	StringBuilder st2 = {0};
-	render_type(&st2, t2);
-	StringBuilder res = {0};
-	sb_appendf(&res, "types mismatch (%s and %s)", st1.items, st2.items);
-	sb_free(&st1);
-	sb_free(&st2);
-	throw_error(loc, res.items);
-}
-
 u32 SymbolTable_hashf(SymbolKey key) {
 	return hash_combine(hash_str(key.id), hash_num(key.kind));
 }
@@ -81,6 +69,18 @@ Type parser_get_type(Parser *p, AST_Node *n) {
 		case AST_VID: return sbltbl_get(p, SBL_VAR, n->as.vid.id)->variable.type;
 		default: UNREACHABLE;
 	}
+}
+
+void throw_types_mismatch(Location loc, Type t1, Type t2) {
+	StringBuilder st1 = {0};
+	render_type(&st1, t1);
+	StringBuilder st2 = {0};
+	render_type(&st2, t2);
+	StringBuilder res = {0};
+	sb_appendf(&res, "types mismatch (%s and %s)", st1.items, st2.items);
+	sb_free(&st1);
+	sb_free(&st2);
+	throw_error(loc, res.items);
 }
 
 long long calc_arr_len(AST_Node *e) {

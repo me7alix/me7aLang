@@ -8,20 +8,9 @@
 #include "../thirdparty/cplus.h"
 #include "../include/parser.h"
 
-Symbol *sbltbl_get(Parser *p, SymbolKind st, char *id);
-
 #define peek(p) (*(p)->tokens)
 #define peek2(p) (*((p)->tokens+1))
 #define next(p) (*((p)->tokens++))
-
-double parse_float(char *data) {
-	return atof(data);
-}
-
-long long parse_int(char *data) {
-	char *end;
-	return strtoll(data, &end, 0);
-}
 
 int op_prec(AST_ExprOp op, bool l) {
 	switch (op) {
@@ -106,6 +95,8 @@ bool type_is_int(Type t) {
 		return false;
 	}
 }
+
+Symbol *sbltbl_get(Parser *p, SymbolKind st, char *id);
 
 // Calculates and checks types, sometimes changes AST
 Type expr_analysis(Parser *p, AST_Node *expr, Type *src_type) {
@@ -471,12 +462,18 @@ AST_Node *parse_array(Parser *p) {
 		AST_Node *expr = parse_expr(p, until(TOK_COM, TOK_CBRA), NULL);
 		da_append(&al->as.array, expr);
 		if (peek(p).kind == TOK_COM) next(p);
-		else if (peek(p).kind != TOK_CBRA) {
-			throw_error(al->loc, "unexpected token");
-		}
 	}
 	next(p);
 	return al;
+}
+
+double parse_float(char *data) {
+	return atof(data);
+}
+
+long long parse_int(char *data) {
+	char *end;
+	return strtoll(data, &end, 0);
 }
 
 AST_Node *parse_expr_item(Parser *p, TokenKind *until) {
