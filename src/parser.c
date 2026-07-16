@@ -402,7 +402,7 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 
 	r->as.stmt_if.expr = parse_expr(p, until(TOK_OBRA, TOK_ARROW, TOK_ARROW_EQ), NULL);
 	if (parser_get_type(p, r->as.stmt_if.expr).kind != TYPE_BOOL)
-		throw_error(r->as.stmt_while.expr->loc, "bool expected");
+		throw_error(r->as.stmt_if.expr->loc, "bool expected");
 	r->as.stmt_if.body = parse_body(p, func, false);
 
 	if (peek(p).kind == TOK_ELSE_SYM) {
@@ -446,7 +446,7 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 	}
 	r->as.stmt_for.expr = parse_expr(p, until(TOK_SEMI), &r->as.stmt_for.var->as.var_def.type);
 	if (parser_get_type(p, r->as.stmt_for.expr).kind != TYPE_BOOL)
-		throw_error(r->as.stmt_while.expr->loc, "bool expected");
+		throw_error(r->as.stmt_for.expr->loc, "bool expected");
 	next(p);
 	r->as.stmt_for.mut = parse_var_mut(p, until(TOK_OBRA, TOK_ARROW, TOK_ARROW_EQ));
 	p->tokens--;
