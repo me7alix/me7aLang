@@ -11,13 +11,11 @@ typedef struct {
 		MACRO_OBJ,
 		MACRO_FUNC,
 	} kind;
-
 	union {
 		struct {
 			DA(char*) args;
 			Tokens body;
 		} func;
-
 		struct {
 			Tokens body;
 		} obj;
@@ -29,14 +27,16 @@ HT_DECL(ImportedTable, char*, bool)
 HT_DECL_STR(MacroTable, Macro)
 
 typedef struct {
-	ImportedTable it;
-	MacroTable mt;
-	Imports *imports;
-	Lexer *lexer;
+	Imports *imported_folders;
+	ImportedTable import_registry;
+	MacroTable macro_definitions;
+	bool inserted_macro;
+	Tokens output;
+	Tokens input;
 	size_t count;
 } PreprocCtx;
 
 char *read_file(const char *filename);
-void preprocessor(PreprocCtx *p, bool skip);
+void preprocessor(PreprocCtx *p);
 
 #endif
