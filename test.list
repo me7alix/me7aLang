@@ -1,3 +1,4 @@
+./build/release/m7c -tc nasm64 -O0 -I ./stdlib -o build/prog examples/macros.m7 && ./build/prog
 ./build/release/m7c -tc nasm64 -O0 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
 ./build/release/m7c -tc nasm64 -O1 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
 ./build/release/m7c -tc nasm64 -O1 -I ./stdlib -o build/prog examples/ifchain.m7 && ./build/prog

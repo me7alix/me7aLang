@@ -1,4 +1,12 @@
-:i count 26
+:i count 27
+:b shell 95
+./build/release/m7c -tc nasm64 -O0 -I ./stdlib -o build/prog examples/macros.m7 && ./build/prog
+:i returncode 0
+:b stdout 3
+17
+
+:b stderr 0
+
 :b shell 95
 ./build/release/m7c -tc nasm64 -O0 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
 :i returncode 0
