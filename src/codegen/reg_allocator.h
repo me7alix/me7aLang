@@ -2,8 +2,8 @@
 #define REG_ALLOCATOR_H
 
 #include <stdbool.h>
-#include "../../include/tac_ir.h"
-#include "../../thirdparty/cplus.h"
+#include <tac_ir.h>
+#include <cplus.h>
 
 HT_DECL(RegTable, uint, int)
 typedef DA(int) Registers;

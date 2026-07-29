@@ -1,5 +1,6 @@
 CC ?= gcc
 CFLAGS ?= -std=c99 -pedantic -D_GNU_SOURCE
+INC := -I include/ -I thirdparty/
 SRCS := \
 src/main.c \
 src/preprocessor.c \
@@ -60,14 +61,14 @@ debug: $(OUT_DEBUG)
 
 $(OUT_DEBUG): $(SRCS) | $(DEBUG_DIR)
 	@echo "Compiling metc (debug)..."
-	@$(CC) $(CFLAGS) -ggdb -O0 -D_CP_RUNTIME_CHECKS $(SRCS) -o $@
+	@$(CC) $(CFLAGS) -ggdb -O0 -D_CP_RUNTIME_CHECKS $(INC) $(SRCS) -o $@
 	@echo "Built $@"
 
 release: $(OUT_RELEASE)
 
 $(OUT_RELEASE): $(SRCS) | $(RELEASE_DIR)
 	@echo "Compiling metc (release)..."
-	@$(CC) $(CFLAGS) -O3 -DNDEBUG $(SRCS) -o $@
+	@$(CC) $(CFLAGS) -O3 -DNDEBUG $(INC) $(SRCS) -o $@
 	@echo "Built $@"
 
 $(DEBUG_DIR):

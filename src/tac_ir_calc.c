@@ -1,4 +1,4 @@
-#include "../include/tac_ir.h"
+#include <tac_ir.h>
 
 bool tac_ir_opr_calc(AST_Node *en, TAC_Operand l, TAC_Operand r, TAC_Operand *ret) {
 	i64 res;

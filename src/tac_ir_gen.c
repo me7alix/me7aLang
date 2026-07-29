@@ -4,9 +4,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <limits.h>
-
-#include "../include/tac_ir.h"
-#include "../include/parser.h"
+#include <tac_ir.h>
+#include <parser.h>
 #include "tac_ir_calc.c"
 
 HT_DECL(ASTVarTable, uint, TAC_Operand)
@@ -1049,7 +1048,7 @@ TAC_Program tac_ir_gen_prog(Parser *p, int _opt_level) {
 	opt_level = _opt_level;
 
 	ht_foreach_node (UserTypes, kv, &p->ut) {
-		UserType *ut = kv->val;
+		UserType *ut = &kv->val;
 		if (ut->kind == TYPE_STRUCT) {
 			da_foreach (Member, member, &ut->as.ustruct.members) {
 				if (member->kind == MBR_METHOD) {

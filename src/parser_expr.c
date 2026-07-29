@@ -4,9 +4,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
-#include "../thirdparty/cplus.h"
-#include "../include/parser.h"
+#include <cplus.h>
+#include <parser.h>
 
 #define peek(p) (*(p)->tokens)
 #define peek2(p) (*((p)->tokens+1))

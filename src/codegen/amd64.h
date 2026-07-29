@@ -1,8 +1,8 @@
 #ifndef AMD64_H
 #define AMD64_H
 
-#include "../../include/tac_ir.h"
-#include "../../thirdparty/cplus.h"
+#include <tac_ir.h>
+#include <cplus.h>
 
 typedef enum {
 	RAX, RDX, RCX,

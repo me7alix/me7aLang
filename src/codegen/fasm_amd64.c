@@ -4,9 +4,8 @@
 #include <stdbool.h>
 #include <stdarg.h>
 #include <assert.h>
-
-#include "../../include/platform.h"
-#include "../../include/tac_ir.h"
+#include <platform.h>
+#include <tac_ir.h>
 
 #include "amd64.h"
 #include "reg_allocator.h"
@@ -721,7 +720,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 			}
 
 			if (shadow_space) sb_appendf(&body, "  sub rsp, 32\n");
-			sb_appendf(&fc, "  call %s%s\n", (tp == TP_MACOS ? "_" : ""), ci.dst.as.name);
+			sb_appendf(&fc, "  call near %s%s\n", (tp == TP_MACOS ? "_" : ""), ci.dst.as.name);
 			sb_appendf(&body, fc.items);
 			if (shadow_space) sb_appendf(&body, "  add rsp, 32\n");
 			sb_free(&fc);

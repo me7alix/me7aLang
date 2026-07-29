@@ -216,6 +216,12 @@ static size_t _cp_da_get_index;
         (da)->count += (new_items_count); \
     } while (0)
 
+#define da_copy(dst, src) \
+	do { \
+		da_reset(dst); \
+		da_append_many((dst), (src)->items, (src)->count); \
+	} while (0)
+
 /* Hashtable templates */
 
 #define HT_DECL(ht_type, key_type, value_type) \

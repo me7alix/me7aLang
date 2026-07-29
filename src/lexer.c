@@ -3,8 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <ctype.h>
-
-#include "../include/lexer.h"
+#include <lexer.h>
 
 char *get_id(Lexer *l) {
 	char *start = l->stream;

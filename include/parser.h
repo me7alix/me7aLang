@@ -3,9 +3,8 @@
 
 #include <stdlib.h>
 #include <stdbool.h>
-
-#include "type.h"
-#include "lexer.h"
+#include <type.h>
+#include <lexer.h>
 
 typedef enum {
 	LIT_INT,
@@ -19,7 +18,6 @@ typedef enum {
 typedef struct Literal {
 	LiteralKind kind;
 	Type type;
-
 	union {
 		long long lint;
 		double lfloat;
@@ -110,11 +108,13 @@ typedef enum {
 } AST_NodeKind;
 
 typedef DA(AST_Node*) AST_Nodes;
+static void nodes_add(AST_Nodes *da, AST_Node *n) {
+	da_append(da, n);
+}
 
 struct AST_Node {
 	AST_NodeKind kind;
 	Location loc;
-
 	union {
 		struct {
 			char *id;

@@ -1,12 +1,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-
-#include "../include/platform.h"
-#include "../include/preprocessor.h"
-#include "../include/lexer.h"
-#include "../include/parser.h"
-#include "../include/tac_ir.h"
+#include <platform.h>
+#include <preprocessor.h>
+#include <lexer.h>
+#include <parser.h>
+#include <tac_ir.h>
 
 /* Codegens */
 char *nasm_gen_prog(TAC_Program *prog, TargetPlatform tp, int ol);
@@ -58,29 +57,22 @@ void throw_error(Location loc, char *error) {
 
 char *read_file(const char *filename) {
 	FILE* file = fopen(filename, "rb");
-	if (!file) {
-		return NULL;
-	}
-
+	if (!file) return NULL;
 	fseek(file, 0, SEEK_END);
 	long filesize = ftell(file);
 	rewind(file);
-
 	char *buffer = (char*) malloc(filesize + 1);
 	if (!buffer) {
 		fclose(file);
 		return NULL;
 	}
-
 	size_t read_size = fread(buffer, 1, filesize, file);
 	if (read_size != filesize) {
 		free(buffer);
 		fclose(file);
 		return NULL;
 	}
-
 	buffer[filesize] = '\0';
-
 	fclose(file);
 	return buffer;
 }
@@ -91,18 +83,15 @@ int write_to_file(const char *filename, const char *text) {
 		perror("Error opening file");
 		return -1;
 	}
-
 	if (fputs(text, file) == EOF) {
 		perror("Error writing to file");
 		fclose(file);
 		return -1;
 	}
-
 	if (fclose(file) == EOF) {
 		perror("Error closing file");
 		return -1;
 	}
-
 	return 0;
 }
 
@@ -137,7 +126,6 @@ bool is_src_file(char *str) {
 			}
 		}
 	}
-
 	return false;
 }
 
@@ -287,22 +275,18 @@ int main(int argc, char **argv) {
 		char output_file[2048];
 		char *src_file = src_files.items[i];
 
-		char *ep_code = read_file(src_file);
-		if (!ep_code) {
+		char *code = read_file(src_file);
+		if (!code) {
 			fprintf(stderr, "error: no such file %s\n", src_file);
 			return 1;
 		}
 
-		Lexer entry_point = lexer_lex(src_file, ep_code);
-		PreprocCtx preprocCtx = {
-			.imports = &imports,
-			.lexer = &entry_point
-		};
+		Lexer lex = lexer_lex(src_file, code);
+		PreprocCtx pp = {.imported_folders = &imports};
+		da_copy(&pp.input, &lex.tokens);
+		preprocessor(&pp);
 
-		preprocessor(&preprocCtx, false);
-		entry_point = *preprocCtx.lexer;
-
-		Parser parser = parser_parse(entry_point.tokens.items);
+		Parser parser = parser_parse(pp.output.items);
 		TAC_Program prog = tac_ir_gen_prog(&parser, opt_level);
 		if (save_ir_output) {
 			sprintf(buf, "%s.ir", srcs.items[i]);
@@ -327,7 +311,8 @@ int main(int argc, char **argv) {
 				(match(tp),
 					when(TP_WINDOWS, "win64")
 					when(TP_LINUX,   "elf64")
-					when(TP_MACOS,   "macho64") "err"),
+					when(TP_MACOS,   "macho64")
+					"err"),
 				output_file);
 			break;
 		case CG_FASM_AMD64:

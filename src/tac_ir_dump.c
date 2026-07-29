@@ -2,8 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
-
-#include "../include/tac_ir.h"
+#include <tac_ir.h>
 
 char *tac_ir_dump_opr_type(TAC_Operand op) {
 	Type type = tac_ir_get_opr_type(op);

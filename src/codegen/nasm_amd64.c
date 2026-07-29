@@ -4,9 +4,8 @@
 #include <stdbool.h>
 #include <stdarg.h>
 #include <assert.h>
-
-#include "../../include/platform.h"
-#include "../../include/tac_ir.h"
+#include <platform.h>
+#include <tac_ir.h>
 
 #include "amd64.h"
 #include "reg_allocator.h"
