@@ -77,7 +77,7 @@ struct UserType {
 	} as;
 };
 
-HT_DECL_STR(UserTypes, UserType*)
+HT_DECL_STR(UserTypes, UserType)
 
 #define is_pointer(t) ((t).kind == TYPE_ARRAY || (t).kind == TYPE_POINTER)
 #define get_pointer_base(t) ((t).kind == TYPE_POINTER ? (t).as.pointer.base : (t).as.array.elem)

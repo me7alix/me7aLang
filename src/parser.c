@@ -5,15 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <parser.h>
 
-#include "../include/parser.h"
-
-HT_IMPL_STR(UserTypes, UserType*)
+HT_IMPL_STR(UserTypes, UserType)
 HT_IMPL(SymbolTable, SymbolKey, Symbol)
-
-#define peek(p) (*(p)->tokens)
-#define peek2(p) (*((p)->tokens+1))
-#define next(p) (*((p)->tokens++))
 
 u32 SymbolTable_hashf(SymbolKey key) {
 	return hash_combine(hash_str(key.id), hash_num(key.kind));
@@ -112,6 +107,10 @@ long long calc_arr_len(AST_Node *e) {
 	return 0;
 }
 
+#define peek(p) (*(p)->tokens)
+#define peek2(p) (*((p)->tokens+1))
+#define next(p) (*((p)->tokens++))
+
 void parse_func_args(Parser *p, AST_Nodes *fargs);
 Type *parse_type(Parser *p);
 
@@ -194,10 +193,10 @@ Type *parse_type_r(Parser *p) {
 		}
 	}
 
-	UserType **user_type = UserTypes_get(&p->ut, peek(p).data);
+	UserType *user_type = UserTypes_get(&p->ut, peek(p).data);
 	if (user_type) {
-		type->kind = (*user_type)->kind;
-		type->as.user = *user_type;
+		type->kind = user_type->kind;
+		type->as.user = user_type;
 		next(p);
 		return type;
 	}
@@ -776,14 +775,13 @@ void parse_method(Parser *p, UserType *st, bool is_static) {
 
 void parse_struct(Parser *p) {
 	next(p);
-	if (UserTypes_get(&p->ut, peek(p).data)) {
+	if (UserTypes_get(&p->ut, peek(p).data))
 		throw_error(peek(p).loc, "redefinition of the struct");
-	}
 
-	UserType *st = new(UserType,
+	UserTypes_add(&p->ut, peek(p).data, (UserType){
 		.kind = TYPE_STRUCT,
-		.id = peek(p).data);
-	UserTypes_add(&p->ut, next(p).data, st);
+		.id = peek(p).data});
+	UserType *st = UserTypes_get(&p->ut, next(p).data);
 
 	expect(next(p), TOK_OBRA);
 	while (peek(p).kind != TOK_CBRA) {
@@ -819,9 +817,8 @@ void parse_impl(Parser *p) {
 	}
 
 	Location snl = peek(p).loc;
-	UserType **stc = UserTypes_get(&p->ut, next(p).data);
-	if (!stc) throw_error(snl, "no such struct or union");
-	UserType *st = *stc;
+	UserType *st = UserTypes_get(&p->ut, next(p).data);
+	if (!st) throw_error(snl, "no such struct or union");
 
 	expect(next(p), TOK_OBRA);
 	while (peek(p).kind != TOK_CBRA) {
