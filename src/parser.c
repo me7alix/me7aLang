@@ -41,12 +41,10 @@ bool sbltbl_add(Parser *p, SymbolKind st, char *id, Symbol smbl) {
 
 Symbol *sbltbl_get(Parser *p, SymbolKind st, char *id) {
 	SymbolKey key = {st, id};
-
 	for (int i = p->sss.count - 1; i >= 0; i--) {
 		Symbol *smbl = SymbolTable_get(&da_get(&p->sss, i), key);
 		if (smbl) return smbl;
 	}
-
 	return NULL;
 }
 
@@ -83,11 +81,9 @@ long long calc_arr_len(AST_Node *e) {
 	case AST_LITERAL:
 		if (e->as.literal.kind == LIT_INT) return e->as.literal.as.lint;
 		else throw_error(e->loc, "expected integer literal");
-
 	case AST_UN_EXP:
 		if (e->as.eun.op == AST_OP_NEG) return -calc_arr_len(e->as.eun.v);
 		else throw_error(e->loc, "invalid unary operator in array size");
-
 	case AST_BIN_EXP: {
 		size_t le = calc_arr_len(e->as.ebin.l);
 		size_t re = calc_arr_len(e->as.ebin.r);
@@ -99,11 +95,9 @@ long long calc_arr_len(AST_Node *e) {
 			default: throw_error(e->loc, "invalid binary operator in array size");
 		}
 	}
-
 	default:
 		throw_error(e->loc, "wrong expression");
 	}
-
 	return 0;
 }
 
@@ -240,13 +234,10 @@ AST_Node *parse_func_call(Parser *p) {
 	AST_Node *fcn = new(AST_Node, .kind = AST_FUNC_CALL);
 	fcn->loc = peek(p).loc;
 	fcn->as.func_call.id = next(p).data;
-	expect(peek(p), TOK_OPAR);
-	next(p);
-
+	expect(next(p), TOK_OPAR);
 	Symbol *fcf = sbltbl_get(p, SBL_FUNC_DEF,    fcn->as.func_call.id);
 	Symbol *fce = sbltbl_get(p, SBL_FUNC_EXTERN, fcn->as.func_call.id);
 	if (!fcf && !fce) throw_error(fcn->loc, "calling an undeclared function");
-
 	AST_Nodes fargs;
 	if (fcf) {
 		fcn->as.func_call.type = fcf->func_def.type;
@@ -256,29 +247,24 @@ AST_Node *parse_func_call(Parser *p) {
 		fcn->as.func_call.id = fce->func_extern.extern_smb;
 		fargs = fce->func_extern.args;
 	}
-
 	size_t arg_cnt = 0;
 	bool met_any = false;
 	bool is_next_any = false;
 	AST_Node *expr;
-
 	while (peek(p).kind != TOK_CPAR) {
 		if (!met_any) {
 			if (arg_cnt >= fargs.count) {
 				throw_error(fcn->loc, "too many arguments");
 			}
 		}
-
 		if (fargs.items[arg_cnt]->kind == AST_FUNC_DEF_ARG_ANY) {
 			met_any = true;
 		}
-
 		if (arg_cnt < fargs.count - 1) {
 			if (fargs.items[arg_cnt + 1]->kind == AST_FUNC_DEF_ARG_ANY) {
 				is_next_any = true;
 			}
 		}
-
 		if (!met_any) {
 			Type farg_type = fargs.items[arg_cnt++]->as.func_def_arg.type;
 			expr = parse_expr(p, until(TOK_CPAR, TOK_COM), &farg_type);
@@ -289,15 +275,11 @@ AST_Node *parse_func_call(Parser *p) {
 		} else {
 			expr = parse_expr(p, until(TOK_CPAR, TOK_COM), NULL);
 		}
-
 		da_append(&fcn->as.func_call.args, expr);
 		if (peek(p).kind == TOK_COM) next(p);
 	}
-
-	if (!met_any && !is_next_any && arg_cnt < fargs.count) {
+	if (!met_any && !is_next_any && arg_cnt < fargs.count)
 		throw_error(fcn->loc, "not enough arguments");
-	}
-
 	next(p);
 	return fcn;
 }
@@ -372,7 +354,6 @@ AST_Node *parse_func_return(Parser *p, AST_Node *func) {
 		.kind = AST_FUNC_RET,
 		.loc = peek(p).loc,
 		.as.func_ret.type = func->as.func_def.type);
-
 	next(p);
 	if (peek(p).kind == TOK_SEMI) {
 		if (ret->as.func_ret.type.kind != TYPE_NULL)
@@ -388,7 +369,6 @@ AST_Node *parse_func_return(Parser *p, AST_Node *func) {
 			);
 		}
 	}
-
 	return ret;
 }
 
@@ -422,8 +402,9 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 }
 
 AST_Node *parse_while_stmt(Parser *p, AST_Node *func) {
-	next(p);
-	AST_Node *r = new(AST_Node, .kind = AST_WHILE_STMT);
+	AST_Node *r = new(AST_Node,
+		.kind = AST_WHILE_STMT,
+		.loc = next(p).loc);
 	r->as.stmt_while.expr = parse_expr(p, until(TOK_OBRA, TOK_ARROW, TOK_ARROW_EQ), NULL);
 	if (parser_get_type(p, r->as.stmt_while.expr).kind != TYPE_BOOL)
 		throw_error(r->as.stmt_while.expr->loc, "bool expected");
@@ -456,15 +437,14 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 
 AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 	if (!skip) push_scope(p);
-
 	bool is_arrow    = peek(p).kind == TOK_ARROW;
 	bool is_arrow_eq = peek(p).kind == TOK_ARROW_EQ;
-
-	AST_Node *body = new(AST_Node, .kind = AST_BODY);
+	AST_Node *body = new(AST_Node,
+		.kind = AST_BODY,
+		.loc = peek(p).loc);
 	if (!is_arrow && !is_arrow_eq)
 		expect(peek(p), TOK_OBRA);
 	next(p);
-
 	if (is_arrow_eq) {
 		Type ft = func->as.func_def.type;
 		AST_Node *en = parse_expr(p, until(TOK_SEMI), &ft);
@@ -478,16 +458,13 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 				.as.func_ret.type = et));
 		goto done;
 	}
-
 	while (true) {
 		switch (peek(p).kind) {
 		case TOK_CBRA: goto done;
 		case TOK_SEMI: next(p); break;
-
 		case TOK_OBRA:
 			ast_body_append(body, parse_body(p, func, false));
 			break;
-
 		case TOK_ID: {
 			switch (peek2(p).kind) {
 			case TOK_COL:
@@ -505,7 +482,6 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 				ast_body_append(body, parse_var_mut(p, until(TOK_SEMI)));
 			}
 		} break;
-
 		case TOK_BREAK:
 			ast_body_append(body, new(AST_Node,
 				.kind = AST_LOOP_BREAK,
@@ -513,7 +489,6 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 			));
 			expect(next(p), TOK_SEMI);
 			break;
-
 		case TOK_CONTINUE:
 			ast_body_append(body, new(AST_Node,
 				.kind = AST_LOOP_CONTINUE,
@@ -521,32 +496,25 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 			));
 			expect(next(p), TOK_SEMI);
 			break;
-
 		case TOK_BLOCK:
 			next(p);
 			ast_body_append(body, parse_body(p, func, false));
 			break;
-
 		case TOK_IF_SYM:
 			ast_body_append(body, parse_if_stmt(p, func));
 			break;
-
 		case TOK_WHILE_SYM:
 			ast_body_append(body, parse_while_stmt(p, func));
 			break;
-
 		case TOK_FOR_SYM:
 			ast_body_append(body, parse_for_stmt(p, func));
 			break;
-
 		case TOK_RET:
 			ast_body_append(body, parse_func_return(p, func));
 			break;
-
 		default:
 			ast_body_append(body, parse_var_mut(p, until(TOK_SEMI)));
 		}
-
 		if (is_arrow) {
 			p->tokens--;
 			goto done;
@@ -565,7 +533,6 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 		case TOK_COM:
 			next(p);
 			break;
-
 		case TOK_ID: {
 			expect(peek2(p), TOK_COL);
 			AST_Node *arg = new(AST_Node,
@@ -582,13 +549,11 @@ void parse_func_args(Parser *p, AST_Nodes *fargs) {
 				.variable.uid = arg->as.func_def_arg.uid,
 			})) throw_error(arg->loc, "redifinition of the variable");
 		} break;
-
 		case TOK_ANY:;
 			AST_Node *arg = new(AST_Node, .kind = AST_FUNC_DEF_ARG_ANY);
 			next(p);
 			da_append(fargs, arg);
 			break;
-
 		default:
 			throw_error(peek(p).loc, "unexpected token");
 		}
@@ -601,23 +566,17 @@ AST_Node *parse_function(Parser *p, AST_Node *self, bool is_static) {
 		is_static = true;
 		expect(next(p), TOK_FUNC);
 	}
-
 	AST_Node *fdn = new(AST_Node,
 		.kind = AST_FUNC_DEF,
 		.loc = peek(p).loc,
 		.as.func_def.id = peek(p).data,
-		.as.func_def.is_static = is_static,
-	);
-
+		.as.func_def.is_static = is_static);
 	char *pref = "method";
 	if (strncmp(pref, fdn->as.func_def.id, strlen(pref)) == 0)
-		throw_error(fdn->loc, "`method` prefix is reserved, you cannot use it");
-
+		throw_error(fdn->loc, "prefix `method` is reserved, you cannot use it");
 	next(p);
 	expect(next(p), TOK_OPAR);
-
 	push_scope(p);
-
 	if (self) {
 		da_append(&fdn->as.func_def.args, self);
 		sbltbl_add(p, SBL_VAR, self->as.func_def_arg.id, (Symbol) {
@@ -625,35 +584,28 @@ AST_Node *parse_function(Parser *p, AST_Node *self, bool is_static) {
 			.variable.uid = self->as.func_def_arg.uid,
 		});
 	}
-
 	parse_func_args(p, &fdn->as.func_def.args);
-
 	if (peek(p).kind == TOK_COL) {
 		fdn->as.func_def.type = *parse_type(p);
 	} else {
 		fdn->as.func_def.type = (Type) {.kind = TYPE_NULL};
 	}
-
 	if (self) {
 		if (peek(p).kind != TOK_SEMI)
 			fdn->as.func_def.body = parse_body(p, fdn, true);
 		pop_scope(p);
 		return fdn;
 	}
-
 	Symbol fds = {
 		.func_def.type = fdn->as.func_def.type,
 		.func_def.is_def = true,
 	};
-
 	for (size_t i = 0; i < fdn->as.func_def.args.count; i++)
 		da_append(&fds.func_def.args, da_get(&fdn->as.func_def.args, i));
-
-	Symbol *seu = sbltbl_get(p, SBL_FUNC_EX_USED, fdn->as.func_def.id);
-	Symbol *se  = sbltbl_get(p, SBL_FUNC_EXTERN,  fdn->as.func_def.id);
-	Symbol *sf  = sbltbl_get(p, SBL_FUNC_DEF,     fdn->as.func_def.id);
-
-	if (se || seu) throw_error(fdn->loc, "the symbol is already in use");
+	Symbol *su = sbltbl_get(p, SBL_FUNC_EX_USED, fdn->as.func_def.id);
+	Symbol *se = sbltbl_get(p, SBL_FUNC_EXTERN,  fdn->as.func_def.id);
+	Symbol *sf = sbltbl_get(p, SBL_FUNC_DEF,     fdn->as.func_def.id);
+	if (se || su) throw_error(fdn->loc, "the symbol is already in use");
 	else if (sf) {
 		if (sf->func_def.is_def)
 			throw_error(fdn->loc, "function redefinition");
@@ -664,10 +616,8 @@ AST_Node *parse_function(Parser *p, AST_Node *self, bool is_static) {
 		for (size_t i = 0; i < fds.func_def.args.count; i++) {
 			Type l = fds.func_def.args.items[i]->as.func_def_arg.type;
 			Type r = sf->func_def.args.items[i]->as.func_def_arg.type;
-			if (!compare_types(l, r))
-				throw_error(fdn->loc, "wrong type in the function declaration");
+			if (!compare_types(l, r)) throw_error(fdn->loc, "wrong type in the function declaration");
 		}
-
 		sf->func_def.is_def = true;
 		fdn->as.func_def.body = parse_body(p, fdn, true);
 		pop_scope(p);
@@ -693,33 +643,24 @@ void parse_extern(Parser *p) {
 	char *extern_smb = peek(p).data;
 	if (peek2(p).kind == TOK_ID)
 		next(p);
-
 	expect(peek(p), TOK_ID);
 	char *id = peek(p).data;
 	Symbol fes = { .func_extern.extern_smb = extern_smb };
-	Location loc = peek(p).loc;
-
-	next(p);
+	Location loc = next(p).loc;
 	expect(next(p), TOK_OPAR);
-
 	push_scope(p);
 	parse_func_args(p, &fes.func_extern.args);
 	pop_scope(p);
-
 	if (peek(p).kind == TOK_COL) {
 		fes.func_extern.type = *parse_type(p);
 		next(p);
 	} else {
 		fes.func_extern.type = (Type){.kind = TYPE_NULL};
 	}
-
-	Symbol *sf  = sbltbl_get(p, SBL_FUNC_DEF,     id);
-	Symbol *se  = sbltbl_get(p, SBL_FUNC_EXTERN,  id);
-	Symbol *seu = sbltbl_get(p, SBL_FUNC_EX_USED, id);
-
-	if (sf || se || seu)
-		throw_error(loc, "the symbol is already in use");
-
+	Symbol *sf = sbltbl_get(p, SBL_FUNC_DEF,     id);
+	Symbol *se = sbltbl_get(p, SBL_FUNC_EXTERN,  id);
+	Symbol *su = sbltbl_get(p, SBL_FUNC_EX_USED, id);
+	if (sf || se || su) throw_error(loc, "the symbol is already in use");
 	sbltbl_add(p, SBL_FUNC_EXTERN, id, fes);
 	sbltbl_add(p, SBL_FUNC_EX_USED, extern_smb, (Symbol){0});
 }
@@ -728,17 +669,13 @@ void parse_method(Parser *p, UserType *st, bool is_static) {
 	Type *ut = new(Type,
 		.kind = TYPE_STRUCT,
 		.as.user = st);
-
 	AST_Node *self = new(AST_Node,
 		.kind = AST_FUNC_DEF_ARG,
 		.as.func_def_arg.id = "self",
 		.as.func_def_arg.uid = var_id_ctr++,
 		.as.func_def_arg.type = (Type){
 			.kind = TYPE_POINTER,
-			.as.pointer.base = ut,
-		},
-	);
-
+			.as.pointer.base = ut});
 	AST_Node *func = parse_function(p, self, is_static);
 	da_foreach (Member, member, &st->as.ustruct.members) {
 		if (member->kind == MBR_METHOD) {
@@ -766,7 +703,6 @@ void parse_method(Parser *p, UserType *st, bool is_static) {
 			member--;
 		}
 	}
-
 	da_append(&st->as.ustruct.members, ((Member){
 		.kind = MBR_METHOD,
 		.as.method.func = func,
@@ -777,12 +713,10 @@ void parse_struct(Parser *p) {
 	next(p);
 	if (UserTypes_get(&p->ut, peek(p).data))
 		throw_error(peek(p).loc, "redefinition of the struct");
-
 	UserTypes_add(&p->ut, peek(p).data, (UserType){
 		.kind = TYPE_STRUCT,
 		.id = peek(p).data});
 	UserType *st = UserTypes_get(&p->ut, next(p).data);
-
 	expect(next(p), TOK_OBRA);
 	while (peek(p).kind != TOK_CBRA) {
 		switch (peek(p).kind) {
@@ -815,11 +749,9 @@ void parse_impl(Parser *p) {
 		is_static = true;
 		expect(next(p), TOK_IMPL);
 	}
-
 	Location snl = peek(p).loc;
 	UserType *st = UserTypes_get(&p->ut, next(p).data);
 	if (!st) throw_error(snl, "no such struct or union");
-
 	expect(next(p), TOK_OBRA);
 	while (peek(p).kind != TOK_CBRA) {
 		switch (peek(p).kind) {
@@ -842,60 +774,13 @@ Parser parser_parse(Token *tokens) {
 	AST_Node *prog = new(AST_Node, .kind = AST_PROG);
 	p.program = prog;
 	p.tokens = tokens;
-
 	push_scope(&p);
-
 	while (peek(&p).kind != TOK_EOF) {
 		switch (peek(&p).kind) {
-		case TOK_SEMI:
-			next(&p);
-			break;
-
-		case TOK_STRUCT:
-			parse_struct(&p);
-			break;
-
-		case TOK_IMPL:
-			parse_impl(&p);
-			break;
-
-		case TOK_EXTERN:
-			parse_extern(&p);
-			break;
-
-		case TOK_IMPORT:
-			next(&p);
-			next(&p);
-			next(&p);
-			break;
-
-		case TOK_MACRO_OBJ:
-			while (peek(&p).kind != TOK_SEMI)
-				next(&p);
-			next(&p);
-			break;
-
-		case TOK_MACRO_FUNC:
-			next(&p);
-			expect(next(&p), TOK_ID);
-			expect(next(&p), TOK_OPAR);
-			while (peek(&p).kind != TOK_CPAR)
-				next(&p);
-			next(&p);
-			expect(next(&p), TOK_OBRA);
-			int braCnt = 1;
-			while (true) {
-				next(&p);
-				if (peek(&p).kind == TOK_CBRA) {
-					braCnt--;
-					if (braCnt == 0) break;
-				} else if (peek(&p).kind == TOK_OBRA) {
-					braCnt++;
-				}
-			}
-			next(&p);
-			break;
-
+		case TOK_SEMI:   next(&p);         break;
+		case TOK_STRUCT: parse_struct(&p); break;
+		case TOK_IMPL:   parse_impl(&p);   break;
+		case TOK_EXTERN: parse_extern(&p); break;
 		case TOK_STATIC: {
 			if (peek2(&p).kind == TOK_FUNC) {
 				AST_Node *func = parse_function(&p, NULL, true);
@@ -904,12 +789,10 @@ Parser parser_parse(Token *tokens) {
 				parse_impl(&p);
 			}
 		} break;
-
 		case TOK_FUNC: {
 			AST_Node *func = parse_function(&p, NULL, false);
 			if (func) da_append(&prog->as.program.stmts, func);
 		} break;
-
 		case TOK_ID:
 			if (peek2(&p).kind == TOK_COL) {
 				da_append(&prog->as.program.stmts, parse_var_def(&p));
@@ -917,11 +800,9 @@ Parser parser_parse(Token *tokens) {
 				da_append(&prog->as.program.stmts, parse_var_assign(&p));
 			} else throw_error(peek(&p).loc, "unexpected top level declaration");
 			break;
-
 		default:
 			throw_error(peek(&p).loc, "unexpected top level declaration");
 		}
 	}
-
 	return p;
 }
