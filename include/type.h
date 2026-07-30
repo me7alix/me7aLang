@@ -32,7 +32,6 @@ typedef struct Type Type;
 
 struct Type {
 	TypeKind kind;
-
 	union {
 		struct {
 			Type *base;
@@ -54,7 +53,6 @@ typedef struct {
 		MBR_FIELD,
 		MBR_METHOD,
 	} kind;
-
 	union {
 		struct {
 			Type type;
@@ -69,7 +67,6 @@ typedef struct {
 struct UserType {
 	TypeKind kind;
 	char *id;
-
 	union {
 		struct {
 			DA(Member) members;
@@ -100,7 +97,6 @@ static bool compare_types(Type a, Type b) {
 	} else if (a.kind != b.kind) {
 		return false;
 	}
-
 	return true;
 }
 
@@ -125,7 +121,6 @@ static void render_type(StringBuilder *sb, Type t) {
 	case TYPE_F64:      sb_appendf (sb, "f64");   break;
 	case TYPE_BOOL:     sb_appendf (sb, "bool");  break;
 	case TYPE_FUNCTION: sb_appendf (sb, "func");  break;
-
 	case TYPE_POINTER:
 		sb_appendf(sb, "*");
 		render_type(sb, *t.as.pointer.base);
@@ -142,5 +137,19 @@ static void render_type(StringBuilder *sb, Type t) {
 static Type TU8 = {.kind = TYPE_U8};
 static Type TU0 = {.kind = TYPE_NULL};
 static Type TUPTR = {.kind = TYPE_UPTR};
+
+static bool is_type_integer(Type a) {
+	switch (a.kind) {
+	case TYPE_INT: case TYPE_UINT:
+	case TYPE_I8: case TYPE_U8:
+	case TYPE_I16: case TYPE_U16:
+	case TYPE_I32: case TYPE_U32:
+	case TYPE_I64: case TYPE_U64:
+	case TYPE_IPTR: case TYPE_UPTR:
+		return true;
+	default:
+		return false;
+	}
+}
 
 #endif //TYPE_H
