@@ -685,7 +685,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 			}
 
 			is_there_return = true;
-			sb_appendf(&body, "  jmp .L_func_exit\n");
+			sb_appendf(&body, "  jmp .FE\n");
 		} break;
 
 		case OP_FUNC_CALL: {
@@ -720,7 +720,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 			}
 
 			if (shadow_space) sb_appendf(&body, "  sub rsp, 32\n");
-			sb_appendf(&fc, "  call near %s%s\n", (tp == TP_MACOS ? "_" : ""), ci.dst.as.name);
+			sb_appendf(&fc, "  call %s%s\n", (tp == TP_MACOS ? "_" : ""), ci.dst.as.name);
 			sb_appendf(&body, fc.items);
 			if (shadow_space) sb_appendf(&body, "  add rsp, 32\n");
 			sb_free(&fc);
@@ -757,7 +757,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 	if (strcmp(func.name, "main") == 0)
 		sb_appendf(code, "  mov eax, 0\n");
 	if (is_there_return)
-		sb_appendf(code, ".L_func_exit:\n");
+		sb_appendf(code, ".FE:\n");
 	if (is_stack_used)
 		sb_appendf(code, "  leave\n");
 	else if (regal.callee_saved_regs.count * 8 % 16 == 0)
