@@ -19,9 +19,6 @@ macro swap(a, b) {
 macro do_while(expr, body) {
     while true {
         block body
-
-        if !(expr) {
-            break
-        }
+        if !(expr) do break
     }
 }

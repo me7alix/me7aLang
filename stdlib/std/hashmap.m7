@@ -20,7 +20,7 @@ static fn hash_combine(h1: u32, h2: u32): u32 {
 }
 
 macro hash_num(num) {
-    (1462847356:u32 * num:u32 + 1550508858:u32) \
+    (1462847356 * num:u32 + 1550508858):u32 \
 }
 
 macro HashMap(HT, KT, VT) {
@@ -28,9 +28,14 @@ macro HashMap(HT, KT, VT) {
 	HashMapImpl(HT, KT, VT)
 }
 
+macro HashMapStatic(HT, KT, VT) {
+	HashMapDecl(HT, KT, VT)
+	static HashMapImpl(HT, KT, VT)
+}
+
 macro HashMapDecl(HT, KT, VT) {
 	fn HT##_hashf(key: KT): u32
-	fn HT##_compare(a: KT, b: KT): int
+	fn HT##_compare(a: KT, b: KT): bool
 
 	struct HT##_node {
 		key:  KT
@@ -52,35 +57,25 @@ macro HashMapImpl(HT, KT, VT) {
 				self.capacity = 256
 				self.arr = calloc(self.capacity, sizeof:*u0)
 			}
-
 			idx := HT##_hashf(key):uptr % self.capacity
-			cur := self.arr[idx]
-
-			while cur != null {
-				if HT##_compare(cur.key, key) == 0 {
+			for cur := self.arr[idx]; cur != null; cur = cur.next {
+				if HT##_compare(cur.key, key) {
 					cur.val = val
 					return
 				}
-
-				cur = cur.next
 			}
-
 			n: *HT##_node = calloc(1, sizeof:HT##_node)
 			n.key = key
 			n.val = val
 			n.next = self.arr[idx]
-
 			self.arr[idx] = n
 			self.count += 1
-
 			if self.count > self.capacity * 2 {
 				old_cap := self.capacity
 				new_cap := old_cap * 3
 				new_arr: **HT##_node = calloc(new_cap, sizeof:*u0)
-
 				for i: uptr = 0; i < old_cap; i+=1 {
 					it := self.arr[i]
-
 					while it != null {
 						next := it.next
 						j := HT##_hashf(it.key):uptr % new_cap
@@ -89,7 +84,6 @@ macro HashMapImpl(HT, KT, VT) {
 						it = next
 					}
 				}
-
 				free(self.arr)
 				self.arr = new_arr
 				self.capacity = new_cap
@@ -97,55 +91,37 @@ macro HashMapImpl(HT, KT, VT) {
 		}
 
 		fn get(key: KT): *VT {
-			if self.capacity == 0 {
-				return null
-			}
-
+			if self.capacity == 0 => null
 			idx := HT##_hashf(key):uptr % self.capacity
 			cur := self.arr[idx]
 			while cur != null {
-				if HT##_compare(cur.key, key) == 0 {
+				if HT##_compare(cur.key, key) do
 					return &cur.val
-				}
-
 				cur = cur.next
 			}
-
 			return null
 		}
 
 		fn remove(key: KT) {
-			if self.capacity == 0 {
-				return
-			}
-
+			if self.capacity == 0 do return
 			idx := HT##_hashf(key):uptr % self.capacity
 			cur := self.arr[idx]
 			prev: *HT##_node = null
-
 			while cur != null {
-				if HT##_compare(cur.key, key) == 0 {
-					if prev != null {
-						prev.next = cur.next
-					} else {
-						self.arr[idx] = cur.next
-					}
-
+				if HT##_compare(cur.key, key) {
+					if prev != null do prev.next = cur.next
+					else do self.arr[idx] = cur.next
 					free(cur)
 					self.count -= 1
 					return
 				}
-
 				prev = cur
 				cur = cur.next
 			}
 		}
 
 		fn free() {
-			if self.capacity == 0 {
-				return
-			}
-
+			if self.capacity == 0 do return
 			for i: uptr = 0; i < self.capacity; i+=1 {
 				cur := self.arr[i]
 				while cur != null {
@@ -154,7 +130,6 @@ macro HashMapImpl(HT, KT, VT) {
 					cur = next
 				}
 			}
-
 			free(self.arr)
 			self.arr = null
 			self.capacity = 0
@@ -169,8 +144,14 @@ macro HashMapStrDecl(HT, VT) {
 
 macro HashMapStrImpl(HT, VT) {
 	HashMapImpl(HT, *u8, VT)
-	fn HT##_compare(a: *u8, b: *u8): int => strcmp(a, b)
+	fn HT##_compare(a: *u8, b: *u8): bool => strcmp(a, b) == 0
 	fn HT##_hashf(str: *u8): u32 => hash_str(str)
+}
+
+macro HashMapStrStaticImpl(HT, VT) {
+	static HashMapImpl(HT, *u8, VT)
+	static fn HT##_compare(a: *u8, b: *u8): bool => strcmp(a, b) == 0
+	static fn HT##_hashf(str: *u8): u32 => hash_str(str)
 }
 
 macro HashMapStr(HT, VT) {
@@ -178,8 +159,19 @@ macro HashMapStr(HT, VT) {
 	HashMapStrImpl(HT, VT)
 }
 
+macro HashMapStrStatic(HT, VT) {
+	HashMapStrDecl(HT, VT)
+	HashMapStrStaticImpl(HT, VT)
+}
+
 macro HashMapNumImpl(HT, KT, VT) {
 	HashMapImpl(HT, KT, VT)
-	fn HT##_compare(a: KT, b: KT): int => a != b
+	fn HT##_compare(a: KT, b: KT): bool => a == b
 	fn HT##_hashf(val: KT): u32 => hash_num(val)
+}
+
+macro HashMapNumStaticImpl(HT, KT, VT) {
+	static HashMapImpl(HT, KT, VT)
+	static fn HT##_compare(a: KT, b: KT): bool => a == b
+	static fn HT##_hashf(val: KT): u32 => hash_num(val)
 }

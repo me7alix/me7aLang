@@ -18,6 +18,11 @@ macro DynArr(N, T) {
 	DynArrImpl(N, T)
 }
 
+macro DynArrStatic(N, T) {
+	DynArrDecl(N, T)
+	static DynArrImpl(N, T)
+}
+
 macro DynArrDecl(N, T) {
 	struct N {
 		items:    *T
@@ -43,14 +48,10 @@ macro DynArrImpl(N, T) {
 		fn reserve(cap: uptr) {
 			if cap > self.capacity {
 				new_capacity: uptr = 256
-				if self.capacity != 0 {
+				if self.capacity != 0 do
 					new_capacity = self.capacity
-				}
-
-				while cap > new_capacity {
+				while cap > new_capacity do
 					new_capacity *= 2
-				}
-
 				self.capacity = new_capacity
 				self.items = realloc(
 					self.items,
@@ -61,14 +62,13 @@ macro DynArrImpl(N, T) {
 
 		fn append(item: T) {
 			self.reserve(self.count + 1)
-
 			self.items[self.count] = item
 			self.count += 1
 		}
 
 		fn check_index(index: uptr) {
 			if index < 0 || index >= self.count {
-				printf("dynarr error: index %zu is not in the range 0..%zu\n", index, self.count)
+				printf("dynarr "#N" error: index %zu is not in the range 0..%zu\n", index, self.count)
 				exit(1)
 			}
 		}
@@ -88,13 +88,11 @@ macro DynArrImpl(N, T) {
 			return self.items + index
 		}
 
-		fn reset() {
-			self.count = 0
-		}
+		fn reset() do self.count = 0
 
 		fn check_empty() {
 			if self.count <= 0 {
-				printf("dynarr error: empty dynamic array\n")
+				printf("dynarr "#N" error: empty dynamic array\n")
 				exit(1)
 			}
 		}
@@ -124,10 +122,8 @@ macro DynArrImpl(N, T) {
 		}
 
 		fn free() {
-			if self.items != null {
+			if self.items != null do
 				free(self.items)
-			}
-
 			self.count = 0
 			self.capacity = 0
 		}
