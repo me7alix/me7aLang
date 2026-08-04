@@ -15,9 +15,8 @@ static fn hash_str(p: *u8): u32 {
     return h
 }
 
-static fn hash_combine(h1: u32, h2: u32): u32 {
-    return h1 ^ (h2 + 581019932:u32 + (h1 << 3) + (h1 >> 2))
-}
+static fn hash_combine(h1: u32, h2: u32): u32 =>
+	h1 ^ (h2 + 581019932:u32 + (h1 << 3) + (h1 >> 2))
 
 macro hash_num(num) {
     (1462847356 * num:u32 + 1550508858):u32 \
@@ -34,9 +33,6 @@ macro HashMapStatic(HT, KT, VT) {
 }
 
 macro HashMapDecl(HT, KT, VT) {
-	fn HT##_hashf(key: KT): u32
-	fn HT##_compare(a: KT, b: KT): bool
-
 	struct HT##_node {
 		key:  KT
 		val:  VT
@@ -44,10 +40,18 @@ macro HashMapDecl(HT, KT, VT) {
     }
 
 	struct HT {
-        arr:      **HT##_node
-        count:    uptr
-        capacity: uptr
+		arr:      **HT##_node
+		count:    uptr
+		capacity: uptr
+
+		fn add(key: KT, val: VT)
+		fn get(key: KT): *VT
+		fn remove(key: KT)
+		fn free()
 	}
+
+	fn HT##_hashf(key: KT): u32
+	fn HT##_compare(a: KT, b: KT): bool
 }
 
 macro HashMapImpl(HT, KT, VT) {
