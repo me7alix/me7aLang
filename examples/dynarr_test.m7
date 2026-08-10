@@ -1,6 +1,7 @@
 import "std/dynarr.m7"
 
 DynArr(Numbers, int)
+DynArr(Integers, int)
 
 fn main() {
 	nums: Numbers
@@ -24,14 +25,14 @@ fn main() {
 	// change 78 to 90
 	nums.set(nums.count - 1, 90)
 
-	nums2: Numbers
-	da_copy(nums2, nums)
+	ints: Integers
+	da_copy(ints, nums)
 
-	da_foreach (num, nums2) {
-		idx := (num - nums2.items + 1):uptr
+	da_foreach (num, ints) {
+		idx := da_index_of(num, ints) + 1
 		printf("%zu) %d\n", idx, *num)
 	}
 
 	nums.free()
-	nums2.free()
+	ints.free()
 }
