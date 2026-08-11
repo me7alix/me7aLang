@@ -122,6 +122,7 @@ struct AST_Node {
 			AST_Nodes args;
 			Type type;
 			AST_Node *body;
+			DA(AST_Nodes) defers_stack;
 		} func_def;
 		struct {
 			AST_Nodes stmts;

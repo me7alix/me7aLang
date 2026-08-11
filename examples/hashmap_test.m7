@@ -4,14 +4,14 @@ HashMapStr(HM_StrInt, int)
 
 fn main() {
 	hm: HM_StrInt
+	defer hm.free()
 
 	hm.add("ten",    10)
 	hm.add("twenty", 20)
 
 	printf("one: %p\n", hm.get("one"))
 
-	ht_foreach_node (node, hm) do
+	ht_foreach_node (node, hm) {
 		printf("%s\t%d\n", node.key, node.val)
-
-	hm.free()
+	}
 }

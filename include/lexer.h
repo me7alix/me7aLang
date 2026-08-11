@@ -51,7 +51,7 @@ typedef enum {
 	TOK_TO_STR, TOK_IFDEF,
 	TOK_UNDEF,
 
-	TOK_PS, TOK_BLOCK,
+	TOK_PS, TOK_BLOCK, TOK_DEFER,
 	TOK_LEFT_SHIFT, TOK_RIGHT_SHIFT,
 	TOK_TILDA, TOK_XOR, TOK_ID_CONCAT,
 	TOK_ARROW, TOK_ARROW_EQ,
@@ -82,6 +82,7 @@ static struct {
 	{ "do",       TOK_ARROW      },
 	{ "def",      TOK_MACRO_OBJ  },
 	{ "macro",    TOK_MACRO_FUNC },
+	{ "defer",    TOK_DEFER      },
 };
 
 typedef struct {

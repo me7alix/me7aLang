@@ -5,7 +5,7 @@ endif
 syn match m7Comment "//.*$"
 syn region m7String start=+"+ skip=+\\\\\|\\"+ end=+"+
 syn region m7String start=+'+ skip=+\\\\\\|\\'+ end=+'+
-syn keyword m7Keyword import if else while for return break continue extern struct null fn def macro block impl static do
+syn keyword m7Keyword import if else while for return break continue extern struct null fn def macro block impl static do defer
 syn keyword m7Boolean true false
 syn match m7Bracket /\v[\[\]]/
 syn match m7Number /\v\<\d+(\.\d+)?([eE][+-]?\d+)?\>/

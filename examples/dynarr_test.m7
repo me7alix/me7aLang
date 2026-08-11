@@ -5,6 +5,7 @@ DynArr(Integers, int)
 
 fn main() {
 	nums: Numbers
+	defer nums.free()
 
 	nums.append(69)
 	nums.append(420)
@@ -26,13 +27,11 @@ fn main() {
 	nums.set(nums.count - 1, 90)
 
 	ints: Integers
+	defer ints.free()
 	da_copy(ints, nums)
 
 	da_foreach (num, ints) {
 		idx := da_index_of(num, ints) + 1
 		printf("%zu) %d\n", idx, *num)
 	}
-
-	nums.free()
-	ints.free()
 }
