@@ -26,14 +26,11 @@ fn draw_game() {
 			GREEN,
 		)
 	}
-
 	DrawRectangle(
 		apple.x * TILE_SIZE,
 		apple.y * TILE_SIZE,
 		TILE_SIZE, TILE_SIZE,
-		RED,
-	)
-
+		RED)
 	sprintf(strbuf, "Score: %zu", snake_len - 2)
 	DrawText(strbuf, 20, 20, 20, WHITE)
 }
@@ -60,12 +57,8 @@ fn snake_eat_apple() {
 }
 
 fn is_game_over(): bool {
-	for i := snake_len - 1; i >= 1; i-=1 {
-		if snake[0].x == snake[i].x && snake[0].y == snake[i].y {
-			return true
-		}
-	}
-
+	for i := snake_len - 1; i >= 1; i-=1 do
+		if snake[0].x == snake[i].x && snake[0].y == snake[i].y => true
 	return false
 }
 
@@ -95,7 +88,6 @@ fn snake_movement() {
 	snake_follow()
 	snake[0].x += snake_dir.x
 	snake[0].y += snake_dir.y
-
 	if snake[0].x == MAP_WIDTH {
 		snake[0].x = 0
 	} else if snake[0].x == -1 {
@@ -118,62 +110,51 @@ fn game_init() {
 	snake_dir.y = 0
 }
 
-timer    := 0
-new_game := false
-
 fn main() {
 	srand(time(null))
 	game_init()
+
+	timer := 0
+	new_game := false
 
 	InitWindow(
 		MAP_WIDTH  * TILE_SIZE,
 		MAP_HEIGHT * TILE_SIZE,
 		"Snake")
-
+	defer CloseWindow()
 	SetTargetFPS(60)
 
 	while !WindowShouldClose() {
 		BeginDrawing()
+		defer EndDrawing()
 		ClearBackground(BLACK)
-
 		if new_game {
 			draw_game()
-
 			DrawText(
 				"Game over!",
 				200, MAP_HEIGHT/2 * TILE_SIZE - 20,
 				40, WHITE)
-
 			DrawText(
 				"Press SPACE to restart",
 				200, MAP_HEIGHT/2 * TILE_SIZE + 20,
 				18, WHITE)
-
 			if IsKeyPressed(KEY_SPACE) {
 				game_init()
 				new_game = false
 			}
 		} else {
 			snake_set_dir()
-
 			if timer % 12 == 0 {
 				snake_movement()
-
 				if is_game_over() {
 					new_game = true
 					continue
 				}
-
 				snake_eat_apple()
 				timer = 0
 			}
-
 			draw_game()
 		}
-
 		timer += 1
-		EndDrawing()
 	}
-
-	CloseWindow()
 }
