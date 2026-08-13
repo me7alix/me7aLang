@@ -69,4 +69,61 @@ static size_t get_reg_size(Type t) {
 	}
 }
 
+static void align_up(uint *x, uint a) {
+	if (*x % a != 0) *x += a - *x % a;
+}
+
+static uint get_type_alignment(Type type) {
+	if (type.kind == TYPE_STRUCT) {
+		uint max_al = 0;
+		da_foreach (Member, member, &type.as.user->as.ustruct.members) {
+			if (member->kind == MBR_FIELD) {
+				uint al = get_type_alignment(member->as.field.type);
+				if (al > max_al) max_al = al;
+			}
+		}
+		return max_al;
+	}
+	return 1 << get_reg_size(type);
+}
+
+static uint get_type_size(Type type) {
+	if (type.kind == TYPE_STRUCT) {
+		uint total = 0;
+		uint max_align = 1;
+		da_foreach (Member, member, &type.as.user->as.ustruct.members) {
+			if (member->kind != MBR_FIELD) continue;
+			uint align = get_type_alignment(member->as.field.type);
+			uint size  = get_type_size(member->as.field.type);
+			if (align > max_align) max_align = align;
+			align_up(&total, align);
+			total += size;
+		}
+		align_up(&total, max_align);
+        return total;
+	}
+	return 1 << get_reg_size(type);
+}
+
+static uint get_struct_offset(TAC_Operand var) {
+	uint total = 0;
+	if (var.as.var.fields.count == 0)
+		return 0;
+	for (size_t i = 0; i < var.as.var.fields.count; i++) {
+		char *off = da_get(&var.as.var.fields, i);
+		da_foreach (Member, member, &var.as.var.type.as.user->as.ustruct.members) {
+			if (member->kind != MBR_FIELD) continue;
+			uint size  = get_type_size(member->as.field.type);
+			uint align = get_type_alignment(member->as.field.type);
+			align_up(&total, align);
+			if (strcmp(member->as.field.id, off) == 0) {
+				var.as.var.type = member->as.field.type;
+				break;
+			}
+			total += size;
+		}
+	}
+	return total;
+}
+
 #endif
