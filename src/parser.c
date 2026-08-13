@@ -111,7 +111,6 @@ Type *parse_type(Parser *p);
 Type *parse_type_r(Parser *p) {
 	Location loc = peek(p).loc;
 	Type *type = NULL;
-
 	if (peek(p).kind == TOK_STAR) {
 		next(p);
 		type = new(Type,
@@ -133,7 +132,6 @@ Type *parse_type_r(Parser *p) {
 		type->as.array.elem = parse_type_r(p);
 		return type;
 	}
-
 	type = new(Type, 0);
 	if (peek(p).kind == TOK_FUNC) {
 		type->kind = TYPE_FUNCTION;
@@ -157,7 +155,6 @@ Type *parse_type_r(Parser *p) {
 		}
 		return type;
 	}
-
 	static struct {
 		const char *str;
 		TypeKind kind;
@@ -178,7 +175,6 @@ Type *parse_type_r(Parser *p) {
 		{ "uptr",  TYPE_UPTR  },
 		{ "u0",    TYPE_NULL  },
 	};
-
 	for (size_t i = 0; i < ARR_LEN(types); i++) {
 		if (strcmp(peek(p).data, types[i].str) == 0) {
 			type->kind = types[i].kind;
@@ -186,7 +182,6 @@ Type *parse_type_r(Parser *p) {
 			return type;
 		}
 	}
-
 	UserType *user_type = UserTypes_get(&p->ut, peek(p).data);
 	if (user_type) {
 		type->kind = user_type->kind;
@@ -194,7 +189,6 @@ Type *parse_type_r(Parser *p) {
 		next(p);
 		return type;
 	}
-
 	throw_error(loc, "incorrect type");
 	return type;
 }
@@ -216,10 +210,8 @@ AST_Node *parse_method_call(Parser *p) {
 		.kind = AST_METHOD_CALL,
 		.loc = peek(p).loc,
 		.as.method_call.id = next(p).data);
-
 	// The first argument of any method is reserved for "self"
 	da_append(&metCall->as.method_call.args, NULL);
-
 	expect(next(p), TOK_OPAR);
 	while (peek(p).kind != TOK_CPAR) {
 		AST_Node *expr = parse_expr(p, until(TOK_COM, TOK_CPAR), NULL);
@@ -290,7 +282,6 @@ AST_Node *parse_var_def(Parser *p) {
 	char *id = peek(p).data;
 	Location loc = next(p).loc;
 	Type type = *parse_type(p);
-
 	AST_Node *vdn = new(AST_Node,
 		.kind = AST_VAR_DEF,
 		.loc = loc,
@@ -298,7 +289,6 @@ AST_Node *parse_var_def(Parser *p) {
 		.as.var_def.uid = var_id_ctr++,
 		.as.var_def.type = type,
 		.as.var_def.expr = NULL);
-
 	if (peek(p).kind == TOK_EQ) {
 		next(p);
 		AST_Node *expr = parse_expr(p, until(TOK_SEMI), &type); next(p);
@@ -308,12 +298,10 @@ AST_Node *parse_var_def(Parser *p) {
 			vdn->as.var_def.type.as.array.length == 0
 		) vdn->as.var_def.type.as.array.length = expr->as.array.count;
 	}
-
 	if (sbltbl_add(p, SBL_VAR, vdn->as.var_def.id, (Symbol) {
 		.variable.type = vdn->as.var_def.type,
 		.variable.uid = vdn->as.var_def.uid,
 	})) throw_error(vdn->loc, "redifinition of the variable");
-
 	return vdn;
 }
 
@@ -321,7 +309,6 @@ AST_Node *parse_var_assign(Parser *p) {
 	char *id = peek(p).data;
 	Location loc = next(p).loc;
 	next(p);
-
 	AST_Node *expr = parse_expr(p, until(TOK_SEMI), NULL); next(p);
 	AST_Node *vdn = new(AST_Node,
 		.kind = AST_VAR_DEF,
@@ -330,12 +317,10 @@ AST_Node *parse_var_assign(Parser *p) {
 		.as.var_def.uid = var_id_ctr++,
 		.as.var_def.type = parser_get_type(p, expr),
 		.as.var_def.expr = expr);
-
 	if (sbltbl_add(p, SBL_VAR, vdn->as.var_def.id, (Symbol) {
 		.variable.type = vdn->as.var_def.type,
 		.variable.uid  = vdn->as.var_def.uid,
 	})) throw_error(vdn->loc, "redifinition of the variable");
-
 	return vdn;
 }
 
@@ -383,12 +368,10 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 	AST_Node *r = new(AST_Node,
 		.kind = AST_IF_STMT,
 		.loc = next(p).loc);
-
 	r->as.stmt_if.expr = parse_expr(p, until(TOK_OBRA, TOK_ARROW, TOK_ARROW_EQ), NULL);
 	if (parser_get_type(p, r->as.stmt_if.expr).kind != TYPE_BOOL)
 		throw_error(r->as.stmt_if.expr->loc, "bool expected");
 	r->as.stmt_if.body = parse_body(p, func, false);
-
 	if (peek(p).kind == TOK_ELSE_SYM) {
 		next(p);
 		if (peek(p).kind == TOK_IF_SYM) {
@@ -402,7 +385,6 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 	} else {
 		r->as.stmt_if.next = NULL;
 	}
-
 	return r;
 }
 

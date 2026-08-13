@@ -7,10 +7,6 @@
 #include <cplus.h>
 #include <parser.h>
 
-#define peek(p) (*(p)->tokens)
-#define peek2(p) (*((p)->tokens+1))
-#define next(p) (*((p)->tokens++))
-
 int op_prec(AST_ExprOp op, bool l) {
 	switch (op) {
 	case AST_OP_ADD:
@@ -157,15 +153,13 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *src_type) {
 					*nt = lt;
 					Type ct = {
 						.kind = TYPE_POINTER,
-						.as.pointer.base = nt,
-					};
+						.as.pointer.base = nt};
 					expr->as.ebin.l = new(AST_Node,
 						.kind = AST_UN_EXP,
-						.loc = peek(p).loc,
+						.loc = expr->loc,
 						.as.eun.op = AST_OP_REF,
 						.as.eun.v = expr->as.ebin.l,
-						.as.eun.type = ct,
-					);
+						.as.eun.type = ct);
 					lt = ct;
 				} else {
 					if (is_pointer(lt)) {
@@ -213,7 +207,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *src_type) {
 				if (lt.kind == TYPE_POINTER) {
 					expr->as.ebin.l = new(AST_Node,
 						.kind = AST_UN_EXP,
-						.loc = peek(p).loc,
+						.loc = expr->loc,
 						.as.eun.op = AST_OP_DEREF,
 						.as.eun.v = expr->as.ebin.l,
 						.as.eun.type = *lt.as.pointer.base,
@@ -346,6 +340,11 @@ AST_ExprOp get_un_op(Token tok) {
 		return 0;
 	}
 }
+
+
+#define peek(p) (p)->tokens[0]
+#define peek2(p) (p)->tokens[1]
+#define next(p) (*((p)->tokens++))
 
 bool check_expr_ended(Parser *p, TokenKind *until) {
 	while (*until) {

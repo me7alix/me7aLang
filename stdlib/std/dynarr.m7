@@ -9,12 +9,15 @@ macro da_index_of(vn, da) {
 }
 
 macro da_copy(dst, src) {
-	(dst).reserve((src).count)
-	(dst).count = (src).count
-	memcpy(
-		(dst).items, (src).items,
-		sizeof(*(dst).items) * (dst).count,
-	)
+	block {
+		(dst).reserve((src).count)
+		(dst).count = (src).count
+		*(dst).items + *(src).items
+		memcpy(
+			(dst).items, (src).items,
+			sizeof(*(dst).items) * (dst).count,
+		)
+	}
 }
 
 macro DynArr(N, T) {
@@ -35,8 +38,7 @@ macro DynArrDecl(N, T) {
 
 		fn reserve(cap: uptr)
 		fn append(item: T)
-		fn set(index: uptr, item: T)
-		fn get(index: uptr): T
+		fn pop(): T
 		fn at(index: uptr): *T
 		fn reset()
 		fn first(): T
@@ -77,14 +79,10 @@ macro DynArrImpl(N, T) {
 			}
 		}
 
-		fn set(index: uptr, item: T) {
-			self.check_index(index)
-			self.items[index] = item
-		}
-
-		fn get(index: uptr): T {
-			self.check_index(index)
-			return self.items[index]
+		fn pop(): T {
+			val := self.last()
+			self.count -= 1
+			return val
 		}
 
 		fn at(index: uptr): *T {
@@ -103,23 +101,23 @@ macro DynArrImpl(N, T) {
 
 		fn first(): T {
 			self.check_empty()
-			return self.get(0)
+			return self.items[0]
 		}
 
 		fn last(): T {
 			self.check_empty()
-			return self.get(self.count - 1)
+			return self.items[self.count-1]
 		}
 
 		fn remove_unordered(index: uptr) {
 			self.check_index(index)
-			self.set(index, self.last())
+			*self.at(index) = self.last()
 			self.count -= 1
 		}
 
 		fn remove_ordered(index: uptr) {
 			self.check_index(index)
-			self.set(index, self.last())
+			*self.at(index) = self.last()
 			memmove(self.items + index, self.items + index + 1,
 					sizeof(*self.items) * (self.count - index))
 			self.count -= 1
@@ -128,6 +126,7 @@ macro DynArrImpl(N, T) {
 		fn free() {
 			if self.items != null do
 				free(self.items)
+			self.items = null
 			self.count = 0
 			self.capacity = 0
 		}

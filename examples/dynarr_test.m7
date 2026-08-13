@@ -24,14 +24,14 @@ fn main() {
 	*nums.at(0) += 1
 
 	// change 78 to 90
-	nums.set(nums.count - 1, 90)
+	*nums.at(nums.count - 1) = 90
 
 	ints: Integers
 	defer ints.free()
 	da_copy(ints, nums)
 
 	da_foreach (num, ints) {
-		idx := da_index_of(num, ints) + 1
-		printf("%zu) %d\n", idx, *num)
+		idx := da_index_of(num, ints)
+		printf("%zu) %d\n", idx + 1, *num)
 	}
 }
