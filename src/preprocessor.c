@@ -233,7 +233,13 @@ void preprocessor(PreprocCtx *p) {
 				next(p);
 			} break;
 			case TOK_ID:
-				insert_macro(p);
+				if (strcmp(peek(p).data, "__FILE__") == 0) {
+					pp_append(p, ((Token){.kind = TOK_STRING, .data = next(p).loc.file}));
+				} else if (strcmp(peek(p).data, "__LINE__") == 0) {
+					StringBuilder sb = {0};
+					sb_appendf(&sb, "%zu", next(p).loc.line_num + 1);
+					pp_append(p, ((Token){.kind = TOK_INT,.data = sb.items}));
+				} else insert_macro(p);
 				break;
 			default:
 				pp_append(p, next(p));

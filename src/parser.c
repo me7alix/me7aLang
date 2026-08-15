@@ -85,8 +85,8 @@ long long calc_arr_len(AST_Node *e) {
 		if (e->as.eun.op == AST_OP_NEG) return -calc_arr_len(e->as.eun.v);
 		else throw_error(e->loc, "invalid unary operator in array size");
 	case AST_BIN_EXP: {
-		size_t le = calc_arr_len(e->as.ebin.l);
-		size_t re = calc_arr_len(e->as.ebin.r);
+		long long le = calc_arr_len(e->as.ebin.l);
+		long long re = calc_arr_len(e->as.ebin.r);
 		switch (e->as.ebin.op) {
 			case AST_OP_ADD: return le + re;
 			case AST_OP_SUB: return le - re;
@@ -122,13 +122,10 @@ Type *parse_type_r(Parser *p) {
 		next(p);
 		AST_Node *arrLenExpr = parse_expr(p, until(TOK_CSQBRA), &TUPTR); next(p);
 		if (arrLenExpr) {
-			long long calculatedArrLen = calc_arr_len(arrLenExpr);
-			if (calculatedArrLen <= 0)
-				throw_error(arrLenExpr->loc, "array size must be greater than zero");
-			type->as.array.length = calculatedArrLen;
-		} else {
-			type->as.array.length = 0;
-		}
+			long long arr_len = calc_arr_len(arrLenExpr);
+			if (arr_len <= 0) throw_error(arrLenExpr->loc, "array size must be greater than zero");
+			type->as.array.length = arr_len;
+		} else type->as.array.length = 0;
 		type->as.array.elem = parse_type_r(p);
 		return type;
 	}
@@ -140,7 +137,6 @@ Type *parse_type_r(Parser *p) {
 		while (true) {
 			Type *arg = parse_type_r(p); next(p);
 			da_append(&type->as.func.args, *arg);
-
 			if (peek(p).kind == TOK_COM) {
 				next(p);
 			} else if (peek(p).kind == TOK_CPAR) {
@@ -150,9 +146,7 @@ Type *parse_type_r(Parser *p) {
 		}
 		if (peek(p).kind == TOK_COL) {
 			type->as.func.ret = parse_type(p);
-		} else {
-			type->as.func.ret = &TU0;
-		}
+		} else type->as.func.ret = &TU0;
 		return type;
 	}
 	static struct {
@@ -382,9 +376,7 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 				.loc = peek(p).loc);
 			r->as.stmt_if.next->as.stmt_else.body = parse_body(p, func, false);
 		}
-	} else {
-		r->as.stmt_if.next = NULL;
-	}
+	} else r->as.stmt_if.next = NULL;
 	return r;
 }
 
@@ -686,10 +678,7 @@ void parse_method(Parser *p, UserType *st, bool is_static) {
 				Type a = memb->as.func_def.args.items[i]->as.func_def_arg.type;
 				Type b = func->as.func_def.args.items[i]->as.func_def_arg.type;
 				if (!compare_types(a, b)) {
-					throw_error(func->loc,
-						"argument type mismatch "
-						"between declaration and definition"
-					);
+					throw_error(func->loc, "argument type mismatch between declaration and definition");
 				}
 			}
 			da_remove_ordered(
