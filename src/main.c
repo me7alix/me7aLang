@@ -8,20 +8,23 @@
 #include <tac_ir.h>
 
 /* Codegens */
-char *nasm_gen_prog(TAC_Program *prog, TargetPlatform tp, int ol);
-char *fasm_gen_prog(TAC_Program *prog, TargetPlatform tp, int ol);
+char *nasm_gen_prog(TAC_Program*, TargetPlatform, int);
+char *fasm_gen_prog(TAC_Program*, TargetPlatform, int);
+char *gas_gen_prog(TAC_Program*, TargetPlatform, int);
 
 typedef enum {
 	CG_NASM_AMD64,
 	CG_FASM_AMD64,
+	CG_GAS_AARCH64,
 } Codegen;
 
 struct {
 	const char *str;
 	Codegen cg;
 } codegens[] = {
-	{ "fasm64", CG_FASM_AMD64 },
-	{ "nasm64", CG_NASM_AMD64 },
+	{ "fasm64",  CG_FASM_AMD64 },
+	{ "nasm64",  CG_NASM_AMD64 },
+	{ "gas_aarch64", CG_GAS_AARCH64 },
 };
 
 #if defined(_WIN32)
@@ -114,7 +117,8 @@ void print_usage() {
 		"  -asm Save assembler output\n"
 		"  -ir  Save IR output\n"
 		"  -tc  Set target codegen\n"
-		"  -tl  List of targets\n");
+		"  -tl  List of targets\n"
+	);
 }
 
 bool is_src_file(char *str) {
@@ -166,7 +170,11 @@ int main(int argc, char **argv) {
 		da_append(&imports, std.items);
 	}
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+	Codegen codegen = CG_GAS_AARCH64;
+#else
 	Codegen codegen = CG_FASM_AMD64;
+#endif
 
 	DA(char*) src_files = {0};
 	DA(char*) obj_files = {0};
@@ -221,9 +229,8 @@ int main(int argc, char **argv) {
 				return 1;
 			}
 		} else if (strcmp(argv[i], "-tl") == 0) {
-			for (size_t j = 0; j < ARR_LEN(codegens); j++) {
+			for (size_t j = 0; j < ARR_LEN(codegens); j++)
 				printf(" - %s\n", codegens[j].str);
-			}
 			return 0;
 		} else if (strcmp(argv[i], "-asm") == 0) {
 			save_asm_output = true;
@@ -300,6 +307,9 @@ int main(int argc, char **argv) {
 			break;
 		case CG_NASM_AMD64:
 			cg = nasm_gen_prog(&prog, tp, opt_level);
+			break;
+		case CG_GAS_AARCH64:
+			cg = gas_gen_prog(&prog, tp, opt_level);
 		}
 		sprintf(output_file, "%s.asm", srcs.items[i]);
 		write_to_file(output_file, cg);
@@ -310,8 +320,8 @@ int main(int argc, char **argv) {
 				"nasm -f %s %s",
 				(match(tp),
 					when(TP_WINDOWS, "win64")
-					when(TP_LINUX,   "elf64")
-					when(TP_MACOS,   "macho64")
+					when(TP_LINUX, "elf64")
+					when(TP_MACOS, "macho64")
 					"err"),
 				output_file);
 			break;
@@ -323,15 +333,17 @@ int main(int argc, char **argv) {
 			case TP_LINUX:
 			case TP_MACOS:
 				systemf("fasm %s %s.o > /dev/null", output_file, srcs.items[i]);
-			}
+			} break;
+		case CG_GAS_AARCH64:
+			systemf("as -o %s.o %s", srcs.items[i], output_file);
 		}
 	}
 
 	char *obj_ext =
 		(match(tp),
 			when(TP_WINDOWS, "obj")
-			when(TP_LINUX,   "o")
-			when(TP_MACOS,   "o") "err");
+			when(TP_LINUX, "o")
+			when(TP_MACOS, "o") "err");
 
 	if (!save_asm_output) {
 		switch (tp) {
