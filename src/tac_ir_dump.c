@@ -38,46 +38,50 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 			sprintf(buf, "{%u}", opr.as.var.addr_id);
 			break;
 		}
-
 		char scnd[256];
 		if (opr.as.var.fields.count > 0) {
 			strcpy(scnd, buf);
-
 			StringBuilder fields = {0};
-			da_foreach (char*, field, &opr.as.var.fields) {
+			da_foreach (char*, field, &opr.as.var.fields)
 				sb_appendf(&fields, ".%s", *field);
-			}
-
 			sprintf(buf, "%s%s", scnd, fields.items);
 		}
-
 		strcpy(scnd, buf);
 		sprintf(buf, "%s:%s", scnd, tac_ir_dump_opr_type(opr));
 	} break;
 
-	case OPR_LITERAL: {
+	case OPR_LITERAL:
 		switch (opr.as.literal.type.kind) {
 		case TYPE_I32:
 		case TYPE_INT:
 			sprintf(buf, "%d:%s", (i32) opr.as.literal.as.lint, tac_ir_dump_opr_type(opr));
 			break;
+		case TYPE_U32:
+			sprintf(buf, "%d:%s", (u32) opr.as.literal.as.lint, tac_ir_dump_opr_type(opr));
+			break;
 		case TYPE_I8:
 		case TYPE_BOOL:
 			sprintf(buf, "%d:%s", (i8) opr.as.literal.as.lint, tac_ir_dump_opr_type(opr));
 			break;
-		case TYPE_POINTER:
+		case TYPE_U64:
 		case TYPE_UPTR:
+			sprintf(buf, "%llu:%s", (u64) opr.as.literal.as.lint, tac_ir_dump_opr_type(opr));
+			break;
+		case TYPE_ARRAY:
+			sprintf(buf, "arr");
+			break;
+		case TYPE_POINTER:
 		case TYPE_IPTR:
 		case TYPE_I64:
 			sprintf(buf, "%lli:%s", opr.as.literal.as.lint, tac_ir_dump_opr_type(opr));
 			break;
+		case TYPE_FLOAT:
 		case TYPE_F32:
 			sprintf(buf, "%f:%s", (float) opr.as.literal.as.lfloat, tac_ir_dump_opr_type(opr));
 			break;
 		default:
 			sprintf(buf, "ERR");
 		}
-	} break;
 	}
 }
 
@@ -133,18 +137,15 @@ void tac_ir_dump_inst(TAC_Instruction inst, char *res) {
 
 void ir_dump_func(TAC_Func func, FILE *fl) {
 	fprintf(fl, "%s:\n", func.name);
-
 	ht_foreach_node (TAC_VarIntervals, vi, &func.var_ints) {
-		fprintf(fl, "    | %u [%u %u]\n", vi->key, vi->val.start, vi->val.end);
+		fprintf(fl, "    | %03u [%u, %u]\n", vi->key, vi->val.start, vi->val.end);
 	}
-
 	for (size_t i = 0; i < func.body.count; i++) {
 		char res[256];
 		fprintf(fl, "%5zu:", i);
 		tac_ir_dump_inst(da_get(&func.body, i), res);
 		fprintf(fl, "%s\n", res);
 	}
-
 	fprintf(fl, "\n");
 }
 
@@ -153,6 +154,5 @@ void tac_ir_dump_prog(TAC_Program *prog, char *filename) {
 	for (size_t i = 0; i < prog->funcs.count; i++) {
 		ir_dump_func(da_get(&prog->funcs, i), fl);
 	}
-
 	fclose(fl);
 }

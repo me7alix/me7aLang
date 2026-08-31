@@ -985,12 +985,10 @@ void tac_ir_gen_calc_inters(TAC_Program *prog) {
 		for (size_t i = 0; i < func->body.count; i++) {
 			TAC_Instruction ci = func->body.items[i];
 			calc_inst_intervals(func, &ci, i);
-
 			switch (ci.op) {
 			case OP_JUMP_IF_NOT:;
 				Interval intr;
 				uint search_for;
-
 				for (int j = i + 1; j < func->body.count; j++) {
 					if (
 						func->body.items[j].op == OP_LABEL &&
@@ -1002,7 +1000,6 @@ void tac_ir_gen_calc_inters(TAC_Program *prog) {
 						break;
 					}
 				}
-
 				for (int j = (int)i - 1; j >= 0; j--) {
 					if (
 						func->body.items[j].op == OP_LABEL &&
@@ -1012,7 +1009,6 @@ void tac_ir_gen_calc_inters(TAC_Program *prog) {
 						break;
 					}
 				}
-
 				da_append(&loop_ints, intr);
 				break;
 			case OP_REF:
