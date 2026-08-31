@@ -1,5 +1,5 @@
-#ifndef IR_H
-#define IR_H
+#ifndef TAC_IR_H
+#define TAC_IR_H
 
 #include <math.h>
 #include <stdint.h>
@@ -50,7 +50,6 @@ HT_DECL(TAC_VarIntervals, uint, TAC_VarInterval)
 
 typedef struct {
 	TAC_OperandKind kind;
-
 	union {
 		Literal literal;
 		uint label_id;

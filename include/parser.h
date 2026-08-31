@@ -29,7 +29,7 @@ typedef struct Literal {
 } Literal;
 
 typedef enum {
-	// number
+/* number */
 	AST_OP_ADD,
 	AST_OP_SUB,
 	AST_OP_DIV,
@@ -41,7 +41,7 @@ typedef enum {
 	AST_OP_DIV_EQ,
 	AST_OP_MUL_EQ,
 
-	// boolean
+/* boolean */
 	AST_OP_EQ,
 	AST_OP_NOT_EQ,
 	AST_OP_LESS,
@@ -52,7 +52,7 @@ typedef enum {
 	AST_OP_OR,
 	AST_OP_NOT,
 
-	//bitops
+/* bitops */
 	AST_OP_BW_AND,
 	AST_OP_BW_OR,
 	AST_OP_BW_XOR,
@@ -60,7 +60,7 @@ typedef enum {
 	AST_OP_BW_RS,
 	AST_OP_BW_NOT,
 
-	// other
+/* other */
 	AST_OP_SIZEOF,
 	AST_OP_CAST,
 	AST_OP_REF,
