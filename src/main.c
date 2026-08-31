@@ -37,6 +37,13 @@ TargetPlatform tp = TP_MACOS;
 TargetPlatform tp = TP_NULL;
 #endif
 
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+bool ARM64 = true;
+#else
+bool ARM64 = false;
+#endif
+
 void throw_error(Location loc, char *error) {
 	size_t lines_num = loc.line_num + 1;
 	size_t chars_num = loc.line_char-loc.line_start + 1;
@@ -170,11 +177,7 @@ int main(int argc, char **argv) {
 		da_append(&imports, std.items);
 	}
 
-#if defined(__aarch64__) || defined(_M_ARM64)
-	Codegen codegen = CG_GAS_AARCH64;
-#else
-	Codegen codegen = CG_FASM_AMD64;
-#endif
+	Codegen codegen = ARM64 ? CG_GAS_AARCH64 : CG_FASM_AMD64;
 
 	DA(char*) src_files = {0};
 	DA(char*) obj_files = {0};
@@ -361,7 +364,7 @@ int main(int argc, char **argv) {
 
 	if (!compile_to_obj) {
 		StringBuilder cmd = {0};
-		sb_appendf(&cmd, "gcc -no-pie -o \"%s\"", output_bin);
+		sb_appendf(&cmd, "gcc %s -o \"%s\"", ARM64 ? "" : "-no-pie", output_bin);
 		da_foreach (char*, src, &srcs)
 			sb_appendf(&cmd, " %s.%s", *src, obj_ext);
 		da_foreach (char*, obj_file, &obj_files)
