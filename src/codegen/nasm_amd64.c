@@ -36,7 +36,7 @@ static void opr_type_to_stack(TAC_Operand t, char *buf) {
 
 typedef enum {REG, MEM, IMM, LBL} OprKind;
 char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
-	static char rbuf[64];
+	static char buf[64];
 	switch (opr.kind) {
 	case OPR_SIZEOF: {
 		uint size = get_type_size(opr.as.size_of.vtype);
@@ -45,12 +45,12 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 			size = elemSize * opr.as.size_of.vtype.as.array.length;
 		}
 		if (opr_kind) *opr_kind = IMM;
-		sprintf(rbuf, "%u", size);
+		sprintf(buf, "%u", size);
 	} break;
 
 	case OPR_LABEL: {
 		if (opr_kind) *opr_kind = LBL;
-		sprintf(rbuf, ".L%u", opr.as.label_id);
+		sprintf(buf, ".L%u", opr.as.label_id);
 	} break;
 
 	case OPR_VAR: {
@@ -60,11 +60,11 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 		if (opr.as.var.kind == VAR_LOCAL) {
 			uint *off = OffTable_get(&stack_table, opr.as.var.addr_id);
 			if (off) {
-				sprintf(rbuf, "%s[rbp - %u]", ts, *off - fo);
+				sprintf(buf, "%s[rbp - %u]", ts, *off - fo);
 			} else {
 				size_t row = get_reg_size(opr.as.var.type);
 				Register reg = *RegTable_get(&regal.allocated_regs, opr.as.var.addr_id);
-				sprintf(rbuf, "%s", reg_forms[reg][row]);
+				sprintf(buf, "%s", reg_forms[reg][row]);
 				if (opr_kind) *opr_kind = REG;
 			}
 		} else if (opr.as.var.kind == VAR_ADDR) {
@@ -72,20 +72,20 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 				uint *off = OffTable_get(&stack_table, opr.as.var.addr_id);
 				if (off) {
 					sb_appendf(&body, "  mov rax, qword[rbp - %u]\n", *off);
-					if (fo) sprintf(rbuf, "%s[rax + %u]", ts, fo);
-					else    sprintf(rbuf, "%s[rax]", ts);
+					if (fo) sprintf(buf, "%s[rax + %u]", ts, fo);
+					else    sprintf(buf, "%s[rax]", ts);
 				} else {
 					Register reg = *RegTable_get(&regal.allocated_regs, opr.as.var.addr_id);
-					if (fo) sprintf(rbuf, "%s[%s + %u]", ts, reg_forms[reg][3], fo);
-					else    sprintf(rbuf, "%s[%s]", ts, reg_forms[reg][3]);
+					if (fo) sprintf(buf, "%s[%s + %u]", ts, reg_forms[reg][3], fo);
+					else    sprintf(buf, "%s[%s]", ts, reg_forms[reg][3]);
 				}
 			} else if (opr.as.var.addr_kind == VAR_GLOBAL) {
-				if (fo) sprintf(rbuf, "%s[D%u + %lu]", ts, opr.as.var.addr_id, fo);
-				else    sprintf(rbuf, "%s[D%u]", ts, opr.as.var.addr_id);
+				if (fo) sprintf(buf, "%s[D%u + %u]", ts, opr.as.var.addr_id, fo);
+				else    sprintf(buf, "%s[D%u]", ts, opr.as.var.addr_id);
 			} else UNREACHABLE;
 		} else if (opr.as.var.kind == VAR_GLOBAL) {
-			if (fo) sprintf(rbuf, "%s[D%u + %u]", ts, opr.as.var.addr_id, fo);
-			else    sprintf(rbuf, "%s[D%u]", ts, opr.as.var.addr_id);
+			if (fo) sprintf(buf, "%s[D%u + %u]", ts, opr.as.var.addr_id, fo);
+			else    sprintf(buf, "%s[D%u]", ts, opr.as.var.addr_id);
 		}
 	} break;
 
@@ -99,38 +99,38 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 			memcpy(&bits, &x, 4);
 			sb_appendf(&body, "  mov r10d, 0x%08X\n", bits);
 			sb_appendf(&body, "  movd xmm0, r10d\n", bits);
-			sprintf(rbuf, "xmm0");
+			sprintf(buf, "xmm0");
 		} break;
 		case TYPE_I32:
 		case TYPE_INT:
-			sprintf(rbuf, "%d", (int) opr.as.literal.as.lint);
+			sprintf(buf, "%d", (int) opr.as.literal.as.lint);
 			break;
 		case TYPE_U32:
 		case TYPE_UINT:
-			sprintf(rbuf, "%u", (uint) opr.as.literal.as.lint);
+			sprintf(buf, "%u", (uint) opr.as.literal.as.lint);
 			break;
 		case TYPE_BOOL:
 		case TYPE_I8:
-			sprintf(rbuf, "%d", (i8) opr.as.literal.as.lint);
+			sprintf(buf, "%d", (i8) opr.as.literal.as.lint);
 			break;
 		case TYPE_U8:
-			sprintf(rbuf, "%d", (u8) opr.as.literal.as.lint);
+			sprintf(buf, "%d", (u8) opr.as.literal.as.lint);
 			break;
 		case TYPE_I16:
-			sprintf(rbuf, "%hd", (i16) opr.as.literal.as.lint);
+			sprintf(buf, "%hd", (i16) opr.as.literal.as.lint);
 			break;
 		case TYPE_U16:
-			sprintf(rbuf, "%hu", (u16) opr.as.literal.as.lint);
+			sprintf(buf, "%hu", (u16) opr.as.literal.as.lint);
 			break;
 		case TYPE_UPTR:
 		case TYPE_U64:
-			sprintf(rbuf, "%llu", opr.as.literal.as.lint);
+			sprintf(buf, "%llu", opr.as.literal.as.lint);
 			break;
 		case TYPE_ARRAY:
 		case TYPE_POINTER:
 		case TYPE_IPTR:
 		case TYPE_I64:
-			sprintf(rbuf, "%lli", opr.as.literal.as.lint);
+			sprintf(buf, "%lli", opr.as.literal.as.lint);
 			break;
 		default:
 			UNREACHABLE;
@@ -145,7 +145,7 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 			assert(!"error: passing arrays or structs isn't supported yet\n");
 		default:;
 			uint reg_size = get_reg_size(opr.as.func_ret.type);
-			sprintf(rbuf, "%s", reg_forms[RAX][reg_size]);
+			sprintf(buf, "%s", reg_forms[RAX][reg_size]);
 		}
 	} break;
 
@@ -161,17 +161,17 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 			if (arg_id >= ARR_LEN(sysv_gn_fa)) {
 				uint shadow_space = (arg_id - ARR_LEN(sysv_gn_fa)) * 8 + 48;
 				sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", reg_forms[R10][arg_size], ts, shadow_space);
-				sprintf(rbuf, "%s", reg_forms[R10][arg_size]);
+				sprintf(buf, "%s", reg_forms[R10][arg_size]);
 			} else {
-				sprintf(rbuf, "%s", reg_forms[sysv_gn_fa[arg_id]][arg_size]);
+				sprintf(buf, "%s", reg_forms[sysv_gn_fa[arg_id]][arg_size]);
 			} break;
 		case TP_WINDOWS:
 			if (arg_id >= ARR_LEN(win_gn_fa)) {
 				uint shadow_space = (arg_id - ARR_LEN(win_gn_fa)) * 8 + 48;
 				sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", reg_forms[R10][arg_size], ts, shadow_space);
-				sprintf(rbuf, "%s", reg_forms[R10][arg_size]);
+				sprintf(buf, "%s", reg_forms[R10][arg_size]);
 			} else {
-				sprintf(rbuf, "%s", reg_forms[win_gn_fa[arg_id]][arg_size]);
+				sprintf(buf, "%s", reg_forms[win_gn_fa[arg_id]][arg_size]);
 			}
 		}
 	} break;
@@ -180,7 +180,7 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 		UNREACHABLE;
 	}
 
-	return rbuf;
+	return buf;
 }
 
 static void type_to_reg(TAC_Operand opr, char *arg1, char *arg2) {
@@ -229,7 +229,6 @@ void nasm_gen_new_var(TAC_Instruction ci, char *dst, OprKind *opr_kind) {
 			}
 		}
 	}
-
 	if (opr_kind) *opr_kind = MEM;
 	char ts[32]; opr_type_to_stack(ci.dst, ts);
 	stack_offset_add(get_type_size(ci.dst.as.var.type));
@@ -626,7 +625,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			for (size_t i = 0; ci.args[i].kind != OPR_NULL; i++) {
 				if (i >= ARR_LEN(sysv_gn_fa)) {
 					is_shadow_space_used = true;
-					sb_appendf(&body, "  sub rsp, 64\n");
+					sb_appendf(&body, "  sub rsp, 32\n");
 					break;
 				}
 			}
@@ -654,7 +653,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				}
 			}
 			sb_appendf(&body, "  call %s%s\n", (tp == TP_MACOS ? "_" : ""), ci.dst.as.name);
-			if (is_shadow_space_used) sb_appendf(&body, "  add rsp, 64\n");
+			if (is_shadow_space_used) sb_appendf(&body, "  add rsp, 32\n");
 		} break;
 
 		default:

@@ -1,46 +1,57 @@
-#ifndef AMD64_H
-#define AMD64_H
+#ifndef ARM64_H
+#define ARM64_H
 
 #include <tac_ir.h>
 #include <cplus.h>
 
 typedef enum {
-	RAX, RDX, RCX,
-	RDI, RBX, RSI,
-	R8,  R9,
-	R10, R11, R12,
-	R13, R14, R15,
-
-	XMM0, XMM1, XMM2,
-	XMM3, XMM4, XMM5,
-	XMM6, XMM7, XMM8,
-	XMM9, XMM10, XMM11,
-	XMM12, XMM13, XMM14,
-	XMM15,
+	X0, X1, X2, X3,
+	X4, X5, X6, X7,
+	X8, X9, X10, X11,
+	X12, X13, X14, X15,
+	X16, X17, X18, X19,
+	X20, X21, X22, X23,
+	X24, X25, X26, X27,
+	X28, X29, SP,
 } Register;
 
-static char *reg_forms[][4] = {
-	[RAX] = {"al",   "ax",   "eax",  "rax"},
-	[RDX] = {"dl",   "dx",   "edx",  "rdx"},
-	[RCX] = {"cl",   "cx",   "ecx",  "rcx"},
-	[RDI] = {"dil",  "di",   "edi",  "rdi"},
-	[RBX] = {"bl",   "bx",   "ebx",  "rbx"},
-	[RSI] = {"sil",  "si",   "esi",  "rsi"},
-	[R8]  = {"r8b",  "r8w",  "r8d",  "r8"},
-	[R9]  = {"r9b",  "r9w",  "r9d",  "r9"},
-	[R10] = {"r10b", "r10w", "r10d", "r10"},
-	[R11] = {"r11b", "r11w", "r11d", "r11"},
-	[R12] = {"r12b", "r12w", "r12d", "r12"},
-	[R13] = {"r13b", "r13w", "r13d", "r13"},
-	[R14] = {"r14b", "r14w", "r14d", "r14"},
-	[R15] = {"r15b", "r15w", "r15d", "r15"},
+static char *RF[][4] = {
+	[X0]  = {"w0",  "w0",  "w0",  "x0"  },
+	[X1]  = {"w1",  "w1",  "w1",  "x1"  },
+	[X2]  = {"w2",  "w2",  "w2",  "x2"  },
+	[X3]  = {"w3",  "w3",  "w3",  "x3"  },
+	[X4]  = {"w4",  "w4",  "w4",  "x4"  },
+	[X5]  = {"w5",  "w5",  "w5",  "x5"  },
+	[X6]  = {"w6",  "w6",  "w6",  "x6"  },
+	[X7]  = {"w7",  "w7",  "w7",  "x7"  },
+	[X8]  = {"w8",  "w8",  "w8",  "x8"  },
+	[X9]  = {"w9",  "w9",  "w9",  "x9"  },
+	[X10] = {"w10", "w10", "w10", "x10" },
+	[X11] = {"w11", "w11", "w11", "x11" },
+	[X12] = {"w12", "w12", "w12", "x12" },
+	[X13] = {"w13", "w13", "w13", "x13" },
+	[X14] = {"w14", "w14", "w14", "x14" },
+	[X15] = {"w15", "w15", "w15", "x15" },
+	[X16] = {"w16", "w16", "w16", "x16" },
+	[X17] = {"w17", "w17", "w17", "x17" },
+	[X18] = {"w18", "w18", "w18", "x18" },
+	[X19] = {"w19", "w19", "w19", "x19" },
+	[X20] = {"w20", "w20", "w20", "x20" },
+	[X21] = {"w21", "w21", "w21", "x21" },
+	[X22] = {"w22", "w22", "w22", "x22" },
+	[X23] = {"w23", "w23", "w23", "x23" },
+	[X24] = {"w24", "w24", "w24", "x24" },
+	[X25] = {"w25", "w25", "w25", "x25" },
+	[X26] = {"w26", "w26", "w26", "x26" },
+	[X27] = {"w27", "w27", "w27", "x27" },
+	[X28] = {"w28", "w28", "w28", "x28" },
+	[X29] = {"w29", "w29", "w29", "x29" },
 };
 
-static Register callee_saved [] = {R15, R14, R13, R12, RBX};
-static Register sysv_gn_fa   [] = {RDI, RSI, RDX, RCX, R8, R9};
-static Register win_gn_fa    [] = {RCX, RDX, R8, R9};
-static Register sysv_fl_fa   [] = {XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6, XMM7};
-static Register win_fl_fa    [] = {XMM0, XMM1, XMM2, XMM3};
+static Register scratch      [] = {X12, X13, X14, X15};
+static Register callee_saved [] = {X19, X20, X21, X22, X23, X24, X25, X26, X27, X28};
+static Register sysv_gn_fa   [] = {X0, X1, X2, X3, X4, X5, X6, X7};
+static Register win_gn_fa    [] = {X0, X1, X2, X3, X4, X5, X6, X7};
 
 static size_t get_reg_size(Type t) {
 	switch (t.kind) {

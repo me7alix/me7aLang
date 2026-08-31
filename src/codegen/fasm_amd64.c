@@ -80,7 +80,7 @@ char *opr_to_fasm(TAC_Operand opr, OprKind *opr_kind) {
 					else    sprintf(rbuf, "%s[%s]", ts, reg_forms[reg][3]);
 				}
 			} else if (opr.as.var.addr_kind == VAR_GLOBAL) {
-				if (fo) sprintf(rbuf, "%s[D%u + %lu]", ts, opr.as.var.addr_id, fo);
+				if (fo) sprintf(rbuf, "%s[D%u + %u]", ts, opr.as.var.addr_id, fo);
 				else    sprintf(rbuf, "%s[D%u]", ts, opr.as.var.addr_id);
 			} else UNREACHABLE;
 		} else if (opr.as.var.kind == VAR_GLOBAL) {
@@ -623,7 +623,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 			for (size_t i = 0; ci.args[i].kind != OPR_NULL; i++) {
 				if (i >= ARR_LEN(sysv_gn_fa)) {
 					is_shadow_space_used = true;
-					sb_appendf(&body, "  sub rsp, 64\n");
+					sb_appendf(&body, "  sub rsp, 32\n");
 					break;
 				}
 			}
@@ -651,7 +651,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 				}
 			}
 			sb_appendf(&body, "  call %s%s\n", (tp == TP_MACOS ? "_" : ""), ci.dst.as.name);
-			if (is_shadow_space_used) sb_appendf(&body, "  add rsp, 64\n");
+			if (is_shadow_space_used) sb_appendf(&body, "  add rsp, 32\n");
 		} break;
 
 		default:
