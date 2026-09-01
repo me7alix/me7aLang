@@ -19,7 +19,7 @@ typedef enum {
 	XMM15,
 } Register;
 
-static char *reg_forms[][4] = {
+static char *RF[][4] = {
 	[RAX] = {"al",   "ax",   "eax",  "rax"},
 	[RDX] = {"dl",   "dx",   "edx",  "rdx"},
 	[RCX] = {"cl",   "cx",   "ecx",  "rcx"},

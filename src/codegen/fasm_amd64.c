@@ -64,7 +64,7 @@ char *opr_to_fasm(TAC_Operand opr, OprKind *opr_kind) {
 			} else {
 				size_t row = get_reg_size(opr.as.var.type);
 				Register reg = *RegTable_get(&regal.allocated_regs, opr.as.var.addr_id);
-				sprintf(buf, "%s", reg_forms[reg][row]);
+				sprintf(buf, "%s", RF[reg][row]);
 				if (opr_kind) *opr_kind = REG;
 			}
 		} else if (opr.as.var.kind == VAR_ADDR) {
@@ -76,8 +76,8 @@ char *opr_to_fasm(TAC_Operand opr, OprKind *opr_kind) {
 					else    sprintf(buf, "%s[rax]", ts);
 				} else {
 					Register reg = *RegTable_get(&regal.allocated_regs, opr.as.var.addr_id);
-					if (fo) sprintf(buf, "%s[%s + %u]", ts, reg_forms[reg][3], fo);
-					else    sprintf(buf, "%s[%s]", ts, reg_forms[reg][3]);
+					if (fo) sprintf(buf, "%s[%s + %u]", ts, RF[reg][3], fo);
+					else    sprintf(buf, "%s[%s]", ts, RF[reg][3]);
 				}
 			} else if (opr.as.var.addr_kind == VAR_GLOBAL) {
 				if (fo) sprintf(buf, "%s[D%u + %u]", ts, opr.as.var.addr_id, fo);
@@ -145,7 +145,7 @@ char *opr_to_fasm(TAC_Operand opr, OprKind *opr_kind) {
 			assert(!"passing arrays or structs isn't supported yet");
 		default:;
 			uint reg_size = get_reg_size(opr.as.func_ret.type);
-			sprintf(buf, "%s", reg_forms[RAX][reg_size]);
+			sprintf(buf, "%s", RF[RAX][reg_size]);
 		}
 	} break;
 
@@ -160,18 +160,18 @@ char *opr_to_fasm(TAC_Operand opr, OprKind *opr_kind) {
 		case TP_LINUX:
 			if (arg_id >= ARR_LEN(sysv_gn_fa)) {
 				uint shadow_space = (arg_id - ARR_LEN(sysv_gn_fa)) * 8 + 48;
-				sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", reg_forms[R10][arg_size], ts, shadow_space);
-				sprintf(buf, "%s", reg_forms[R10][arg_size]);
+				sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", RF[R10][arg_size], ts, shadow_space);
+				sprintf(buf, "%s", RF[R10][arg_size]);
 			} else {
-				sprintf(buf, "%s", reg_forms[sysv_gn_fa[arg_id]][arg_size]);
+				sprintf(buf, "%s", RF[sysv_gn_fa[arg_id]][arg_size]);
 			} break;
 		case TP_WINDOWS:
 			if (arg_id >= ARR_LEN(win_gn_fa)) {
 				uint shadow_space = (arg_id - ARR_LEN(win_gn_fa)) * 8 + 48;
-				sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", reg_forms[R10][arg_size], ts, shadow_space);
-				sprintf(buf, "%s", reg_forms[R10][arg_size]);
+				sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", RF[R10][arg_size], ts, shadow_space);
+				sprintf(buf, "%s", RF[R10][arg_size]);
 			} else {
-				sprintf(buf, "%s", reg_forms[win_gn_fa[arg_id]][arg_size]);
+				sprintf(buf, "%s", RF[win_gn_fa[arg_id]][arg_size]);
 			}
 		}
 	} break;
@@ -192,8 +192,8 @@ static void type_to_reg(TAC_Operand opr, char *arg1, char *arg2) {
 		sprintf(arg2, "xmm1");
 		break;
 	default:
-		sprintf(arg1, "%s", reg_forms[R10][get_reg_size(opr_type)]);
-		sprintf(arg2, "%s", reg_forms[R11][get_reg_size(opr_type)]);
+		sprintf(arg1, "%s", RF[R10][get_reg_size(opr_type)]);
+		sprintf(arg2, "%s", RF[R11][get_reg_size(opr_type)]);
 	}
 }
 
@@ -224,7 +224,7 @@ void fasm_gen_new_var(TAC_Instruction ci, char *dst, OprKind *opr_kind) {
 			if (reg_allocator_push(&regal, ci.dst.as.var.addr_id, (int*)&reg)) {
 				if (opr_kind) *opr_kind = REG;
 				size_t row = get_reg_size(ci.dst.as.var.type);
-				sprintf(dst, "%s", reg_forms[reg][row]);
+				sprintf(dst, "%s", RF[reg][row]);
 				return;
 			}
 		}
@@ -275,7 +275,9 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 		case OP_LESS_EQ: case OP_GREAT_EQ:
 		case OP_GREAT:   case OP_LESS:
 		case OP_EQ:      case OP_NOT_EQ: {
-			fasm_gen_new_var(ci, dst, NULL);
+			OprKind dst_kind;
+			char oprd[64];
+			fasm_gen_new_var(ci, oprd, &dst_kind);
 			load_reserved_regs(ci, arg1, arg2);
 
 			OprKind opr1_kind, opr2_kind;
@@ -291,27 +293,33 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "  mov %s, %s\n", arg2, opr2);
 			} else sprintf(arg2, opr2);
 
+			if (dst_kind != REG) {
+				sprintf(dst, "al");
+			} else sprintf(dst, "%s", oprd);
+
 			if (ci.op == OP_EQ) {
 				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
-				sb_appendf(&body, "  sete al\n", arg1);
+				sb_appendf(&body, "  sete %s\n", dst);
 			} else if (ci.op == OP_NOT_EQ) {
 				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
-				sb_appendf(&body, "  setne al\n");
+				sb_appendf(&body, "  setne %s\n", dst);
 			} else if (ci.op == OP_GREAT) {
 				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
-				sb_appendf(&body, "  setg al\n");
+				sb_appendf(&body, "  setg %s\n", dst);
 			} else if (ci.op == OP_LESS) {
 				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
-				sb_appendf(&body, "  setl al\n");
+				sb_appendf(&body, "  setl %s\n", dst);
 			} else if (ci.op == OP_GREAT_EQ) {
 				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
-				sb_appendf(&body, "  setge al\n");
+				sb_appendf(&body, "  setge %s\n", dst);
 			} else if (ci.op == OP_LESS_EQ) {
 				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
-				sb_appendf(&body, "  setle al\n");
+				sb_appendf(&body, "  setle %s\n", dst);
 			}
 
-			sb_appendf(&body, "  mov %s, al\n", dst);
+			if (dst_kind != REG) {
+				sb_appendf(&body, "  mov %s, al\n", oprd);
+			}
 		} break;
 
 		case OP_ADD:    case OP_SUB:
@@ -349,7 +357,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 			else if (ci.op == OP_MUL)    sb_appendf(&body, "  imul %s, %s\n", arg1, arg2);
 
 			else if (ci.op == OP_BW_LS || ci.op == OP_BW_RS) {
-				const char *rcx = reg_forms[RCX][get_reg_size(ci.dst.as.var.type)];
+				const char *rcx = RF[RCX][get_reg_size(ci.dst.as.var.type)];
 				sb_appendf(&body, "  mov %s, %s\n", rcx, arg2);
 				sb_appendf(&body, "  %s %s, cl\n", ci.op == OP_BW_LS ? "shl" : "shr", arg1);
 			}
@@ -358,7 +366,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 			else if (ci.op == OP_DIV || ci.op == OP_MOD) {
 				char *SEI[] = {"cbw", "cwd", "cdq", "cqo"};
 				uint reg_size = get_reg_size(ci.dst.as.var.type);
-				sb_appendf(&body, "  mov %s, %s\n", reg_forms[RAX][reg_size], arg1);
+				sb_appendf(&body, "  mov %s, %s\n", RF[RAX][reg_size], arg1);
 
 				switch (ci.dst.as.var.type.kind) {
 				case TYPE_ARRAY:
@@ -380,8 +388,8 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 					UNREACHABLE;
 				}
 
-				if (ci.op == OP_DIV) sprintf(arg1, "%s", reg_forms[RAX][reg_size]);
-				else                 sprintf(arg1, "%s", reg_forms[RDX][reg_size]);
+				if (ci.op == OP_DIV) sprintf(arg1, "%s", RF[RAX][reg_size]);
+				else                 sprintf(arg1, "%s", RF[RDX][reg_size]);
 			}
 
 			else if (ci.op == OP_AND) {
@@ -397,11 +405,14 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 
 		case OP_BW_NOT:
 		case OP_NOT: case OP_NEG: {
-			fasm_gen_new_var(ci, dst, NULL);
+			OprKind dst_kind;
+			fasm_gen_new_var(ci, dst, &dst_kind);
 			load_reserved_regs(ci, arg1, arg2);
 			sb_appendf(&body, "  mov %s, %s\n", arg1, opr_to_fasm(ci.args[0], NULL));
-			if      (ci.op == OP_NEG)    sb_appendf(&body, "  neg %s\n", arg1);
-			else if (ci.op == OP_BW_NOT) sb_appendf(&body, "  not %s\n", arg1);
+			if (ci.op == OP_NEG)
+				sb_appendf(&body, "  neg %s\n", arg1);
+			else if (ci.op == OP_BW_NOT)
+				sb_appendf(&body, "  not %s\n", arg1);
 			else if (ci.op == OP_NOT) {
 				sb_appendf(&body, "  test %s, %s\n", arg1, arg1);
 				sb_appendf(&body, "  setz al\n");
@@ -610,7 +621,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 					assert(!"returning arrays/structs isn't supported yet");
 				default:;
 					uint reg_size = get_reg_size(func.type);
-					sb_appendf(&body, "  mov %s, %s\n", reg_forms[RAX][reg_size], opr_to_fasm(ci.args[0], NULL));
+					sb_appendf(&body, "  mov %s, %s\n", RF[RAX][reg_size], opr_to_fasm(ci.args[0], NULL));
 				}
 			}
 
@@ -634,19 +645,19 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 				case TP_MACOS:
 				case TP_LINUX:
 					if (i >= ARR_LEN(sysv_gn_fa)) {
-						sb_appendf(&body, "  mov %s, %s\n", reg_forms[R10][arg_size], opr_to_fasm(ci.args[i], NULL));
+						sb_appendf(&body, "  mov %s, %s\n", RF[R10][arg_size], opr_to_fasm(ci.args[i], NULL));
 						uint shadow_space = (i - ARR_LEN(sysv_gn_fa)) * 8 + 32;
-						sb_appendf(&body, "  mov %s[rsp + %u], %s\n", ts, shadow_space, reg_forms[R10][arg_size]);
+						sb_appendf(&body, "  mov %s[rsp + %u], %s\n", ts, shadow_space, RF[R10][arg_size]);
 					} else {
-						sb_appendf(&body, "  mov %s, %s\n", reg_forms[sysv_gn_fa[i]][arg_size], opr_to_fasm(ci.args[i], NULL));
+						sb_appendf(&body, "  mov %s, %s\n", RF[sysv_gn_fa[i]][arg_size], opr_to_fasm(ci.args[i], NULL));
 					} break;
 				case TP_WINDOWS:
 					if (i >= ARR_LEN(win_gn_fa)) {
-						sb_appendf(&body, "  mov %s, %s\n", reg_forms[R10][arg_size], opr_to_fasm(ci.args[i], NULL));
+						sb_appendf(&body, "  mov %s, %s\n", RF[R10][arg_size], opr_to_fasm(ci.args[i], NULL));
 						uint shadow_space = (i - ARR_LEN(win_gn_fa)) * 8 + 32;
-						sb_appendf(&body, "  mov %s[rsp + %u], %s\n", ts, shadow_space, reg_forms[R10][arg_size]);
+						sb_appendf(&body, "  mov %s[rsp + %u], %s\n", ts, shadow_space, RF[R10][arg_size]);
 					} else {
-						sb_appendf(&body, "  mov %s, %s\n", reg_forms[win_gn_fa[i]][arg_size], opr_to_fasm(ci.args[i], NULL));
+						sb_appendf(&body, "  mov %s, %s\n", RF[win_gn_fa[i]][arg_size], opr_to_fasm(ci.args[i], NULL));
 					}
 				}
 			}
@@ -666,7 +677,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 	if (opt_level > 0) {
 		stack_offset += ((regal.callee_saved_regs.count + is_stack_used) * 8 % 16 == 0) * 8;
 		for (size_t i = 0; i < regal.callee_saved_regs.count; i++) {
-			sb_appendf(code, "  push %s\n", reg_forms[regal.callee_saved_regs.items[i]][3]);
+			sb_appendf(code, "  push %s\n", RF[regal.callee_saved_regs.items[i]][3]);
 		}
 	}
 
@@ -692,7 +703,7 @@ void fasm_gen_func(StringBuilder *code, TAC_Func func) {
 		sb_appendf(code, "  add rsp, 8\n");
 	if (opt_level > 0) {
 		for (long i = (long)regal.callee_saved_regs.count - 1; i >= 0; i--) {
-			sb_appendf(code, "  pop %s\n", reg_forms[regal.callee_saved_regs.items[i]][3]);
+			sb_appendf(code, "  pop %s\n", RF[regal.callee_saved_regs.items[i]][3]);
 		}
 	}
 	sb_appendf(code, "  ret\n\n");
