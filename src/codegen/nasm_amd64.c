@@ -91,46 +91,46 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 
 	case OPR_LITERAL: {
 		if (opr_kind) *opr_kind = IMM;
+		long long val = opr.as.literal.as.lint;
 		switch (opr.as.literal.type.kind) {
 		case TYPE_FLOAT:
 		case TYPE_F32: {
 			float x = (float)opr.as.literal.as.lfloat;
-			uint32_t bits;
-			memcpy(&bits, &x, 4);
+			uint32_t bits; memcpy(&bits, &x, 4);
 			sb_appendf(&body, "  mov r10d, 0x%08X\n", bits);
 			sb_appendf(&body, "  movd xmm0, r10d\n", bits);
 			sprintf(buf, "xmm0");
 		} break;
 		case TYPE_I32:
 		case TYPE_INT:
-			sprintf(buf, "%d", (int) opr.as.literal.as.lint);
+			sprintf(buf, "%d", (int)val);
 			break;
 		case TYPE_U32:
 		case TYPE_UINT:
-			sprintf(buf, "%u", (uint) opr.as.literal.as.lint);
+			sprintf(buf, "%u", (uint)val);
 			break;
 		case TYPE_BOOL:
 		case TYPE_I8:
-			sprintf(buf, "%d", (i8) opr.as.literal.as.lint);
+			sprintf(buf, "%d", (i8)val);
 			break;
 		case TYPE_U8:
-			sprintf(buf, "%d", (u8) opr.as.literal.as.lint);
+			sprintf(buf, "%d", (u8)val);
 			break;
 		case TYPE_I16:
-			sprintf(buf, "%hd", (i16) opr.as.literal.as.lint);
+			sprintf(buf, "%hd", (i16)val);
 			break;
 		case TYPE_U16:
-			sprintf(buf, "%hu", (u16) opr.as.literal.as.lint);
+			sprintf(buf, "%hu", (u16)val);
 			break;
 		case TYPE_UPTR:
 		case TYPE_U64:
-			sprintf(buf, "%llu", opr.as.literal.as.lint);
+			sprintf(buf, "%llu", val);
 			break;
 		case TYPE_ARRAY:
 		case TYPE_POINTER:
 		case TYPE_IPTR:
 		case TYPE_I64:
-			sprintf(buf, "%lli", opr.as.literal.as.lint);
+			sprintf(buf, "%lli", val);
 			break;
 		default:
 			UNREACHABLE;
@@ -142,7 +142,7 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 		switch (opr.as.func_ret.type.kind) {
 		case TYPE_ARRAY:
 		case TYPE_STRUCT:
-			assert(!"error: passing arrays or structs isn't supported yet\n");
+			assert(!"passing arrays or structs isn't supported yet");
 		default:;
 			uint reg_size = get_reg_size(opr.as.func_ret.type);
 			sprintf(buf, "%s", reg_forms[RAX][reg_size]);
@@ -609,7 +609,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				switch (func.type.kind) {
 				case TYPE_STRUCT:
 				case TYPE_ARRAY:
-					assert(!"error: returning arrays/structs isn't supported yet\n");
+					assert(!"returning arrays/structs isn't supported yet");
 				default:;
 					uint reg_size = get_reg_size(func.type);
 					sb_appendf(&body, "  mov %s, %s\n", reg_forms[RAX][reg_size], opr_to_nasm(ci.args[0], NULL));
@@ -752,11 +752,12 @@ char *nasm_gen_prog(TAC_Program *prog, TargetPlatform _tp, int _opt_level) {
 						(char*[]){"db", "dw", "dd", "dq"}
 						[get_reg_size(g->type)]);
 					switch (g->data.kind) {
-					case LIT_INT:   sb_appendf(&code, "%lli", g->data.as.lint);   break;
-					case LIT_FLOAT: sb_appendf(&code, "%lf",  g->data.as.lfloat); break;
-					case LIT_BOOL:  sb_appendf(&code, "%d",   g->data.as.lbool);  break;
-					case LIT_CHAR:  sb_appendf(&code, "%lli", g->data.as.lint);   break;
-					default: UNREACHABLE; }
+						case LIT_INT:   sb_appendf(&code, "%lli", g->data.as.lint);   break;
+						case LIT_FLOAT: sb_appendf(&code, "%lf",  g->data.as.lfloat); break;
+						case LIT_BOOL:  sb_appendf(&code, "%d",   g->data.as.lbool);  break;
+						case LIT_CHAR:  sb_appendf(&code, "%lli", g->data.as.lint);   break;
+						default: UNREACHABLE;
+					}
 					sb_appendf(&code, "\n", g->index);
 				}
 			}

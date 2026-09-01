@@ -22,6 +22,7 @@ static bool is_there_return;
 static uint stack_offset;
 static uint inst_idx;
 
+// Scratch registers allocator
 static int CSR = 0;
 #define nSR scratch[CSR=(CSR+1)%ARR_LEN(scratch)]
 #define SR scratch[CSR]
@@ -50,11 +51,8 @@ GasOpr gas_opr(int kind, char *text) {
 }
 
 static void gas_load_imm(const char *reg, bool is64, const char *imm_text) {
-	long long signed_val = strtoll(imm_text[0] == '#' ? imm_text + 1 : imm_text, NULL, 0);
-	unsigned long long val = is64
-		? (unsigned long long) signed_val
-		: (unsigned long long)(uint32_t) signed_val;
-
+	i64 signed_val = strtoll(imm_text[0] == '#' ? imm_text + 1 : imm_text, NULL, 0);
+	u64 val = is64 ? (u64) signed_val : (u64)(u32) signed_val;
 	int top = is64 ? 64 : 32;
 	bool started = false;
 	for (int shift = 0; shift < top; shift += 16) {
@@ -175,37 +173,38 @@ GasOpr opr_to_gas(TAC_Operand opr) {
 
 	case OPR_LITERAL: {
 		res.kind = IMM;
+		long long val = opr.as.literal.as.lint;
 		switch (opr.as.literal.type.kind) {
 		case TYPE_I32:
 		case TYPE_INT:
-			sprintf(res.text, "#%d", (int) opr.as.literal.as.lint);
+			sprintf(res.text, "#%d", (int)val);
 			break;
 		case TYPE_U32:
 		case TYPE_UINT:
-			sprintf(res.text, "#%u", (uint) opr.as.literal.as.lint);
+			sprintf(res.text, "#%u", (uint)val);
 			break;
 		case TYPE_BOOL:
 		case TYPE_I8:
-			sprintf(res.text, "#%d", (i8) opr.as.literal.as.lint);
+			sprintf(res.text, "#%d", (i8)val);
 			break;
 		case TYPE_U8:
-			sprintf(res.text, "#%d", (u8) opr.as.literal.as.lint);
+			sprintf(res.text, "#%d", (u8)val);
 			break;
 		case TYPE_I16:
-			sprintf(res.text, "#%hd", (i16) opr.as.literal.as.lint);
+			sprintf(res.text, "#%hd", (i16)val);
 			break;
 		case TYPE_U16:
-			sprintf(res.text, "#%hu", (u16) opr.as.literal.as.lint);
+			sprintf(res.text, "#%hu", (u16)val);
 			break;
 		case TYPE_ARRAY:
 		case TYPE_POINTER:
 		case TYPE_UPTR:
 		case TYPE_U64:
-			sprintf(res.text, "#%llu", opr.as.literal.as.lint);
+			sprintf(res.text, "#%llu", val);
 			break;
 		case TYPE_IPTR:
 		case TYPE_I64:
-			sprintf(res.text, "#%lli", opr.as.literal.as.lint);
+			sprintf(res.text, "#%lli", val);
 			break;
 		default:
 			UNREACHABLE;
@@ -253,7 +252,6 @@ GasOpr opr_to_gas(TAC_Operand opr) {
 	default:
 		UNREACHABLE;
 	}
-
 	return res;
 }
 
@@ -563,10 +561,6 @@ void gas_gen_func(StringBuilder *code, TAC_Func func) {
 
 			if (ci.args[0].kind != OPR_NULL) {
 				if (tac_ir_get_opr_type(ci.dst).kind == TYPE_STRUCT) {
-					//sb_appendf(&body, "  ldr x0, %s\n", oprd.text);
-					//sb_appendf(&body, "  ldr x1, %s\n", opr_to_gas(ci.args[0]).text);
-					//sb_appendf(&body, "  mov x2, #%u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
-					//sb_appendf(&body, "  bl memcpy\n");
 					copy_struct(ci.dst, ci.args[0]);
 				} else gas_mov(oprd, opr_to_gas(ci.args[0]));
 			} else {
