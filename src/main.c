@@ -214,11 +214,10 @@ int main(int argc, char **argv) {
 			}
 			da_append(&imports, argv[++i]);
 		} else if (strcmp(argv[i], "-tc") == 0) {
-			if (i >= argc) {
+			if (++i >= argc) {
 				fprintf(stderr, "invalid -tc argument\n");
 				return 1;
 			}
-			i++;
 			bool found = false;
 			for (size_t j = 0; j < ARR_LEN(codegens); j++) {
 				if (strcmp(codegens[j].str, argv[i]) == 0) {

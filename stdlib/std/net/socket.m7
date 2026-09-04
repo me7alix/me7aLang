@@ -32,7 +32,7 @@ extern socket(
 ): int
 
 extern bind(
-	sockfd: int
+	sockfd: int,
 	name:   *SockAddr,
 	size:   u32,
 ): int
@@ -88,7 +88,7 @@ extern send(
     sockfd: int,
     buf:    *u0,
     len:    uptr,
-    flags:  int
+    flags:  int,
 ): iptr
 
 extern recv(
