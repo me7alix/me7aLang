@@ -88,7 +88,7 @@ Type tac_ir_get_opr_type(TAC_Operand op) {
 	case OPR_FUNC_INP: return op.as.func_inp.type;
 	case OPR_FUNC_RET: return op.as.func_ret.type;
 	case OPR_SIZEOF:   return TUPTR;
-	default: UNREACHABLE; return (Type){0};
+	default: UNREACHABLE;
 	}
 }
 
@@ -303,26 +303,26 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		};
 
 		switch (en->as.ebin.op) {
-		case AST_OP_ADD:      inst.op = OP_ADD;      break;
-		case AST_OP_SUB:      inst.op = OP_SUB;      break;
-		case AST_OP_MUL:      inst.op = OP_MUL;      break;
-		case AST_OP_DIV:      inst.op = OP_DIV;      break;
-		case AST_OP_MOD:      inst.op = OP_MOD;      break;
-		case AST_OP_LESS:     inst.op = OP_LESS;     break;
-		case AST_OP_LESS_EQ:  inst.op = OP_LESS_EQ;  break;
-		case AST_OP_GREAT:    inst.op = OP_GREAT;    break;
-		case AST_OP_GREAT_EQ: inst.op = OP_GREAT_EQ; break;
-		case AST_OP_EQ:       inst.op = OP_EQ;       break;
-		case AST_OP_NOT_EQ:   inst.op = OP_NOT_EQ;   break;
-		case AST_OP_AND:      inst.op = OP_AND;      break;
-		case AST_OP_OR:       inst.op = OP_OR;       break;
-		case AST_OP_BW_AND:   inst.op = OP_BW_AND;   break;
-		case AST_OP_BW_OR:    inst.op = OP_BW_OR;    break;
-		case AST_OP_BW_LS:    inst.op = OP_BW_LS;    break;
-		case AST_OP_BW_RS:    inst.op = OP_BW_RS;    break;
-		case AST_OP_BW_XOR:   inst.op = OP_BW_XOR;   break;
-		case AST_OP_ARR:                             break;
-		default: UNREACHABLE;
+			case AST_OP_ADD:      inst.op = OP_ADD;      break;
+			case AST_OP_SUB:      inst.op = OP_SUB;      break;
+			case AST_OP_MUL:      inst.op = OP_MUL;      break;
+			case AST_OP_DIV:      inst.op = OP_DIV;      break;
+			case AST_OP_MOD:      inst.op = OP_MOD;      break;
+			case AST_OP_LESS:     inst.op = OP_LESS;     break;
+			case AST_OP_LESS_EQ:  inst.op = OP_LESS_EQ;  break;
+			case AST_OP_GREAT:    inst.op = OP_GREAT;    break;
+			case AST_OP_GREAT_EQ: inst.op = OP_GREAT_EQ; break;
+			case AST_OP_EQ:       inst.op = OP_EQ;       break;
+			case AST_OP_NOT_EQ:   inst.op = OP_NOT_EQ;   break;
+			case AST_OP_AND:      inst.op = OP_AND;      break;
+			case AST_OP_OR:       inst.op = OP_OR;       break;
+			case AST_OP_BW_AND:   inst.op = OP_BW_AND;   break;
+			case AST_OP_BW_OR:    inst.op = OP_BW_OR;    break;
+			case AST_OP_BW_LS:    inst.op = OP_BW_LS;    break;
+			case AST_OP_BW_RS:    inst.op = OP_BW_RS;    break;
+			case AST_OP_BW_XOR:   inst.op = OP_BW_XOR;   break;
+			case AST_OP_ARR:                             break;
+			default: UNREACHABLE;
 		}
 
 		/* Pointers arithmetic */
@@ -597,11 +597,11 @@ void tac_ir_gen_var_mut(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	TAC_OpCode op_eq;
 	bool is_op_eq;
 	switch (cn->as.var_mut.expr->as.ebin.op) {
-	case AST_OP_ADD_EQ: op_eq = OP_ADD; is_op_eq = true; break;
-	case AST_OP_SUB_EQ: op_eq = OP_SUB; is_op_eq = true; break;
-	case AST_OP_MUL_EQ: op_eq = OP_MUL; is_op_eq = true; break;
-	case AST_OP_DIV_EQ: op_eq = OP_DIV; is_op_eq = true; break;
-	default: is_op_eq = false;
+		case AST_OP_ADD_EQ: op_eq = OP_ADD; is_op_eq = true; break;
+		case AST_OP_SUB_EQ: op_eq = OP_SUB; is_op_eq = true; break;
+		case AST_OP_MUL_EQ: op_eq = OP_MUL; is_op_eq = true; break;
+		case AST_OP_DIV_EQ: op_eq = OP_DIV; is_op_eq = true; break;
+		default: is_op_eq = false;
 	}
 
 	if (is_op_eq) {
@@ -870,9 +870,9 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 		case AST_FOR_STMT: {
 			ctx->loop_gen++;
 			switch (cn->as.stmt_for.var->kind) {
-			case AST_VAR_MUT: tac_ir_gen_var_mut(prog, func, cn->as.stmt_for.var); break;
-			case AST_VAR_DEF: tac_ir_gen_var_def(prog, func, cn->as.stmt_for.var); break;
-			default: UNREACHABLE;
+				case AST_VAR_MUT: tac_ir_gen_var_mut(prog, func, cn->as.stmt_for.var); break;
+				case AST_VAR_DEF: tac_ir_gen_var_def(prog, func, cn->as.stmt_for.var); break;
+				default: UNREACHABLE;
 			}
 
 			uint saved_label_start = ctx->label_start;

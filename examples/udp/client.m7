@@ -12,7 +12,7 @@ fn main() {
 	serv: SockAddrV4
 	serv.set("127.0.0.1", 12345)
 
-	stdin: *u0 = fdopen(0, "r")
+	stdin := fdopen(0, "r")
 	while true {
 		msg: [1024]u8
 		fgets(msg, sizeof(msg):int, stdin)

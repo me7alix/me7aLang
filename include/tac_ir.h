@@ -5,8 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
-
-#include "../include/parser.h"
+#include <parser.h>
 
 typedef enum {
 	OP_ADD, OP_SUB, OP_NEG, OP_MUL, OP_DIV,
