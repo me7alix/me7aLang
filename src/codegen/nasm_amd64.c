@@ -533,7 +533,6 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					sb_appendf(&body, "  lea rsi, %s\n", opr_to_nasm(ci.args[0], NULL));
 					sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst, NULL));
 					sb_appendf(&body, "  mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
-					sb_appendf(&body, "  cld\n");
 					sb_appendf(&body, "  rep movsb\n");
 				} else {
 					load_reserved_regs(ci, arg1, arg2);
@@ -569,7 +568,6 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "  mov rsi, %s\n", opr_to_nasm(ci.args[0], NULL));
 				sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst, NULL));
 				sb_appendf(&body, "  mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
-				sb_appendf(&body, "  cld\n");
 				sb_appendf(&body, "  rep movsb\n");
 			}
 		} break;
