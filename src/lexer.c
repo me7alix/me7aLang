@@ -32,15 +32,11 @@ bool is_keyword(Lexer *l, const char *tok, TokenKind type, char *str) {
 	for (size_t i = 0; i < strlen(tok); i++) {
 		if (tok[i] != str[i]) return false;
 	}
-
 	if (isalpha(str[strlen(tok)]) || str[strlen(tok)] == '_')
 		return false;
-
 	add_token(l, type, (char*)tok);
-
 	for (size_t i = 0; i < strlen(tok) - 1; i++)
 		l->stream++;
-
 	return true;
 }
 
@@ -166,9 +162,6 @@ Lexer lexer_lex(char *file, char *code) {
 			if (l.stream[1] == '=') {
 				add_token(&l, TOK_EQ_EQ, "==");
 				l.stream++;
-			} else if (l.stream[1] == '>') {
-				add_token(&l, TOK_ARROW_EQ, "=>");
-				l.stream++;
 			} else add_token(&l, TOK_EQ, "=");
 		} break;
 
@@ -179,7 +172,7 @@ Lexer lexer_lex(char *file, char *code) {
 				case TOK_OPAR:  case TOK_DOT:
 				case TOK_SEMI:  case TOK_CBRA:
 				case TOK_OBRA:  case TOK_COM:
-				case TOK_ARROW: case TOK_ARROW_EQ: break;
+				case TOK_DO:    break;
 				default:
 					if (l.stream[-1] != '\\') {
 						add_token(&l, TOK_SEMI, ";");

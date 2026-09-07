@@ -58,7 +58,8 @@ fn snake_eat_apple() {
 
 fn is_game_over(): bool {
 	for i := snake_len - 1; i >= 1; i-=1 do
-		if snake[0].x == snake[i].x && snake[0].y == snake[i].y => true
+		if snake[0].x == snake[i].x && snake[0].y == snake[i].y do
+			return true
 	return false
 }
 

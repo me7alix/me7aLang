@@ -15,8 +15,8 @@ static fn hash_str(p: *u8): u32 {
     return h
 }
 
-static fn hash_combine(h1: u32, h2: u32): u32 =>
-	h1 ^ (h2 + 581019932:u32 + (h1 << 3) + (h1 >> 2))
+static fn hash_combine(h1: u32, h2: u32): u32 do
+	return h1 ^ (h2 + 581019932:u32 + (h1 << 3) + (h1 >> 2))
 
 macro hash_num(num) {
     (1462847356 * num:u32 + 1550508858):u32 \
@@ -95,7 +95,8 @@ macro HashMapImpl(HT, KT, VT) {
 		}
 
 		fn get(key: KT): *VT {
-			if self.capacity == 0 => null
+			if self.capacity == 0 do
+				return null
 			idx := HT##_hashf(key):uptr % self.capacity
 			cur := self.arr[idx]
 			while cur != null {
@@ -148,14 +149,14 @@ macro HashMapStrDecl(HT, VT) {
 
 macro HashMapStrImpl(HT, VT) {
 	HashMapImpl(HT, *u8, VT)
-	fn HT##_compare(a: *u8, b: *u8): bool => strcmp(a, b) == 0
-	fn HT##_hashf(str: *u8): u32 => hash_str(str)
+	fn HT##_compare(a: *u8, b: *u8): bool do return strcmp(a, b) == 0
+	fn HT##_hashf(str: *u8): u32 do return hash_str(str)
 }
 
 macro HashMapStrStaticImpl(HT, VT) {
 	static HashMapImpl(HT, *u8, VT)
-	static fn HT##_compare(a: *u8, b: *u8): bool => strcmp(a, b) == 0
-	static fn HT##_hashf(str: *u8): u32 => hash_str(str)
+	static fn HT##_compare(a: *u8, b: *u8): bool do return strcmp(a, b) == 0
+	static fn HT##_hashf(str: *u8): u32 do return hash_str(str)
 }
 
 macro HashMapStr(HT, VT) {
@@ -170,12 +171,12 @@ macro HashMapStrStatic(HT, VT) {
 
 macro HashMapNumImpl(HT, KT, VT) {
 	HashMapImpl(HT, KT, VT)
-	fn HT##_compare(a: KT, b: KT): bool => a == b
-	fn HT##_hashf(val: KT): u32 => hash_num(val)
+	fn HT##_compare(a: KT, b: KT): bool do return a == b
+	fn HT##_hashf(val: KT): u32 do return hash_num(val)
 }
 
 macro HashMapNumStaticImpl(HT, KT, VT) {
 	static HashMapImpl(HT, KT, VT)
-	static fn HT##_compare(a: KT, b: KT): bool => a == b
-	static fn HT##_hashf(val: KT): u32 => hash_num(val)
+	static fn HT##_compare(a: KT, b: KT): bool do return a == b
+	static fn HT##_hashf(val: KT): u32 do return hash_num(val)
 }

@@ -19,30 +19,30 @@ int SymbolTable_compare(SymbolKey cur_key, SymbolKey key) {
 }
 
 void push_scope(Parser *p) {
-	da_append(&p->sss, (SymbolTable){0});
+	da_append(&p->scope_stack, (SymbolTable){0});
 }
 
 void pop_scope(Parser *p) {
-	SymbolTable_free(&da_last(&p->sss));
-	p->sss.count--;
+	SymbolTable_free(&da_last(&p->scope_stack));
+	p->scope_stack.count--;
 }
 
 bool sbltbl_glob_add(Parser *p, SymbolKind st, char *id, Symbol smbl) {
-	if (SymbolTable_get(&da_first(&p->sss), (SymbolKey){st, id})) return true;
-	SymbolTable_add(&da_first(&p->sss), (SymbolKey){st, id}, smbl);
+	if (SymbolTable_get(&da_first(&p->scope_stack), (SymbolKey){st, id})) return true;
+	SymbolTable_add(&da_first(&p->scope_stack), (SymbolKey){st, id}, smbl);
 	return false;
 }
 
 bool sbltbl_add(Parser *p, SymbolKind st, char *id, Symbol smbl) {
-	if (SymbolTable_get(&da_last(&p->sss), (SymbolKey){st, id})) return true;
-	SymbolTable_add(&da_last(&p->sss), (SymbolKey){st, id}, smbl);
+	if (SymbolTable_get(&da_last(&p->scope_stack), (SymbolKey){st, id})) return true;
+	SymbolTable_add(&da_last(&p->scope_stack), (SymbolKey){st, id}, smbl);
 	return false;
 }
 
 Symbol *sbltbl_get(Parser *p, SymbolKind st, char *id) {
 	SymbolKey key = {st, id};
-	for (int i = p->sss.count - 1; i >= 0; i--) {
-		Symbol *smbl = SymbolTable_get(&da_get(&p->sss, i), key);
+	for (int i = p->scope_stack.count - 1; i >= 0; i--) {
+		Symbol *smbl = SymbolTable_get(&da_get(&p->scope_stack, i), key);
 		if (smbl) return smbl;
 	}
 	return NULL;
@@ -176,7 +176,7 @@ Type *parse_type_r(Parser *p) {
 			return type;
 		}
 	}
-	UserType *user_type = UserTypes_get(&p->ut, peek(p).data);
+	UserType *user_type = UserTypes_get(&p->user_types, peek(p).data);
 	if (user_type) {
 		type->kind = user_type->kind;
 		type->as.user = user_type;
@@ -323,7 +323,7 @@ AST_Node *parse_var_mut(Parser *p, TokenKind *until) {
 	return new(AST_Node,
 		.kind = AST_VAR_MUT,
 		.loc = exp->loc,
-		.as.var_mut.type = exp->as.ebin.type,
+		.as.var_mut.type = parser_get_type(p, exp),
 		.as.var_mut.expr = exp
 	);
 }
@@ -362,7 +362,7 @@ AST_Node *parse_if_stmt(Parser *p, AST_Node *func) {
 	AST_Node *r = new(AST_Node,
 		.kind = AST_IF_STMT,
 		.loc = next(p).loc);
-	r->as.stmt_if.expr = parse_expr(p, until(TOK_OBRA, TOK_ARROW, TOK_ARROW_EQ), NULL);
+	r->as.stmt_if.expr = parse_expr(p, until(TOK_OBRA, TOK_DO), NULL);
 	if (parser_get_type(p, r->as.stmt_if.expr).kind != TYPE_BOOL)
 		throw_error(r->as.stmt_if.expr->loc, "bool expected");
 	r->as.stmt_if.body = parse_body(p, func, false);
@@ -384,7 +384,7 @@ AST_Node *parse_while_stmt(Parser *p, AST_Node *func) {
 	AST_Node *r = new(AST_Node,
 		.kind = AST_WHILE_STMT,
 		.loc = next(p).loc);
-	r->as.stmt_while.expr = parse_expr(p, until(TOK_OBRA, TOK_ARROW, TOK_ARROW_EQ), NULL);
+	r->as.stmt_while.expr = parse_expr(p, until(TOK_OBRA, TOK_DO), NULL);
 	if (parser_get_type(p, r->as.stmt_while.expr).kind != TYPE_BOOL)
 		throw_error(r->as.stmt_while.expr->loc, "bool expected");
 	r->as.stmt_while.body = parse_body(p, func, false);
@@ -407,7 +407,7 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 	if (parser_get_type(p, r->as.stmt_for.expr).kind != TYPE_BOOL)
 		throw_error(r->as.stmt_for.expr->loc, "bool expected");
 	next(p);
-	r->as.stmt_for.mut = parse_var_mut(p, until(TOK_OBRA, TOK_ARROW, TOK_ARROW_EQ));
+	r->as.stmt_for.mut = parse_var_mut(p, until(TOK_OBRA, TOK_DO));
 	p->tokens--;
 	r->as.stmt_for.body = parse_body(p, func, true);
 	pop_scope(p);
@@ -415,29 +415,15 @@ AST_Node *parse_for_stmt(Parser *p, AST_Node *func) {
 }
 
 AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
-	bool is_arrow    = peek(p).kind == TOK_ARROW;
-	bool is_arrow_eq = peek(p).kind == TOK_ARROW_EQ;
+	bool one_liner = peek(p).kind == TOK_DO;
 	AST_Node *body = new(AST_Node,
 		.kind = AST_BODY,
 		.loc = peek(p).loc);
-	if (!is_arrow && !is_arrow_eq)
+	if (!one_liner)
 		expect(peek(p), TOK_OBRA);
 	next(p);
 	da_append(&func->as.func_def.defers_stack, (AST_Nodes){0});
 	if (!skip) push_scope(p);
-	if (is_arrow_eq) {
-		Type ft = func->as.func_def.type;
-		AST_Node *en = parse_expr(p, until(TOK_SEMI), &ft);
-		Type et = parser_get_type(p, en);
-		if (!compare_types(ft, et))
-			throw_types_mismatch(en->loc, ft, et);
-		da_append(&body->as.body.stmts,
-			new(AST_Node,
-				.kind = AST_FUNC_RET,
-				.as.func_ret.expr = en,
-				.as.func_ret.type = et));
-		goto done;
-	}
 	while (true) {
 		switch (peek(p).kind) {
 		case TOK_CBRA: goto done;
@@ -494,14 +480,14 @@ AST_Node *parse_body(Parser *p, AST_Node *func, bool skip) {
 			break;
 		case TOK_DEFER:
 			if (peek2(p).kind == TOK_OBRA) next(p);
-			else peek(p).kind = TOK_ARROW;
+			else peek(p).kind = TOK_DO;
 			AST_Node *dbody = parse_body(p, func, false);
 			da_append(&da_last(&func->as.func_def.defers_stack), dbody);
 			break;
 		default:
 			ast_body_append(body, parse_var_mut(p, until(TOK_SEMI)));
 		}
-		if (is_arrow) {
+		if (one_liner) {
 			p->tokens--;
 			goto done;
 		}
@@ -695,12 +681,12 @@ void parse_method(Parser *p, UserType *st, bool is_static) {
 
 void parse_struct(Parser *p) {
 	next(p);
-	if (UserTypes_get(&p->ut, peek(p).data))
+	if (UserTypes_get(&p->user_types, peek(p).data))
 		throw_error(peek(p).loc, "redefinition of the struct");
-	UserTypes_add(&p->ut, peek(p).data, (UserType){
+	UserTypes_add(&p->user_types, peek(p).data, (UserType){
 		.kind = TYPE_STRUCT,
 		.id = peek(p).data});
-	UserType *st = UserTypes_get(&p->ut, next(p).data);
+	UserType *st = UserTypes_get(&p->user_types, next(p).data);
 	expect(next(p), TOK_OBRA);
 	while (peek(p).kind != TOK_CBRA) {
 		switch (peek(p).kind) {
@@ -734,7 +720,7 @@ void parse_impl(Parser *p) {
 		expect(next(p), TOK_IMPL);
 	}
 	Location snl = peek(p).loc;
-	UserType *st = UserTypes_get(&p->ut, next(p).data);
+	UserType *st = UserTypes_get(&p->user_types, next(p).data);
 	if (!st) throw_error(snl, "no such struct or union");
 	expect(next(p), TOK_OBRA);
 	while (peek(p).kind != TOK_CBRA) {

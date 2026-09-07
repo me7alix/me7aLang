@@ -7,7 +7,7 @@ macro ADD(a, b) {
 	((a) + (b)) \
 }
 
-fn add(a: int, b: int): int => a + b
+fn add(a: int, b: int): int do return a + b
 
 fn main() {
 	// 3 + 4 + 10

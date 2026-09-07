@@ -238,9 +238,8 @@ typedef DA(SymbolTable) SymbolScopeStack;
 
 typedef struct {
 	Token *tokens;
-	SymbolTable st;
-	UserTypes ut;
-	SymbolScopeStack sss;
+	UserTypes user_types;
+	SymbolScopeStack scope_stack;
 	AST_Node *program;
 } Parser;
 

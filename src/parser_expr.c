@@ -449,15 +449,6 @@ AST_Node *parse_array(Parser *p) {
 	return al;
 }
 
-double parse_float(char *data) {
-	return atof(data);
-}
-
-long long parse_int(char *data) {
-	char *end;
-	return strtoll(data, &end, 0);
-}
-
 AST_Node *parse_expr_item(Parser *p, TokenKind *until) {
 	switch (peek(p).kind) {
 	case TOK_OPAR: {
@@ -486,7 +477,8 @@ AST_Node *parse_expr_item(Parser *p, TokenKind *until) {
 			.kind = AST_LITERAL,
 			.loc = peek(p).loc,
 			.as.literal.kind = LIT_INT);
-		expr->as.literal.as.lint = parse_int(next(p).data);
+		char *end;
+		expr->as.literal.as.lint = strtoll(next(p).data, &end, 0);
 		return expr;
 	}
 
@@ -546,7 +538,7 @@ AST_Node *parse_expr_item(Parser *p, TokenKind *until) {
 			.kind = AST_LITERAL,
 			.loc = peek(p).loc,
 			.as.literal.kind = LIT_FLOAT);
-		expr->as.literal.as.lfloat = parse_float(next(p).data);
+		expr->as.literal.as.lfloat = atof(next(p).data);
 		return expr;
 	}
 

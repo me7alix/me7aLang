@@ -139,8 +139,6 @@ void insert_macro(PreprocCtx *p) {
 		if (macro->as.func.args.count != args.count)
 			throw_error(peek(p).loc, "arguments count mismatch");
 		da_foreach (Token, tok, &macro->as.func.body) {
-			Token itok = *tok;
-			itok.loc = loc;
 			if (tok->kind == TOK_ID) {
 				bool found = false;
 				for (size_t i = 0; i < macro->as.func.args.count; i++) {
@@ -152,8 +150,8 @@ void insert_macro(PreprocCtx *p) {
 						break;
 					}
 				}
-				if (!found) pp_append(p, itok);
-			} else pp_append(p, itok);
+				if (!found) pp_append(p, *tok);
+			} else pp_append(p, *tok);
 		}
 	}
 }
@@ -238,7 +236,12 @@ void preprocessor(PreprocCtx *p) {
 				} else if (strcmp(peek(p).data, "__LINE__") == 0) {
 					StringBuilder sb = {0};
 					sb_appendf(&sb, "%zu", next(p).loc.line_num + 1);
-					pp_append(p, ((Token){.kind = TOK_INT,.data = sb.items}));
+					pp_append(p, ((Token){.kind = TOK_INT, .data = sb.items}));
+				} else if (strcmp(peek(p).data, "__COUNTER__") == 0) {
+					StringBuilder sb = {0};
+					static size_t counter = 0;
+					sb_appendf(&sb, "%zu", counter++);
+					pp_append(p, ((Token){.kind = TOK_ID, .data = sb.items}));
 				} else insert_macro(p);
 				break;
 			default:

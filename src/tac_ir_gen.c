@@ -579,28 +579,35 @@ void tac_ir_gen_var_def(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 
 void tac_ir_gen_var_mut(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	IRGenExprCtx ctx = {0};
+	AST_Node *expr = cn->as.var_mut.expr;
 
 	if (
-		cn->as.var_mut.expr->kind == AST_BIN_EXP &&
-		cn->as.var_mut.expr->as.ebin.op == AST_OP_FIELD
+		expr->kind == AST_BIN_EXP &&
+		expr->as.ebin.op == AST_OP_FIELD
 	) {
 		ctx.is_met_call_gen = true;
-		tac_ir_gen_expr(&ctx, prog, func, cn->as.var_mut.expr);
+		tac_ir_gen_expr(&ctx, prog, func, expr);
+		return;
+	}
+
+	if (expr->kind != AST_BIN_EXP) {
+		ctx.is_right_of_eq = true;
+		tac_ir_gen_expr(&ctx, prog, func, expr);
 		return;
 	}
 
 	ctx.is_right_of_eq = false;
-	TAC_Operand dst = tac_ir_gen_expr(&ctx, prog, func, cn->as.var_mut.expr->as.ebin.l);
+	TAC_Operand dst = tac_ir_gen_expr(&ctx, prog, func, expr->as.ebin.l);
 	ctx.is_right_of_eq = true;
-	TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->as.var_mut.expr->as.ebin.r);
+	TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, expr->as.ebin.r);
 
 	TAC_OpCode op_eq;
-	bool is_op_eq;
-	switch (cn->as.var_mut.expr->as.ebin.op) {
-		case AST_OP_ADD_EQ: op_eq = OP_ADD; is_op_eq = true; break;
-		case AST_OP_SUB_EQ: op_eq = OP_SUB; is_op_eq = true; break;
-		case AST_OP_MUL_EQ: op_eq = OP_MUL; is_op_eq = true; break;
-		case AST_OP_DIV_EQ: op_eq = OP_DIV; is_op_eq = true; break;
+	bool is_op_eq = true;
+	switch (expr->as.ebin.op) {
+		case AST_OP_ADD_EQ: op_eq = OP_ADD; break;
+		case AST_OP_SUB_EQ: op_eq = OP_SUB; break;
+		case AST_OP_MUL_EQ: op_eq = OP_MUL; break;
+		case AST_OP_DIV_EQ: op_eq = OP_DIV; break;
 		default: is_op_eq = false;
 	}
 
@@ -615,7 +622,6 @@ void tac_ir_gen_var_mut(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 				.as.var.addr_id = var_id++,
 			},
 		};
-
 		append_inst(func, op_eq_res);
 		append_inst(func, (TAC_Instruction){
 			.op = OP_ASSIGN,
@@ -1043,7 +1049,7 @@ TAC_Program tac_ir_gen_prog(Parser *p, int _opt_level) {
 	TAC_Program prog = {0};
 	opt_level = _opt_level;
 
-	ht_foreach_node (UserTypes, kv, &p->ut) {
+	ht_foreach_node (UserTypes, kv, &p->user_types) {
 		UserType *ut = &kv->val;
 		if (ut->kind == TYPE_STRUCT) {
 			da_foreach (Member, member, &ut->as.ustruct.members) {
@@ -1066,7 +1072,7 @@ TAC_Program tac_ir_gen_prog(Parser *p, int _opt_level) {
 		}
 	}
 
-	ht_foreach_node (SymbolTable, n, &da_last(&p->sss)) {
+	ht_foreach_node (SymbolTable, n, &da_last(&p->scope_stack)) {
 		switch (n->key.kind) {
 		case SBL_FUNC_EXTERN:
 			da_append(&prog.externs, ((TAC_Extern){
