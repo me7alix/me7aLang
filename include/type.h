@@ -102,7 +102,7 @@ static bool compare_types(Type a, Type b) {
 
 static void render_type(StringBuilder *sb, Type t) {
 	switch (t.kind) {
-	case TYPE_NULL:     sb_appendf (sb, "null");  break;
+	case TYPE_NULL:     sb_appendf (sb, "u0");    break;
 	case TYPE_INT:      sb_appendf (sb, "int");   break;
 	case TYPE_UINT:     sb_appendf (sb, "uint");  break;
 	case TYPE_I8:       sb_appendf (sb, "i8");    break;

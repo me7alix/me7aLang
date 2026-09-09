@@ -17,10 +17,7 @@ You can pass blocks of code in brackets and it will be parsed as a single argume
 macro do_while(expr, body) {
     while true {
         block body
-
-        if !(expr) {
-            break
-        }
+        if !(expr) do break
     }
 }
 ```
@@ -67,6 +64,7 @@ The compiler supports **Linux**, **Windows**, and **macOS**, and has been tested
 
 - [FASM](https://flatassembler.net)
 - [NASM](https://nasm.us)
+- GAS (aarch64)
 
 ## License
 
