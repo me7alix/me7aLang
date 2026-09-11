@@ -170,6 +170,9 @@ static size_t _cp_da_get_index;
 #define da_first(da) \
     (da)->items[CP_ASSERT((da)->count > 0), 0]
 
+#define da_pop(da) \
+    (da)->items[CP_ASSERT((da)->count > 0), --((da)->count)]
+
 #define da_resize(da, cnt) \
     do { \
         (da)->count = (cnt); \

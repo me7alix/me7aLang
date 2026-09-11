@@ -4,14 +4,14 @@ import "raylib.m7"
 def TILE_SIZE  30
 def MAP_WIDTH  20
 def MAP_HEIGHT 20
-def MAP_SIZE   (MAP_WIDTH * MAP_HEIGHT)
+def MAP_SIZE \
+	(MAP_WIDTH * MAP_HEIGHT)
 
 struct Vec2 {
 	x: int
 	y: int
 }
 
-strbuf:    [128]u8
 apple:     Vec2
 snake:     [MAP_SIZE]Vec2
 snake_dir: Vec2
@@ -31,8 +31,9 @@ fn draw_game() {
 		apple.y * TILE_SIZE,
 		TILE_SIZE, TILE_SIZE,
 		RED)
-	sprintf(strbuf, "Score: %zu", snake_len - 2)
-	DrawText(strbuf, 20, 20, 20, WHITE)
+	score: [128]u8
+	sprintf(score, "Score: %zu", snake_len - 2)
+	DrawText(score, 20, 20, 20, WHITE)
 }
 
 fn snake_follow() {
