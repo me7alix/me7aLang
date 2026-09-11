@@ -48,7 +48,8 @@ static char *RF[][4] = {
 	[X29] = {"w29", "w29", "w29", "x29" },
 };
 
-static Register scratch      [] = {X12, X13, X14, X15};
+static Register scratch      [] = {X12, X13};
+static Register caller_saved [] = {X14, X15};
 static Register callee_saved [] = {X19, X20, X21, X22, X23, X24, X25, X26, X27, X28};
 static Register sysv_gn_fa   [] = {X0, X1, X2, X3, X4, X5, X6, X7};
 static Register win_gn_fa    [] = {X0, X1, X2, X3, X4, X5, X6, X7};

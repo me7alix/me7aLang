@@ -41,6 +41,7 @@ typedef enum {
 
 typedef struct {
 	bool to_spill;
+	bool no_func_calls;
 	uint start;
 	uint end;
 } TAC_VarInterval;

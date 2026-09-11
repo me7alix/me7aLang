@@ -112,6 +112,13 @@ void gas_mov(GasOpr dst, GasOpr src) {
 	} else UNREACHABLE;
 }
 
+static Register *reg_allocator_get(uint vid) {
+	int *cer = RegTable_get(&regal.allocated_ce_regs, vid);
+	if (cer) return (Register*)cer;
+	int *crr = RegTable_get(&regal.allocated_cr_regs, vid);
+	return (Register*)crr;
+}
+
 GasOpr opr_to_gas(TAC_Operand opr) {
 	GasOpr res = {0};
 	if (opr.kind != OPR_LABEL && opr.kind != OPR_FIELD)
@@ -142,7 +149,7 @@ GasOpr opr_to_gas(TAC_Operand opr) {
 			} else {
 				res.kind = REG;
 				size_t row = get_reg_size(opr.as.var.type);
-				Register reg = *RegTable_get(&regal.allocated_regs, opr.as.var.addr_id);
+				Register reg = *reg_allocator_get(opr.as.var.addr_id);
 				sprintf(res.text, "%s", RF[reg][row]);
 			}
 		} else if (opr.as.var.kind == VAR_ADDR) {
@@ -153,7 +160,7 @@ GasOpr opr_to_gas(TAC_Operand opr) {
 					if (fo) sprintf(res.text, "[%s, #%u]", SRs, fo);
 					else    sprintf(res.text, "[%s]", SRs);
 				} else {
-					Register reg = *RegTable_get(&regal.allocated_regs, opr.as.var.addr_id);
+					Register reg = *reg_allocator_get(opr.as.var.addr_id);
 					if (fo) sprintf(res.text, "[%s, #%u]", RF[reg][3], fo);
 					else    sprintf(res.text, "[%s]", RF[reg][3]);
 				}
@@ -265,10 +272,11 @@ static void type_to_reg(TAC_Operand opr, char *a, char *b, char *c) {
 		//sprintf(c, "%s", RF[V10][get_reg_size(type)]);
 		UNREACHABLE;
 		break;
-	default:
-		sprintf(a, "%s", RF[X9][get_reg_size(type)]);
-		sprintf(b, "%s", RF[X10][get_reg_size(type)]);
-		sprintf(c, "%s", RF[X11][get_reg_size(type)]);
+	default:;
+		size_t rs = get_reg_size(type);
+		sprintf(a, "%s", RF[X9][rs]);
+		sprintf(b, "%s", RF[X10][rs]);
+		sprintf(c, "%s", RF[X11][rs]);
 	}
 }
 
@@ -303,7 +311,7 @@ static void load_struct_ptr(const char *reg, TAC_Operand opr) {
 			if (off) {
 				sb_appendf(&body, "  ldr %s, [x29, #-%u]\n", reg, *off);
 			} else {
-				Register r = *RegTable_get(&regal.allocated_regs, opr.as.var.addr_id);
+				Register r = *reg_allocator_get(opr.as.var.addr_id);
 				sb_appendf(&body, "  mov %s, %s\n", reg, RF[r][3]);
 			}
 			if (fo) sb_appendf(&body, "  add %s, %s, %u\n", reg, reg, fo);
@@ -333,8 +341,10 @@ GasOpr gas_gen_new_var(TAC_Instruction ci) {
 		reg_allocator_free(&regal, inst_idx);
 		if (ci.dst.as.var.type.kind != TYPE_STRUCT) {
 			Register reg;
-			if (reg_allocator_push(&regal, ci.dst.as.var.addr_id, (int*)&reg)) {
-				size_t row = get_reg_size(ci.dst.as.var.type);
+			size_t row = get_reg_size(ci.dst.as.var.type);
+			if (reg_allocator_push_cr(&regal, ci.dst.as.var.addr_id, (int*)&reg)) {
+				return gas_oprt(REG, ci.dst.as.var.type, RF[reg][row]);
+			} else if (reg_allocator_push_ce(&regal, ci.dst.as.var.addr_id, (int*)&reg)) {
 				return gas_oprt(REG, ci.dst.as.var.type, RF[reg][row]);
 			}
 		}
@@ -374,13 +384,19 @@ void gas_gen_func(StringBuilder *code, TAC_Func func) {
 	}
 
 	is_there_return = false;
-	RegTable_free(&regal.allocated_regs);
-	regal.allocated_regs = (RegTable){0};
+	RegTable_free(&regal.allocated_ce_regs);
+	regal.allocated_ce_regs = (RegTable){0};
+	RegTable_free(&regal.allocated_cr_regs);
+	regal.allocated_cr_regs = (RegTable){0};
 	regal.life_intervals = &func.var_ints;
 	da_reset(&regal.callee_saved_regs);
-	da_reset(&regal.available_regs);
+	da_reset(&regal.available_ce_regs);
 	for (size_t i = 0; i < ARR_LEN(callee_saved); i++) {
-		da_append(&regal.available_regs, callee_saved[i]);
+		da_append(&regal.available_ce_regs, callee_saved[i]);
+	}
+	da_reset(&regal.available_cr_regs);
+	for (size_t i = 0; i < ARR_LEN(caller_saved); i++) {
+		da_append(&regal.available_cr_regs, caller_saved[i]);
 	}
 
 	sb_reset(&body);
@@ -542,7 +558,7 @@ void gas_gen_func(StringBuilder *code, TAC_Func func) {
 			GasOpr oprd;
 			if (ci.dst.as.var.kind == VAR_LOCAL) {
 				uint *off = OffTable_get(&stack_table, ci.dst.as.var.addr_id);
-				Register *reg = (Register*)RegTable_get(&regal.allocated_regs, ci.dst.as.var.addr_id);
+				Register *reg = reg_allocator_get(ci.dst.as.var.addr_id);
 				if (!off && !reg) {
 					fst_asg = true;
 					oprd = gas_gen_new_var(ci);

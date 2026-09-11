@@ -1026,6 +1026,13 @@ void tac_ir_gen_calc_inters(TAC_Program *prog) {
 		}
 
 		ht_foreach_node (TAC_VarIntervals, n, &func->var_ints) {
+			n->val.no_func_calls = true;
+			da_foreach (size_t, fc, &func_calls) {
+				if (*fc >= n->val.start && *fc <= n->val.end) {
+					n->val.no_func_calls = false;
+				}
+			}
+
 			da_foreach (uint, ref_var, &ref_vars) {
 				if (n->key == *ref_var) {
 					n->val.to_spill = true;

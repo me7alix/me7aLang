@@ -22,6 +22,10 @@ static bool is_there_return;
 static uint stack_offset;
 static uint inst_idx;
 
+static Register *reg_allocator_get(uint vid) {
+	return (Register*)RegTable_get(&regal.allocated_ce_regs, vid);
+}
+
 static void opr_type_to_stack(TAC_Operand t, char *buf) {
 	static char *types[] = {"byte", "word", "dword", "qword"};
 	switch (tac_ir_get_opr_type(t).kind) {
@@ -63,7 +67,7 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 				sprintf(buf, "%s[rbp - %u]", ts, *off - fo);
 			} else {
 				size_t row = get_reg_size(opr.as.var.type);
-				Register reg = *RegTable_get(&regal.allocated_regs, opr.as.var.addr_id);
+				Register reg = *reg_allocator_get(opr.as.var.addr_id);
 				sprintf(buf, "%s", RF[reg][row]);
 				if (opr_kind) *opr_kind = REG;
 			}
@@ -75,7 +79,7 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 					if (fo) sprintf(buf, "%s[rax + %u]", ts, fo);
 					else    sprintf(buf, "%s[rax]", ts);
 				} else {
-					Register reg = *RegTable_get(&regal.allocated_regs, opr.as.var.addr_id);
+					Register reg = *reg_allocator_get(opr.as.var.addr_id);
 					if (fo) sprintf(buf, "%s[%s + %u]", ts, RF[reg][3], fo);
 					else    sprintf(buf, "%s[%s]", ts, RF[reg][3]);
 				}
@@ -221,7 +225,7 @@ void nasm_gen_new_var(TAC_Instruction ci, char *dst, OprKind *opr_kind) {
 		reg_allocator_free(&regal, inst_idx);
 		if (ci.dst.as.var.type.kind != TYPE_STRUCT) {
 			Register reg;
-			if (reg_allocator_push(&regal, ci.dst.as.var.addr_id, (int*)&reg)) {
+			if (reg_allocator_push_ce(&regal, ci.dst.as.var.addr_id, (int*)&reg)) {
 				if (opr_kind) *opr_kind = REG;
 				size_t row = get_reg_size(ci.dst.as.var.type);
 				sprintf(dst, "%s", RF[reg][row]);
@@ -247,13 +251,13 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 	}
 
 	is_there_return = false;
-	RegTable_free(&regal.allocated_regs);
-	regal.allocated_regs = (RegTable){0};
+	RegTable_free(&regal.allocated_ce_regs);
+	regal.allocated_ce_regs = (RegTable){0};
 	regal.life_intervals = &func.var_ints;
 	da_reset(&regal.callee_saved_regs);
-	da_reset(&regal.available_regs);
+	da_reset(&regal.available_ce_regs);
 	for (size_t i = 0; i < ARR_LEN(callee_saved); i++) {
-		da_append(&regal.available_regs, callee_saved[i]);
+		da_append(&regal.available_ce_regs, callee_saved[i]);
 	}
 
 	sb_reset(&body);
@@ -511,7 +515,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			bool fst_asg = false;
 			if (ci.dst.as.var.kind == VAR_LOCAL) {
 				uint *off = OffTable_get(&stack_table, ci.dst.as.var.addr_id);
-				Register *reg = (Register*)RegTable_get(&regal.allocated_regs, ci.dst.as.var.addr_id);
+				Register *reg = reg_allocator_get(ci.dst.as.var.addr_id);
 				if (!off && !reg) {
 					fst_asg = true;
 					nasm_gen_new_var(ci, dst, NULL);
