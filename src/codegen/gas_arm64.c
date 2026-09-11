@@ -391,13 +391,13 @@ void gas_gen_func(StringBuilder *code, TAC_Func func) {
 	regal.life_intervals = &func.var_ints;
 	da_reset(&regal.callee_saved_regs);
 	da_reset(&regal.available_ce_regs);
-	for (size_t i = 0; i < ARR_LEN(callee_saved); i++) {
-		da_append(&regal.available_ce_regs, callee_saved[i]);
-	}
 	da_reset(&regal.available_cr_regs);
-	for (size_t i = 0; i < ARR_LEN(caller_saved); i++) {
+	for (size_t i = 0; i < ARR_LEN(callee_saved); i++)
+		da_append(&regal.available_ce_regs, callee_saved[i]);
+	for (size_t i = 0; i < ARR_LEN(caller_saved); i++)
 		da_append(&regal.available_cr_regs, caller_saved[i]);
-	}
+	for (size_t i = func.args.count; i < ARR_LEN(sysv_gn_fa); i++)
+		da_append(&regal.available_cr_regs, sysv_gn_fa[i]);
 
 	sb_reset(&body);
 	stack_offset = 0;
