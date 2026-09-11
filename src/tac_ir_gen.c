@@ -981,14 +981,14 @@ typedef struct {
 
 void tac_ir_gen_calc_inters(TAC_Program *prog) {
 	da_foreach (TAC_Func, func, &prog->funcs) {
-		static DA(size_t) func_calls = {0};
+		static DA(uint) func_calls = {0};
 		da_reset(&func_calls);
 		static DA(uint) ref_vars = {0};
 		da_reset(&ref_vars);
 		static DA(Interval) loop_ints = {0};
 		da_reset(&loop_ints);
 
-		for (size_t i = 0; i < func->body.count; i++) {
+		for (uint i = 0; i < func->body.count; i++) {
 			TAC_Instruction ci = func->body.items[i];
 			calc_inst_intervals(func, &ci, i);
 			switch (ci.op) {
@@ -1027,17 +1027,21 @@ void tac_ir_gen_calc_inters(TAC_Program *prog) {
 
 		ht_foreach_node (TAC_VarIntervals, n, &func->var_ints) {
 			n->val.no_func_calls = true;
-			da_foreach (size_t, fc, &func_calls) {
+			da_foreach (uint, fc, &func_calls) {
 				if (*fc >= n->val.start && *fc <= n->val.end) {
 					n->val.no_func_calls = false;
+					break;
 				}
 			}
 
+			n->val.to_spill = false;
 			da_foreach (uint, ref_var, &ref_vars) {
 				if (n->key == *ref_var) {
 					n->val.to_spill = true;
+					break;
 				}
 			}
+
 			da_foreach (Interval, loop_int, &loop_ints) {
 				if (n->val.start <= loop_int->end && n->val.end >= loop_int->start) {
 					if (

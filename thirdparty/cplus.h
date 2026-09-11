@@ -111,6 +111,9 @@ static size_t match_val = 0;
 #define da_foreach(Type, it, da) \
     for (Type *it = (da)->items; it < (da)->items + (da)->count; ++it)
 
+#define da_foreach_rev(Type, it, da) \
+    for (Type *it = (da)->items + (da)->count - 1; it >= (da)->items; --it)
+
 #define da_reserve(da, expected_capacity) \
     do { \
         if ((expected_capacity) > (da)->capacity) { \

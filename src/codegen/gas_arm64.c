@@ -329,11 +329,64 @@ static void load_struct_ptr(const char *reg, TAC_Operand opr) {
 }
 
 static void copy_struct(TAC_Operand dst, TAC_Operand src) {
+	static uint uniq = 0;
+
 	load_struct_ptr("x0", dst);
 	load_struct_ptr("x1", src);
+
 	uint size = get_type_size(tac_ir_get_opr_type(dst));
-	sb_appendf(&body, "  mov x2, #%u\n", size);
-	sb_appendf(&body, "  bl memcpy\n");
+	uint off = 0;
+
+	if (size > 64) {
+		uint chunks = size / 16;
+		uint label = ++uniq;
+		sb_appendf(&body, "  mov x4, %u\n", chunks);
+		sb_appendf(&body, ".LC%u:\n", label);
+		sb_appendf(&body, "  ldp x2, x3, [x1], #16\n");
+		sb_appendf(&body, "  stp x2, x3, [x0], #16\n");
+		sb_appendf(&body, "  subs x4, x4, #1\n");
+		sb_appendf(&body, "  b.ne .LC%u\n", label);
+		off = chunks * 16;
+	} else {
+		while (size - off >= 16) {
+			sb_appendf(&body,
+				"  ldp x2, x3, [x1, #%u]\n"
+				"  stp x2, x3, [x0, #%u]\n",
+				off, off);
+			off += 16;
+		}
+	}
+
+	if (size - off >= 8) {
+		sb_appendf(&body,
+			"  ldr x2, [x1, #%u]\n"
+			"  str x2, [x0, #%u]\n",
+			off, off);
+		off += 8;
+	}
+
+	if (size - off >= 4) {
+		sb_appendf(&body,
+			"  ldr w2, [x1, #%u]\n"
+			"  str w2, [x0, #%u]\n",
+			off, off);
+		off += 4;
+	}
+
+	if (size - off >= 2) {
+		sb_appendf(&body,
+			"  ldrh w2, [x1, #%u]\n"
+			"  strh w2, [x0, #%u]\n",
+			off, off);
+		off += 2;
+	}
+
+	if (size - off >= 1) {
+		sb_appendf(&body,
+			"  ldrb w2, [x1, #%u]\n"
+			"  strb w2, [x0, #%u]\n",
+			off, off);
+	}
 }
 
 GasOpr gas_gen_new_var(TAC_Instruction ci) {
