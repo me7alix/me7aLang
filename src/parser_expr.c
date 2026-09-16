@@ -39,8 +39,6 @@ int op_prec(AST_ExprOp op, bool l) {
 		return l ? 50 : 0;
 	case AST_OP_ARR:
 		return 30;
-	case AST_OP_FIELD:
-		return 40;
 	case AST_OP_SIZEOF:
 		return l ? 0 : 60;
 	case AST_OP_NOT:
@@ -48,6 +46,8 @@ int op_prec(AST_ExprOp op, bool l) {
 	case AST_OP_REF:
 	case AST_OP_DEREF:
 		return l ? 0 : 30;
+	case AST_OP_FIELD:
+		return 80;
 	case AST_OP_VAR_EQ:
 	case AST_OP_ADD_EQ:
 	case AST_OP_SUB_EQ:
@@ -116,7 +116,16 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *src_type) {
 	} break;
 	case AST_LITERAL: {
 		if (src_type && expr->as.literal.kind == LIT_INT) {
-			if (is_type_integer(*src_type)) {
+			if (is_type_integer(*src_type) || is_type_float(*src_type)) {
+				expr->as.literal.type = *src_type;
+				if (is_type_float(*src_type)) {
+					long long value = expr->as.literal.as.lint;
+					expr->as.literal.as.lfloat = value;
+				}
+				return expr->as.literal.type;
+			}
+		} else if (src_type && expr->as.literal.kind == LIT_FLOAT) {
+			if (is_type_float(*src_type)) {
 				expr->as.literal.type = *src_type;
 				return expr->as.literal.type;
 			}
@@ -202,7 +211,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *src_type) {
 					}
 				}
 				throw_error(expr->as.ebin.l->loc, "no such method");
-			} else {
+			} else if (expr->as.ebin.r->kind == AST_VID) {
 				/* Auto-dereferencing */
 				if (lt.kind == TYPE_POINTER) {
 					expr->as.ebin.l = new(AST_Node,
@@ -226,7 +235,7 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *src_type) {
 					}
 				}
 				throw_error(expr->loc, "no such field");
-			}
+			} else throw_error(expr->as.ebin.r->loc, "field expected");
 		}
 
 		Type rt = expr_analysis(p, expr->as.ebin.r, src_type);

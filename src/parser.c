@@ -156,6 +156,8 @@ Type *parse_type_r(Parser *p) {
 		{ "int",   TYPE_INT   },
 		{ "uint",  TYPE_UINT  },
 		{ "float", TYPE_FLOAT },
+		{ "f32",   TYPE_F32   },
+		{ "f64",   TYPE_F64   },
 		{ "bool",  TYPE_BOOL  },
 		{ "i16",   TYPE_I16   },
 		{ "i8",    TYPE_I8    },
