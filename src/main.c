@@ -9,12 +9,10 @@
 
 /* Codegens */
 char *nasm_gen_prog(TAC_Program*, TargetPlatform, int);
-char *fasm_gen_prog(TAC_Program*, TargetPlatform, int);
 char *gas_gen_prog(TAC_Program*, TargetPlatform, int);
 
 typedef enum {
 	CG_NASM_AMD64,
-	CG_FASM_AMD64,
 	CG_GAS_AARCH64,
 } Codegen;
 
@@ -22,8 +20,7 @@ struct {
 	const char *str;
 	Codegen cg;
 } codegens[] = {
-	{ "fasm64",  CG_FASM_AMD64 },
-	{ "nasm64",  CG_NASM_AMD64 },
+	{ "nasm_amd64",  CG_NASM_AMD64 },
 	{ "gas_aarch64", CG_GAS_AARCH64 },
 };
 
@@ -177,7 +174,7 @@ int main(int argc, char **argv) {
 		da_append(&imports, std.items);
 	}
 
-	Codegen codegen = ARM64 ? CG_GAS_AARCH64 : CG_FASM_AMD64;
+	Codegen codegen = ARM64 ? CG_GAS_AARCH64 : CG_NASM_AMD64;
 
 	DA(char*) src_files = {0};
 	DA(char*) obj_files = {0};
@@ -304,9 +301,6 @@ int main(int argc, char **argv) {
 
 		char *cg = NULL;
 		switch (codegen) {
-		case CG_FASM_AMD64:
-			cg = fasm_gen_prog(&prog, tp, opt_level);
-			break;
 		case CG_NASM_AMD64:
 			cg = nasm_gen_prog(&prog, tp, opt_level);
 			break;
@@ -327,25 +321,17 @@ int main(int argc, char **argv) {
 					"err"),
 				output_file);
 			break;
-		case CG_FASM_AMD64:
-			switch (tp) {
-			case TP_WINDOWS:
-				systemf("fasm %s %s.o > NUL", output_file, srcs.items[i]);
-				break;
-			case TP_LINUX:
-			case TP_MACOS:
-				systemf("fasm %s %s.o > /dev/null", output_file, srcs.items[i]);
-			} break;
 		case CG_GAS_AARCH64:
 			systemf("as -o %s.o %s", srcs.items[i], output_file);
 		}
 	}
 
-	char *obj_ext =
-		(match(tp),
-			when(TP_WINDOWS, "obj")
-			when(TP_LINUX, "o")
-			when(TP_MACOS, "o") "err");
+	char *obj_ext = (match(tp),
+		when(TP_WINDOWS, "obj")
+		when(TP_LINUX, "o")
+		when(TP_MACOS, "o")
+		"err"
+	);
 
 	if (!save_asm_output) {
 		switch (tp) {
