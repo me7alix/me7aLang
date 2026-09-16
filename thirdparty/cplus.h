@@ -415,4 +415,13 @@ static inline int sb_appendf(StringBuilder *sb, const char *fmt, ...) {
 #define sb_reset(sb)     da_reset(sb)
 #define sb_free(sb)      da_free(sb)
 
+static char *tsprintf(const char *fmt, ...) {
+	static char buf[1 << 16];
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof buf, fmt, ap);
+	va_end(ap);
+	return buf;
+}
+
 #endif // CPLUS_H_

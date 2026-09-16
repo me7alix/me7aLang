@@ -36,11 +36,39 @@ static char *RF[][4] = {
 	[R15] = {"r15b", "r15w", "r15d", "r15"},
 };
 
-static Register callee_saved [] = {R15, R14, R13, R12, RBX};
+static char *RFf[] = {
+	[XMM0]  = "xmm0",
+	[XMM1]  = "xmm1",
+	[XMM2]  = "xmm2",
+	[XMM3]  = "xmm3",
+	[XMM4]  = "xmm4",
+	[XMM5]  = "xmm5",
+	[XMM6]  = "xmm6",
+	[XMM7]  = "xmm7",
+	[XMM8]  = "xmm8",
+	[XMM9]  = "xmm9",
+	[XMM10] = "xmm10",
+	[XMM11] = "xmm11",
+	[XMM12] = "xmm12",
+	[XMM13] = "xmm13",
+	[XMM14] = "xmm14",
+	[XMM15] = "xmm15",
+};
+
+static Register sysv_scr     [] = {R10, R11};
+static Register win_scr      [] = {R13, R12};
+
+static Register sysv_gn_ce   [] = {R15, R14, R13, R12, RBX};
+static Register win_gn_ce    [] = {R15, R14, RBX};
+
 static Register sysv_gn_fa   [] = {RDI, RSI, RDX, RCX, R8, R9};
 static Register win_gn_fa    [] = {RCX, RDX, R8, R9};
+
 static Register sysv_fl_fa   [] = {XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6, XMM7};
 static Register win_fl_fa    [] = {XMM0, XMM1, XMM2, XMM3};
+
+static Register sysv_fl_cr   [] = {XMM8, XMM9, XMM10, XMM11, XMM12, XMM13};
+static Register win_fl_cr    [] = {XMM4, XMM5};
 
 static size_t get_reg_size(Type t) {
 	switch (t.kind) {
@@ -51,11 +79,14 @@ static size_t get_reg_size(Type t) {
 	case TYPE_I16:
 	case TYPE_U16:
 		return 1;
+	case TYPE_FLOAT:
+	case TYPE_F32:
 	case TYPE_U32:
 	case TYPE_I32:
 	case TYPE_INT:
 	case TYPE_UINT:
 		return 2;
+	case TYPE_F64:
 	case TYPE_FUNCTION:
 	case TYPE_ARRAY:
 	case TYPE_POINTER:

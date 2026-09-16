@@ -966,8 +966,12 @@ void tac_ir_gen_func(TAC_Program *prog, AST_Node *fn) {
 			},
 		};
 
-		da_append(&func.body, inst);
 		ASTVarTable_add(&avt, cn->as.func_def_arg.uid, inst.dst);
+		da_append(&func.body, inst);
+		da_append(&func.args, ((TAC_FuncArg){
+			.name = cn->as.func_def_arg.id,
+			.type = cn->as.func_def_arg.type,
+		}));
 	}
 
 	IRGenBodyCtx bctx = {0};

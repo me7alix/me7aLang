@@ -16,14 +16,86 @@ static int opt_level;
 static TargetPlatform tp;
 
 // Function context
+static TAC_Func ir_func;
 static RegAllocator regal = {0};
 static StringBuilder body = {0};
 static bool is_there_return;
 static uint stack_offset;
 static uint inst_idx;
 
+typedef struct {
+	Type type;
+	double value;
+} LitFloat;
+
+static DA(LitFloat) floats = {0};
+
+typedef struct {
+	enum {
+		REG, MEM,
+		IMM, LBL,
+	} kind;
+	Type type;
+	char text[64];
+} NasmOpr;
+
+NasmOpr nasm_oprt(int kind, Type type, char *text) {
+	NasmOpr res = {kind, type};
+	sprintf(res.text, "%s", text);
+	return res;
+}
+
+NasmOpr nasm_opr(int kind, char *text) {
+	NasmOpr res = {kind, (Type){TYPE_NULL}};
+	sprintf(res.text, "%s", text);
+	return res;
+}
+
+void nasm_mov(NasmOpr dst, NasmOpr src) {
+	size_t s = get_reg_size(dst.type);
+	char *reg = "xmm14";
+	char *pf = "";
+
+	switch (dst.type.kind) {
+	case TYPE_FLOAT:
+	case TYPE_F32:
+		pf = "ss";
+		break;
+	case TYPE_F64:
+		pf = "sd";
+		break;
+	default:
+		switch (tp) {
+		case TP_MACOS:
+		case TP_LINUX:
+			reg = RF[sysv_scr[0]][s];
+			break;
+		case TP_WINDOWS:
+			reg = RF[win_scr[0]][s];
+		}
+	}
+
+	if (
+		dst.kind == REG && src.kind == REG ||
+		dst.kind == MEM && src.kind == REG ||
+		dst.kind == REG && src.kind == MEM ||
+		dst.kind == REG && src.kind == IMM
+	) {
+		sb_appendf(&body, "  mov%s %s, %s\n", pf, dst.text, src.text);
+	} else if (
+		dst.kind == MEM && src.kind == MEM ||
+		dst.kind == MEM && src.kind == IMM
+	) {
+		sb_appendf(&body, "  mov%s %s, %s\n", pf, reg, src.text);
+		sb_appendf(&body, "  mov%s %s, %s\n", pf, dst.text, reg);
+	} else UNREACHABLE;
+}
+
 static Register *reg_allocator_get(uint vid) {
-	return (Register*)RegTable_get(&regal.allocated_ce_regs, vid);
+	int *cer = RegTable_get(&regal.allocated_ce_regs, vid);
+	if (cer) return (Register*)cer;
+	int *crr = RegTable_get(&regal.allocated_cr_regs, vid);
+	return (Register*)crr;
 }
 
 static void opr_type_to_stack(TAC_Operand t, char *buf) {
@@ -38,9 +110,10 @@ static void opr_type_to_stack(TAC_Operand t, char *buf) {
 	}
 }
 
-typedef enum {REG, MEM, IMM, LBL} OprKind;
-char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
-	static char buf[64];
+NasmOpr opr_to_nasm(TAC_Operand opr) {
+	int kind;
+	char buf[64];
+
 	switch (opr.kind) {
 	case OPR_SIZEOF: {
 		uint size = get_type_size(opr.as.size_of.vtype);
@@ -48,28 +121,32 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 			uint elemSize = get_type_size(*opr.as.size_of.vtype.as.array.elem);
 			size = elemSize * opr.as.size_of.vtype.as.array.length;
 		}
-		if (opr_kind) *opr_kind = IMM;
+		kind = IMM;
 		sprintf(buf, "%u", size);
 	} break;
 
 	case OPR_LABEL: {
-		if (opr_kind) *opr_kind = LBL;
+		kind = LBL;
 		sprintf(buf, ".L%u", opr.as.label_id);
 	} break;
 
 	case OPR_VAR: {
 		uint fo = get_struct_offset(opr);
 		char ts[32]; opr_type_to_stack(opr, ts);
-		if (opr_kind) *opr_kind = MEM;
+		kind = MEM;
 		if (opr.as.var.kind == VAR_LOCAL) {
 			uint *off = OffTable_get(&stack_table, opr.as.var.addr_id);
 			if (off) {
 				sprintf(buf, "%s[rbp - %u]", ts, *off - fo);
 			} else {
+				kind = REG;
 				size_t row = get_reg_size(opr.as.var.type);
 				Register reg = *reg_allocator_get(opr.as.var.addr_id);
-				sprintf(buf, "%s", RF[reg][row]);
-				if (opr_kind) *opr_kind = REG;
+				if (reg < XMM0) {
+					sprintf(buf, "%s", RF[reg][row]);
+				} else {
+					sprintf(buf, "%s", RFf[reg]);
+				}
 			}
 		} else if (opr.as.var.kind == VAR_ADDR) {
 			if (opr.as.var.addr_kind == VAR_LOCAL) {
@@ -94,16 +171,20 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 	} break;
 
 	case OPR_LITERAL: {
-		if (opr_kind) *opr_kind = IMM;
+		kind = IMM;
 		long long val = opr.as.literal.as.lint;
 		switch (opr.as.literal.type.kind) {
 		case TYPE_FLOAT:
+		case TYPE_F64:
 		case TYPE_F32: {
-			float x = (float)opr.as.literal.as.lfloat;
-			uint32_t bits; memcpy(&bits, &x, 4);
-			sb_appendf(&body, "  mov r10d, 0x%08X\n", bits);
-			sb_appendf(&body, "  movd xmm0, r10d\n", bits);
-			sprintf(buf, "xmm0");
+			kind = MEM;
+			size_t idx = floats.count;
+			LitFloat lit = {
+				.type = opr.as.literal.type,
+				.value = opr.as.literal.as.lfloat,
+			};
+			da_append(&floats, lit);
+			sprintf(buf, "[F%zu]", idx);
 		} break;
 		case TYPE_I32:
 		case TYPE_INT:
@@ -142,40 +223,93 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 	} break;
 
 	case OPR_FUNC_RET: {
-		if (opr_kind) *opr_kind = REG;
-		switch (opr.as.func_ret.type.kind) {
+		kind = REG;
+		Type type = opr.as.func_ret.type;
+		switch (type.kind) {
 		case TYPE_ARRAY:
 		case TYPE_STRUCT:
 			assert(!"passing arrays or structs isn't supported yet");
-		default:;
-			uint reg_size = get_reg_size(opr.as.func_ret.type);
-			sprintf(buf, "%s", RF[RAX][reg_size]);
+			break;
+		case TYPE_FLOAT:
+		case TYPE_F32:
+		case TYPE_F64:
+			sprintf(buf, "%s", RFf[XMM0]);
+			break;
+		default:
+			sprintf(buf, "%s", RF[RAX][get_reg_size(type)]);
 		}
 	} break;
 
 	case OPR_FUNC_INP: {
 		char ts[32]; opr_type_to_stack(opr, ts);
 		uint arg_id = opr.as.func_inp.arg_id;
-		size_t arg_size = get_reg_size(opr.as.func_inp.type);
-		if (opr_kind) *opr_kind = REG;
+		size_t as = get_reg_size(opr.as.func_inp.type);
 
-		switch (tp) {
-		case TP_MACOS:
-		case TP_LINUX:
-			if (arg_id >= ARR_LEN(sysv_gn_fa)) {
-				uint shadow_space = (arg_id - ARR_LEN(sysv_gn_fa)) * 8 + 48;
-				sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", RF[R10][arg_size], ts, shadow_space);
-				sprintf(buf, "%s", RF[R10][arg_size]);
-			} else {
-				sprintf(buf, "%s", RF[sysv_gn_fa[arg_id]][arg_size]);
-			} break;
-		case TP_WINDOWS:
-			if (arg_id >= ARR_LEN(win_gn_fa)) {
-				uint shadow_space = (arg_id - ARR_LEN(win_gn_fa)) * 8 + 48;
-				sb_appendf(&body, "  mov %s, %s[rbp + %u]\n", RF[R10][arg_size], ts, shadow_space);
-				sprintf(buf, "%s", RF[R10][arg_size]);
-			} else {
-				sprintf(buf, "%s", RF[win_gn_fa[arg_id]][arg_size]);
+		size_t fl_idx = 0;
+		size_t gn_idx = 0;
+		size_t sh_idx = 0;
+
+		for (size_t i = 0; i < ir_func.args.count; i++) {
+			bool is_float = is_type_float(ir_func.args.items[i].type);
+
+			switch (tp) {
+			case TP_MACOS:
+			case TP_LINUX:
+				if (
+					gn_idx >= ARR_LEN(sysv_gn_fa) && !is_float ||
+					fl_idx >= ARR_LEN(sysv_fl_fa) &&  is_float
+				) {
+					kind = MEM;
+					if (arg_id == i) {
+						uint shadow_space = sh_idx * 8 + 48;
+						sprintf(buf, "%s[rbp + %u]", ts, shadow_space);
+						break;
+					}
+					sh_idx++;
+				} else {
+					kind = REG;
+					if (is_float) {
+						if (arg_id == i) {
+							sprintf(buf, "%s", RFf[sysv_fl_fa[fl_idx]]);
+							break;
+						}
+						fl_idx++;
+					} else {
+						if (arg_id == i) {
+							sprintf(buf, "%s", RF[sysv_gn_fa[gn_idx]][as]);
+							break;
+						}
+						gn_idx++;
+					}
+				} break;
+			case TP_WINDOWS:
+				if (
+					gn_idx >= ARR_LEN(win_gn_fa) && !is_float ||
+					fl_idx >= ARR_LEN(win_fl_fa) &&  is_float
+				) {
+					kind = MEM;
+					if (arg_id == i) {
+						uint shadow_space = sh_idx * 8 + 48;
+						sprintf(buf, "%s[rbp + %u]", ts, shadow_space);
+						break;
+					}
+					sh_idx++;
+				} else {
+					kind = REG;
+					if (is_float) {
+						if (arg_id == i) {
+							sprintf(buf, "%s", RFf[win_fl_fa[fl_idx]]);
+							break;
+						}
+						fl_idx++;
+					} else {
+						if (arg_id == i) {
+							sprintf(buf, "%s", RF[win_gn_fa[gn_idx]][as]);
+							break;
+						}
+						gn_idx++;
+					}
+				} break;
 			}
 		}
 	} break;
@@ -184,34 +318,50 @@ char *opr_to_nasm(TAC_Operand opr, OprKind *opr_kind) {
 		UNREACHABLE;
 	}
 
-	return buf;
+	Type type;
+	if (opr.kind != OPR_LABEL && opr.kind != OPR_FIELD) {
+		type = tac_ir_get_opr_type(opr);
+	}
+
+	return nasm_oprt(kind, type, buf);
 }
 
 static void type_to_reg(TAC_Operand opr, char *arg1, char *arg2) {
 	Type opr_type = tac_ir_get_opr_type(opr);
 	switch (opr_type.kind) {
+	case TYPE_F64:
 	case TYPE_F32:
 	case TYPE_FLOAT:
-		sprintf(arg1, "xmm0");
-		sprintf(arg2, "xmm1");
+		sprintf(arg1, "xmm14");
+		sprintf(arg2, "xmm15");
 		break;
 	default:
-		sprintf(arg1, "%s", RF[R10][get_reg_size(opr_type)]);
-		sprintf(arg2, "%s", RF[R11][get_reg_size(opr_type)]);
+		switch (tp) {
+		case TP_MACOS:
+		case TP_LINUX:
+			sprintf(arg1, "%s", RF[sysv_scr[0]][get_reg_size(opr_type)]);
+			sprintf(arg2, "%s", RF[sysv_scr[1]][get_reg_size(opr_type)]);
+			break;
+		case TP_WINDOWS:
+			sprintf(arg1, "%s", RF[win_scr[0]][get_reg_size(opr_type)]);
+			sprintf(arg2, "%s", RF[win_scr[1]][get_reg_size(opr_type)]);
+		}
 	}
 }
 
 static void load_reserved_regs(TAC_Instruction inst, char *arg1, char *arg2) {
 	if (inst.dst.kind == OPR_LABEL) {
 		inst.dst.kind = OPR_VAR;
-		inst.dst.as.var.type = (Type){.kind = TYPE_BOOL};
+		inst.dst.as.var.type = (Type){TYPE_BOOL};
 		type_to_reg(inst.dst, arg1, arg2);
 		return;
 	}
+
 	if (inst.dst.as.var.type.kind == TYPE_BOOL) {
 		type_to_reg(inst.args[0], arg1, arg2);
 		return;
 	}
+
 	type_to_reg(inst.dst, arg1, arg2);
 }
 
@@ -220,24 +370,29 @@ static void stack_offset_add(uint off) {
 	align_up(&stack_offset, 8);
 }
 
-void nasm_gen_new_var(TAC_Instruction ci, char *dst, OprKind *opr_kind) {
+NasmOpr nasm_gen_new_var(TAC_Instruction ci) {
+	Type type = ci.dst.as.var.type;
+
 	if (opt_level > 0) {
+		Register reg;
 		reg_allocator_free(&regal, inst_idx);
-		if (ci.dst.as.var.type.kind != TYPE_STRUCT) {
-			Register reg;
+		if (is_type_integer(type)) {
+			size_t row = get_reg_size(type);
 			if (reg_allocator_push_ce(&regal, ci.dst.as.var.addr_id, (int*)&reg)) {
-				if (opr_kind) *opr_kind = REG;
-				size_t row = get_reg_size(ci.dst.as.var.type);
-				sprintf(dst, "%s", RF[reg][row]);
-				return;
+				return nasm_oprt(REG, type, RF[reg][row]);
+			}
+		} else if (is_type_float(type)) {
+			if (reg_allocator_push_cr(&regal, ci.dst.as.var.addr_id, (int*)&reg)) {
+				return nasm_oprt(REG, type, RFf[reg]);
 			}
 		}
 	}
-	if (opr_kind) *opr_kind = MEM;
+
 	char ts[32]; opr_type_to_stack(ci.dst, ts);
-	stack_offset_add(get_type_size(ci.dst.as.var.type));
+	stack_offset_add(get_type_size(type));
 	OffTable_add(&stack_table, ci.dst.as.var.addr_id, stack_offset);
-	sprintf(dst, "%s[rbp - %u]", ts, stack_offset);
+	char buf[64]; sprintf(buf, "%s[rbp - %u]", ts, stack_offset);
+	return nasm_oprt(MEM, ci.dst.as.var.type, buf);
 }
 
 void nasm_gen_func(StringBuilder *code, TAC_Func func) {
@@ -251,13 +406,33 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 	}
 
 	is_there_return = false;
+	ir_func = func;
+
 	RegTable_free(&regal.allocated_ce_regs);
+	RegTable_free(&regal.allocated_cr_regs);
+
 	regal.allocated_ce_regs = (RegTable){0};
+	regal.allocated_cr_regs = (RegTable){0};
 	regal.life_intervals = &func.var_ints;
+
 	da_reset(&regal.callee_saved_regs);
 	da_reset(&regal.available_ce_regs);
-	for (size_t i = 0; i < ARR_LEN(callee_saved); i++) {
-		da_append(&regal.available_ce_regs, callee_saved[i]);
+	da_reset(&regal.available_cr_regs);
+
+	switch (tp) {
+	case TP_MACOS:
+	case TP_LINUX:
+		for (size_t i = 0; i < ARR_LEN(sysv_fl_cr); i++)
+			da_append(&regal.available_cr_regs, sysv_fl_cr[i]);
+		for (size_t i = 0; i < ARR_LEN(sysv_gn_ce); i++)
+			da_append(&regal.available_ce_regs, sysv_gn_ce[i]);
+		break;
+	case TP_WINDOWS:
+		for (size_t i = 0; i < ARR_LEN(win_fl_cr); i++)
+			da_append(&regal.available_cr_regs, win_fl_cr[i]);
+		for (size_t i = 0; i < ARR_LEN(win_gn_ce); i++)
+			da_append(&regal.available_ce_regs, win_gn_ce[i]);
+		break;
 	}
 
 	sb_reset(&body);
@@ -279,27 +454,22 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		case OP_LESS_EQ: case OP_GREAT_EQ:
 		case OP_GREAT:   case OP_LESS:
 		case OP_EQ:      case OP_NOT_EQ: {
-			OprKind dst_kind;
-			char oprd[64];
-			nasm_gen_new_var(ci, oprd, &dst_kind);
+			NasmOpr oprd = nasm_gen_new_var(ci);
 			load_reserved_regs(ci, arg1, arg2);
 
-			OprKind opr1_kind, opr2_kind;
-			char opr1[64], opr2[64];
+			NasmOpr opr1 = opr_to_nasm(ci.args[0]);
+			if (opr1.kind != REG) {
+				sb_appendf(&body, "  mov %s, %s\n", arg1, opr1.text);
+			} else sprintf(arg1, "%s", opr1.text);
 
-			sprintf(opr1, opr_to_nasm(ci.args[0], &opr1_kind));
-			if (opr1_kind != REG) {
-				sb_appendf(&body, "  mov %s, %s\n", arg1, opr1);
-			} else sprintf(arg1, opr1);
+			NasmOpr opr2 = opr_to_nasm(ci.args[1]);
+			if (opr2.kind != REG) {
+				sb_appendf(&body, "  mov %s, %s\n", arg2, opr2.text);
+			} else sprintf(arg2, "%s", opr2.text);
 
-			sprintf(opr2, opr_to_nasm(ci.args[1], &opr2_kind));
-			if (opr2_kind != REG) {
-				sb_appendf(&body, "  mov %s, %s\n", arg2, opr2);
-			} else sprintf(arg2, opr2);
-
-			if (dst_kind != REG) {
+			if (oprd.kind != REG) {
 				sprintf(dst, "al");
-			} else sprintf(dst, "%s", oprd);
+			} else sprintf(dst, "%s", oprd.text);
 
 			if (ci.op == OP_EQ) {
 				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
@@ -321,8 +491,8 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "  setle %s\n", dst);
 			}
 
-			if (dst_kind != REG) {
-				sb_appendf(&body, "  mov %s, al\n", oprd);
+			if (oprd.kind != REG) {
+				sb_appendf(&body, "  mov %s, al\n", oprd.text);
 			}
 		} break;
 
@@ -332,33 +502,48 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		case OP_BW_AND: case OP_BW_OR:
 		case OP_BW_LS:  case OP_BW_RS:
 		case OP_BW_XOR: case OP_MOD: {
-			OprKind opr1_kind, opr2_kind, dst_kind;
-			char opr1[64], opr2[64];
-			nasm_gen_new_var(ci, dst, &dst_kind);
-			load_reserved_regs(ci, arg1, arg2);
-
-			sprintf(opr1, opr_to_nasm(ci.args[0], &opr1_kind));
-			if (dst_kind != REG) {
-				sb_appendf(&body, "  mov %s, %s\n", arg1, opr1);
-			} else sprintf(arg1, opr1);
-
-			bool is_div = ci.op == OP_DIV || ci.op == OP_MOD;
-			sprintf(opr2, opr_to_nasm(ci.args[1], &opr2_kind));
-			if (is_div || (opr2_kind != REG && dst_kind != REG)) {
-				sb_appendf(&body, "  mov %s, %s\n", arg2, opr2);
-			} else sprintf(arg2, opr2);
-
-			if (dst_kind == REG) {
-				sprintf(arg1, dst);
-				sb_appendf(&body, "  mov %s, %s\n", dst, opr1);
+			char *pf = "";
+			bool flt = false;
+			switch (ci.dst.as.var.type.kind) {
+			case TYPE_FLOAT:
+			case TYPE_F32:
+				pf = "ss";
+				flt = true;
+				break;
+			case TYPE_F64:
+				pf = "sd";
+				flt = true;
 			}
 
-			if      (ci.op == OP_ADD)    sb_appendf(&body, "  add %s, %s\n",  arg1, arg2);
-			else if (ci.op == OP_SUB)    sb_appendf(&body, "  sub %s, %s\n",  arg1, arg2);
-			else if (ci.op == OP_BW_AND) sb_appendf(&body, "  and %s, %s\n",  arg1, arg2);
-			else if (ci.op == OP_BW_OR)  sb_appendf(&body, "  or  %s, %s\n",  arg1, arg2);
-			else if (ci.op == OP_BW_XOR) sb_appendf(&body, "  xor %s, %s\n",  arg1, arg2);
-			else if (ci.op == OP_MUL)    sb_appendf(&body, "  imul %s, %s\n", arg1, arg2);
+			NasmOpr oprd = nasm_gen_new_var(ci);
+			sprintf(dst, "%s", oprd.text);
+			load_reserved_regs(ci, arg1, arg2);
+
+			NasmOpr opr1 = opr_to_nasm(ci.args[0]);
+			if (oprd.kind != REG) {
+				sb_appendf(&body, "  mov%s %s, %s\n", pf, arg1, opr1.text);
+			} else sprintf(arg1, "%s", opr1.text);
+
+			bool is_div = ci.op == OP_DIV || ci.op == OP_MOD;
+			NasmOpr opr2 = opr_to_nasm(ci.args[1]);
+			if (is_div || (opr2.kind != REG && oprd.kind != REG)) {
+				sb_appendf(&body, "  mov%s %s, %s\n", pf, arg2, opr2.text);
+			} else sprintf(arg2, "%s", opr2.text);
+
+			if (oprd.kind == REG) {
+				sprintf(arg1, "%s", dst);
+				sb_appendf(&body, "  mov%s %s, %s\n", pf, dst, opr1.text);
+			}
+
+			if      (ci.op == OP_ADD)    sb_appendf(&body, "  add%s %s, %s\n", pf,  arg1, arg2);
+			else if (ci.op == OP_SUB)    sb_appendf(&body, "  sub%s %s, %s\n", pf, arg1, arg2);
+			else if (ci.op == OP_BW_AND) sb_appendf(&body, "  and %s, %s\n", arg1, arg2);
+			else if (ci.op == OP_BW_OR)  sb_appendf(&body, "  or  %s, %s\n", arg1, arg2);
+			else if (ci.op == OP_BW_XOR) sb_appendf(&body, "  xor %s, %s\n", arg1, arg2);
+
+			else if (ci.op == OP_MUL && !flt) sb_appendf(&body, "  imul %s, %s\n", arg1, arg2);
+			else if (ci.op == OP_MUL && flt)  sb_appendf(&body, "  mul%s %s, %s\n", pf, arg1, arg2);
+			else if (ci.op == OP_DIV && flt)  sb_appendf(&body, "  div%s %s, %s\n", pf, arg1, arg2);
 
 			else if (ci.op == OP_BW_LS || ci.op == OP_BW_RS) {
 				const char *rcx = RF[RCX][get_reg_size(ci.dst.as.var.type)];
@@ -366,8 +551,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "  %s %s, cl\n", ci.op == OP_BW_LS ? "shl" : "shr", arg1);
 			}
 
-
-			else if (ci.op == OP_DIV || ci.op == OP_MOD) {
+			else if ((ci.op == OP_DIV || ci.op == OP_MOD) && !flt) {
 				char *SEI[] = {"cbw", "cwd", "cdq", "cqo"};
 				uint reg_size = get_reg_size(ci.dst.as.var.type);
 				sb_appendf(&body, "  mov %s, %s\n", RF[RAX][reg_size], arg1);
@@ -402,17 +586,19 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "  or %s, %s\n", arg1, arg2);
 			}
 
-			if (dst_kind != REG || is_div) {
-				sb_appendf(&body, "  mov %s, %s\n", dst, arg1);
+			if (oprd.kind != REG || (is_div && !flt)) {
+				sb_appendf(&body, "  mov%s %s, %s\n", pf, dst, arg1);
 			}
 		} break;
 
 		case OP_BW_NOT:
 		case OP_NOT: case OP_NEG: {
-			OprKind dst_kind;
-			nasm_gen_new_var(ci, dst, &dst_kind);
+			NasmOpr oprd = nasm_gen_new_var(ci);
+			sprintf(dst, "%s", oprd.text);
+
 			load_reserved_regs(ci, arg1, arg2);
-			sb_appendf(&body, "  mov %s, %s\n", arg1, opr_to_nasm(ci.args[0], NULL));
+			sb_appendf(&body, "  mov %s, %s\n", arg1, opr_to_nasm(ci.args[0]).text);
+
 			if (ci.op == OP_NEG)
 				sb_appendf(&body, "  neg %s\n", arg1);
 			else if (ci.op == OP_BW_NOT)
@@ -422,29 +608,38 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "  setz al\n");
 				sprintf(arg1, "al");
 			}
+
 			sb_appendf(&body, "  mov %s, %s\n", dst, arg1);
 		} break;
 
 		case OP_CAST: {
-			Type dst_type = ci.dst.as.var.type;
-			Type arg1_type; switch (ci.args[0].kind) {
-				case OPR_LITERAL: arg1_type = ci.args[0].as.literal.type; break;
-				case OPR_VAR:     arg1_type = ci.args[0].as.var.type;     break;
-				case OPR_SIZEOF:  arg1_type = ci.args[0].as.size_of.type; break;
-				default: UNREACHABLE;
-			}
+			Type dt = ci.dst.as.var.type;
+			Type st = tac_ir_get_opr_type(ci.args[0]);
 
-			nasm_gen_new_var(ci, dst, NULL);
+			NasmOpr oprd = nasm_gen_new_var(ci);
+			sprintf(dst, "%s", oprd.text);
 			load_reserved_regs(ci, arg1, arg2);
 
-			if (dst_type.kind == arg1_type.kind)
+			if (dt.kind == st.kind)
 				UNREACHABLE;
+
+			if (
+				dt.kind == TYPE_F32 && st.kind == TYPE_FLOAT ||
+				dt.kind == TYPE_FLOAT && st.kind == TYPE_F32
+			) {
+				nasm_mov(oprd, opr_to_nasm(ci.args[0]));
+				break;
+			}
 
 			int dsz = 0;
 			int ssz = 0;
 			bool ssig = false;
 
-			switch (dst_type.kind) {
+			// New flags to detect floating point casts
+			bool dst_is_float = false;
+			bool src_is_float = false;
+
+			switch (dt.kind) {
 				case TYPE_U64:
 				case TYPE_UPTR: case TYPE_POINTER: dsz = 8; break;
 				case TYPE_INT:  case TYPE_I32:     dsz = 4; break;
@@ -454,10 +649,12 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				case TYPE_U8:                      dsz = 1; break;
 				case TYPE_I16:                     dsz = 2; break;
 				case TYPE_U16:                     dsz = 2; break;
+				case TYPE_F32: case TYPE_FLOAT:    dsz = 4; dst_is_float = true; break;
+				case TYPE_F64:                     dsz = 8; dst_is_float = true; break;
 				default: UNREACHABLE;
 			}
 
-			switch (arg1_type.kind) {
+			switch (st.kind) {
 				case TYPE_U64:
 				case TYPE_UPTR: case TYPE_POINTER: ssz = 8; ssig = false; break;
 				case TYPE_INT:  case TYPE_I32:     ssz = 4; ssig = true;  break;
@@ -467,60 +664,114 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				case TYPE_U8:                      ssz = 1; ssig = false; break;
 				case TYPE_I16:                     ssz = 2; ssig = true;  break;
 				case TYPE_U16:                     ssz = 2; ssig = false; break;
+				case TYPE_F32: case TYPE_FLOAT:    ssz = 4; src_is_float = true; break;
+				case TYPE_F64:                     ssz = 8; src_is_float = true; break;
 				default: UNREACHABLE;
 			}
 
-			const char *ext_inst = ssig ? "movsx" : "movzx"; // ext inst
-			const char *DR = NULL; // dst
-			const char *SR = NULL; // src
-			const char *LR = NULL; // low
+			if (dst_is_float || src_is_float) {
+				const char *dst_text = opr_to_nasm(ci.dst).text;
+				const char *src_text = opr_to_nasm(ci.args[0]).text;
 
-			switch (dsz) {
-				case 1: DR = "al";  LR = "al";  break;
-				case 2: DR = "ax";  LR = "ax";  break;
-				case 4: DR = "eax"; LR = "eax"; break;
-				case 8: DR = "rax"; LR = "eax"; break;
-				default: UNREACHABLE;
-			}
-
-			switch (ssz) {
-				case 1: SR = "al";  break;
-				case 2: SR = "ax";  break;
-				case 4: SR = "eax"; break;
-				case 8: SR = "rax"; break;
-				default: UNREACHABLE;
-			}
-
-			if (dsz > ssz) {
-				if (ssz == 4 && dsz == 8) {
-					if (ssig) {
-						sb_appendf(&body, "  movsxd %s, %s\n", DR, opr_to_nasm(ci.args[0], NULL));
-					} else {
-						sb_appendf(&body, "  mov %s, %s\n", LR, opr_to_nasm(ci.args[0], NULL));
+				if (dst_is_float && src_is_float) {
+					// Float to Float
+					if (ssz == 4 && dsz == 8) { // F32 -> F64
+						sb_appendf(&body, "  cvtss2sd xmm0, %s\n", src_text);
+						sb_appendf(&body, "  movsd %s, xmm0\n", dst_text);
+					} else if (ssz == 8 && dsz == 4) { // F64 -> F32
+						sb_appendf(&body, "  cvtsd2ss xmm0, %s\n", src_text);
+						sb_appendf(&body, "  movss %s, xmm0\n", dst_text);
 					}
-				} else {
-					sb_appendf(&body, "  %s %s, %s\n", ext_inst, DR, opr_to_nasm(ci.args[0], NULL));
+				} else if (dst_is_float && !src_is_float) {
+					// Integer to Float
+					if (ssz < 4) {
+						sb_appendf(&body, "  %s eax, %s\n", ssig ? "movsx" : "movzx", src_text);
+						src_text = "eax";
+					} else if (ssz == 4) {
+						sb_appendf(&body, "  mov eax, %s\n", src_text);
+						src_text = "eax";
+					} else if (ssz == 8) {
+						sb_appendf(&body, "  mov rax, %s\n", src_text);
+						src_text = "rax";
+					}
+
+					const char *inst = (dsz == 8) ? "cvtsi2sd" : "cvtsi2ss";
+					sb_appendf(&body, "  %s xmm0, %s\n", inst, src_text);
+
+					const char *mov_inst = (dsz == 8) ? "movsd" : "movss";
+					sb_appendf(&body, "  %s %s, xmm0\n", mov_inst, dst_text);
+
+				} else if (!dst_is_float && src_is_float) {
+					// Float to Integer
+					const char *inst = (ssz == 8) ? "cvttsd2si" : "cvttss2si";
+					const char *int_reg = (dsz == 8) ? "rax" : "eax";
+
+					sb_appendf(&body, "  %s %s, %s\n", inst, int_reg, src_text);
+
+					// Move result to the properly sized destination
+					const char *sub_reg = NULL;
+					switch (dsz) {
+						case 1: sub_reg = "al";  break;
+						case 2: sub_reg = "ax";  break;
+						case 4: sub_reg = "eax"; break;
+						case 8: sub_reg = "rax"; break;
+					}
+					sb_appendf(&body, "  mov %s, %s\n", dst_text, sub_reg);
 				}
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), DR);
-			} else if (dsz < ssz) {
-				sb_appendf(&body, "  mov %s, %s\n", SR, opr_to_nasm(ci.args[0], NULL));
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), LR);
 			} else {
-				sb_appendf(&body, "  mov %s, %s\n", DR, opr_to_nasm(ci.args[0], NULL));
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), DR);
+				const char *ext_inst = ssig ? "movsx" : "movzx"; // ext inst
+				const char *DR = NULL; // dst
+				const char *SR = NULL; // src
+				const char *LR = NULL; // low
+
+				switch (dsz) {
+					case 1: DR = "al";  LR = "al";  break;
+					case 2: DR = "ax";  LR = "ax";  break;
+					case 4: DR = "eax"; LR = "eax"; break;
+					case 8: DR = "rax"; LR = "eax"; break;
+					default: UNREACHABLE;
+				}
+
+				switch (ssz) {
+					case 1: SR = "al";  break;
+					case 2: SR = "ax";  break;
+					case 4: SR = "eax"; break;
+					case 8: SR = "rax"; break;
+					default: UNREACHABLE;
+				}
+
+				if (dsz > ssz) {
+					if (ssz == 4 && dsz == 8) {
+						if (ssig) {
+							sb_appendf(&body, "  movsxd %s, %s\n", DR, opr_to_nasm(ci.args[0]).text);
+						} else {
+							sb_appendf(&body, "  mov %s, %s\n", LR, opr_to_nasm(ci.args[0]).text);
+						}
+					} else {
+						sb_appendf(&body, "  %s %s, %s\n", ext_inst, DR, opr_to_nasm(ci.args[0]).text);
+					}
+					sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst).text, DR);
+				} else if (dsz < ssz) {
+					sb_appendf(&body, "  mov %s, %s\n", SR, opr_to_nasm(ci.args[0]).text);
+					sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst).text, LR);
+				} else {
+					sb_appendf(&body, "  mov %s, %s\n", DR, opr_to_nasm(ci.args[0]).text);
+					sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst).text, DR);
+				}
 			}
 		} break;
 
 		case OP_ASSIGN: {
+			NasmOpr oprd;
 			bool fst_asg = false;
 			if (ci.dst.as.var.kind == VAR_LOCAL) {
 				uint *off = OffTable_get(&stack_table, ci.dst.as.var.addr_id);
 				Register *reg = reg_allocator_get(ci.dst.as.var.addr_id);
 				if (!off && !reg) {
 					fst_asg = true;
-					nasm_gen_new_var(ci, dst, NULL);
-				}
-			}
+					oprd = nasm_gen_new_var(ci);
+				} else oprd = opr_to_nasm(ci.dst);
+			} else oprd = opr_to_nasm(ci.dst);
 
 			if (ci.dst.as.var.type.kind == TYPE_ARRAY && fst_asg) {
 				load_reserved_regs(ci, arg1, arg2);
@@ -529,30 +780,22 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					ci.dst.as.var.type.as.array.length);
 
 				sb_appendf(&body, "  lea %s, [rbp - %u]\n", arg1, stack_offset);
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), arg1);
+				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst).text, arg1);
 			}
 
 			if (ci.args[0].kind != OPR_NULL) {
 				if (tac_ir_get_opr_type(ci.dst).kind == TYPE_STRUCT) {
-					sb_appendf(&body, "  lea rsi, %s\n", opr_to_nasm(ci.args[0], NULL));
-					sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst, NULL));
+					sb_appendf(&body, "  lea rsi, %s\n", opr_to_nasm(ci.args[0]).text);
+					sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst).text);
 					sb_appendf(&body, "  mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
 					sb_appendf(&body, "  rep movsb\n");
 				} else {
-					load_reserved_regs(ci, arg1, arg2);
-					OprKind dst_kind;
-					sprintf(dst, "%s", opr_to_nasm(ci.dst, &dst_kind));
-					if (dst_kind != REG) {
-						sb_appendf(&body, "  mov %s, %s\n", arg2, opr_to_nasm(ci.args[0], NULL));
-						sb_appendf(&body, "  mov %s, %s\n", dst, arg2);
-					} else {
-						sb_appendf(&body, "  mov %s, %s\n", dst, opr_to_nasm(ci.args[0], NULL));
-					}
+					nasm_mov(oprd, opr_to_nasm(ci.args[0]));
 				}
 			} else {
 				if (tac_ir_get_opr_type(ci.dst).kind == TYPE_STRUCT) {
 					sb_appendf(&body, "  xor rax, rax\n");
-					sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst, NULL));
+					sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst).text);
 					sb_appendf(&body, "  mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
 					sb_appendf(&body, "  rep stosb\n");
 				}
@@ -560,24 +803,26 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		} break;
 
 		case OP_DEREF: {
-			nasm_gen_new_var(ci, dst, NULL);
+			NasmOpr oprd = nasm_gen_new_var(ci);
+			sprintf(dst, "%s", oprd.text);
 			char ts[32]; opr_type_to_stack(ci.dst, ts);
 
 			if (ci.dst.as.var.type.kind != TYPE_STRUCT) {
 				load_reserved_regs(ci, arg1, arg2);
-				sb_appendf(&body, "  mov rax, %s\n",     opr_to_nasm(ci.args[0], NULL));
+				sb_appendf(&body, "  mov rax, %s\n", opr_to_nasm(ci.args[0]).text);
 				sb_appendf(&body, "  mov %s, %s[rax]\n", arg1, ts);
-				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst, NULL), arg1);
+				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst).text, arg1);
 			} else {
-				sb_appendf(&body, "  mov rsi, %s\n", opr_to_nasm(ci.args[0], NULL));
-				sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst, NULL));
+				sb_appendf(&body, "  mov rsi, %s\n", opr_to_nasm(ci.args[0]).text);
+				sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst).text);
 				sb_appendf(&body, "  mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
 				sb_appendf(&body, "  rep movsb\n");
 			}
 		} break;
 
 		case OP_REF: {
-			nasm_gen_new_var(ci, dst, NULL);
+			NasmOpr oprd = nasm_gen_new_var(ci);
+			sprintf(dst, "%s", oprd.text);
 			size_t field_off = get_struct_offset(ci.args[0]);
 
 			if (ci.args[0].as.var.kind == VAR_ADDR) {
@@ -597,42 +842,48 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "  add rax, %zu\n", field_off);
 			}
 
-			sb_appendf(&body, "  mov %s, rax\n", opr_to_nasm(ci.dst, NULL));
+			sb_appendf(&body, "  mov %s, rax\n", opr_to_nasm(ci.dst).text);
 		} break;
 
 		case OP_JUMP_IF_NOT: {
 			load_reserved_regs(ci, arg1, arg2);
-			sb_appendf(&body, "  mov %s, %s\n", arg1, opr_to_nasm(ci.args[0], NULL));
+			sb_appendf(&body, "  mov %s, %s\n", arg1, opr_to_nasm(ci.args[0]).text);
 			sb_appendf(&body, "  cmp %s, 0\n", arg1);
-			sb_appendf(&body, "  je %s\n", opr_to_nasm(ci.dst, NULL));
+			sb_appendf(&body, "  je %s\n", opr_to_nasm(ci.dst).text);
 		} break;
 
 		case OP_LABEL: {
-			sb_appendf(&body, "%s:\n", opr_to_nasm(ci.args[0], NULL));
+			sb_appendf(&body, "%s:\n", opr_to_nasm(ci.args[0]).text);
 		} break;
 
 		case OP_JUMP: {
-			sb_appendf(&body, "  jmp %s\n", opr_to_nasm(ci.dst, NULL));
+			sb_appendf(&body, "  jmp %s\n", opr_to_nasm(ci.dst).text);
 		} break;
 
 		case OP_RETURN: {
 			if (ci.args[0].kind != OPR_NULL) {
 				switch (func.type.kind) {
-				case TYPE_STRUCT:
 				case TYPE_ARRAY:
+				case TYPE_STRUCT:
 					assert(!"returning arrays/structs isn't supported yet");
+					break;
+				case TYPE_FLOAT:
+				case TYPE_F32:
+				case TYPE_F64:
+					nasm_mov(nasm_oprt(REG, func.type, RFf[XMM0]), opr_to_nasm(ci.args[0]));
+					break;
 				default:;
-					uint reg_size = get_reg_size(func.type);
-					sb_appendf(&body, "  mov %s, %s\n", RF[RAX][reg_size], opr_to_nasm(ci.args[0], NULL));
+					size_t row = get_reg_size(func.type);
+					nasm_mov(nasm_oprt(REG, func.type, RF[RAX][row]), opr_to_nasm(ci.args[0]));
 				}
 			}
-
 			is_there_return = true;
 			sb_appendf(&body, "  jmp .FE\n");
 		} break;
 
 		case OP_FUNC_CALL: {
 			bool is_shadow_space_used = false;
+
 			for (size_t i = 0; ci.args[i].kind != OPR_NULL; i++) {
 				if (i >= ARR_LEN(sysv_gn_fa)) {
 					is_shadow_space_used = true;
@@ -640,27 +891,55 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					break;
 				}
 			}
+
+			size_t gn_idx = 0;
+			size_t fl_idx = 0;
+			size_t sh_idx = 0;
+
 			for (size_t i = 0; ci.args[i].kind != OPR_NULL; i++) {
 				char ts[32]; opr_type_to_stack(ci.args[i], ts);
-				size_t arg_size = get_reg_size(tac_ir_get_opr_type(ci.args[i]));
+				size_t as = get_reg_size(tac_ir_get_opr_type(ci.args[i]));
+				Type at = tac_ir_get_opr_type(ci.args[i]);
+				bool is_float = is_type_float(at);
+
 				switch (tp) {
 				case TP_MACOS:
 				case TP_LINUX:
-					if (i >= ARR_LEN(sysv_gn_fa)) {
-						sb_appendf(&body, "  mov %s, %s\n", RF[R10][arg_size], opr_to_nasm(ci.args[i], NULL));
-						uint shadow_space = (i - ARR_LEN(sysv_gn_fa)) * 8 + 32;
-						sb_appendf(&body, "  mov %s[rsp + %u], %s\n", ts, shadow_space, RF[R10][arg_size]);
+					if (
+						gn_idx >= ARR_LEN(sysv_gn_fa) && !is_float ||
+						fl_idx >= ARR_LEN(sysv_fl_fa) &&  is_float
+					) {
+						uint shadow_space = sh_idx++ * 8 + 32;
+						char *addr = tsprintf("%s[rsp + %u]", ts, shadow_space);
+						NasmOpr dst = nasm_oprt(MEM, at, addr);
+						nasm_mov(dst, opr_to_nasm(ci.args[i]));
 					} else {
-						sb_appendf(&body, "  mov %s, %s\n", RF[sysv_gn_fa[i]][arg_size], opr_to_nasm(ci.args[i], NULL));
+						if (is_float) {
+							NasmOpr dst = nasm_oprt(REG, at, RFf[sysv_fl_fa[fl_idx++]]);
+							nasm_mov(dst, opr_to_nasm(ci.args[i]));
+						} else {
+							NasmOpr dst = nasm_oprt(REG, at, RF[sysv_gn_fa[gn_idx++]][as]);
+							nasm_mov(dst, opr_to_nasm(ci.args[i]));
+						}
 					} break;
 				case TP_WINDOWS:
-					if (i >= ARR_LEN(win_gn_fa)) {
-						sb_appendf(&body, "  mov %s, %s\n", RF[R10][arg_size], opr_to_nasm(ci.args[i], NULL));
-						uint shadow_space = (i - ARR_LEN(win_gn_fa)) * 8 + 32;
-						sb_appendf(&body, "  mov %s[rsp + %u], %s\n", ts, shadow_space, RF[R10][arg_size]);
+					if (
+						gn_idx >= ARR_LEN(win_gn_fa) && !is_float ||
+						fl_idx >= ARR_LEN(win_fl_fa) &&  is_float
+					) {
+						uint shadow_space = sh_idx++ * 8 + 32;
+						char *addr = tsprintf("%s[rsp + %u]", ts, shadow_space);
+						NasmOpr dst = nasm_oprt(MEM, at, addr);
+						nasm_mov(dst, opr_to_nasm(ci.args[i]));
 					} else {
-						sb_appendf(&body, "  mov %s, %s\n", RF[win_gn_fa[i]][arg_size], opr_to_nasm(ci.args[i], NULL));
-					}
+						if (is_float) {
+							NasmOpr dst = nasm_oprt(REG, at, RFf[win_fl_fa[fl_idx++]]);
+							nasm_mov(dst, opr_to_nasm(ci.args[i]));
+						} else {
+							NasmOpr dst = nasm_oprt(REG, at, RF[win_gn_fa[gn_idx++]][as]);
+							nasm_mov(dst, opr_to_nasm(ci.args[i]));
+						}
+					} break;
 				}
 			}
 			sb_appendf(&body, "  call %s%s\n", (tp == TP_MACOS ? "_" : ""), ci.dst.as.name);
@@ -716,11 +995,13 @@ char *nasm_gen_prog(TAC_Program *prog, TargetPlatform _tp, int _opt_level) {
 	opt_level = _opt_level;
 	tp = _tp;
 
+	sb_appendf(&code, "DEFAULT REL\n\n");
+
 	da_foreach(TAC_Extern, ext, &prog->externs)
 		sb_appendf(&code, "extern %s\n", ext->name);
 	sb_appendf(&code, "\n");
 
-	sb_appendf(&code, "DEFAULT REL\nsection .data\n");
+	sb_appendf(&code, "section .data\n");
 	uint uniq_data_off = 0;
 
 	da_foreach (TAC_GlobalVar, g, &prog->globals) {
@@ -780,6 +1061,17 @@ char *nasm_gen_prog(TAC_Program *prog, TargetPlatform _tp, int _opt_level) {
 	sb_appendf(&code, "section .text\n");
 	for (size_t i = 0; i < prog->funcs.count; i++) {
 		nasm_gen_func(&code, da_get(&prog->funcs, i));
+	}
+
+	if (floats.count > 0) {
+		sb_appendf(&code, "section .data\n");
+		for (size_t i = 0; i < floats.count; i++) {
+			size_t s = get_reg_size(floats.items[i].type);
+			sb_appendf(&code, "  F%zu %s %lf\n", i,
+				(char*[]){"db", "dw", "dd", "dq"}[s],
+				floats.items[i].value
+			);
+		}
 	}
 
 	return code.items;

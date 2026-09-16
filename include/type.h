@@ -152,4 +152,15 @@ static bool is_type_integer(Type a) {
 	}
 }
 
+static bool is_type_float(Type a) {
+	switch (a.kind) {
+	case TYPE_FLOAT:
+	case TYPE_F32:
+	case TYPE_F64:
+		return true;
+	default:
+		return false;
+	}
+}
+
 #endif //TYPE_H

@@ -77,6 +77,7 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 			break;
 		case TYPE_FLOAT:
 		case TYPE_F32:
+		case TYPE_F64:
 			sprintf(buf, "%f:%s", (float) opr.as.literal.as.lfloat, tac_ir_dump_opr_type(opr));
 			break;
 		default:
