@@ -231,7 +231,10 @@ Hello World!
 :b shell 83
 ./build/release/m7c -O0 -I ./stdlib -o build/prog examples/float.m7 && ./build/prog
 :i returncode 0
-:b stdout 20
+:b stdout 53
+a = 21.299999
+b = 3.300000
+a > b
 24.599998
 10.700000
 
@@ -240,7 +243,10 @@ Hello World!
 :b shell 83
 ./build/release/m7c -O1 -I ./stdlib -o build/prog examples/float.m7 && ./build/prog
 :i returncode 0
-:b stdout 20
+:b stdout 53
+a = 21.299999
+b = 3.300000
+a > b
 24.599998
 10.700000
 
