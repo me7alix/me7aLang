@@ -131,9 +131,9 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *src_type) {
 			}
 		}
 		switch (expr->as.literal.kind) {
-		case LIT_CHAR:  expr->as.literal.type = (Type) {.kind =   TYPE_U8}; break;
-		case LIT_FLOAT: expr->as.literal.type = (Type) {.kind =  TYPE_F32}; break;
-		case LIT_BOOL:  expr->as.literal.type = (Type) {.kind = TYPE_BOOL}; break;
+		case LIT_CHAR:  expr->as.literal.type = (Type) {.kind = TYPE_U8};    break;
+		case LIT_FLOAT: expr->as.literal.type = (Type) {.kind = TYPE_FLOAT}; break;
+		case LIT_BOOL:  expr->as.literal.type = (Type) {.kind = TYPE_BOOL};  break;
 		case LIT_INT:
 			if(expr->as.literal.type.kind == TYPE_NULL) {
 				expr->as.literal.type = (Type){.kind = TYPE_INT};
@@ -260,6 +260,21 @@ Type expr_analysis(Parser *p, AST_Node *expr, Type *src_type) {
 				AST_Node *not_lit = le->kind != AST_LITERAL ? le : re;
 				lit->as.literal.type = parser_get_type(p, not_lit);
 			} else throw_types_mismatch(expr->loc, lt, rt);
+		}
+
+		if (is_type_float(expr->as.ebin.type)) {
+			switch (expr->as.ebin.op) {
+			case AST_OP_EQ:      case AST_OP_NOT_EQ:
+			case AST_OP_LESS_EQ: case AST_OP_GREAT_EQ:
+			case AST_OP_GREAT:   case AST_OP_LESS:
+			case AST_OP_ADD:     case AST_OP_MUL:
+			case AST_OP_DIV:     case AST_OP_SUB:
+			case AST_OP_ADD_EQ:  case AST_OP_MUL_EQ:
+			case AST_OP_DIV_EQ:  case AST_OP_SUB_EQ:
+				break;
+			default:
+				throw_error(expr->loc, "invalid operation on floating-point numbers");
+			}
 		}
 
 		switch (expr->as.ebin.op) {

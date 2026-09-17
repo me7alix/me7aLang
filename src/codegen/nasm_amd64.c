@@ -454,17 +454,31 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		case OP_LESS_EQ: case OP_GREAT_EQ:
 		case OP_GREAT:   case OP_LESS:
 		case OP_EQ:      case OP_NOT_EQ: {
+			char *cmp = "cmp";
+			char *pf = "";
+			switch (ci.args[0].as.var.type.kind) {
+			case TYPE_FLOAT:
+			case TYPE_F32:
+				cmp = "ucomiss";
+				pf = "ss";
+				break;
+			case TYPE_F64:
+				cmp = "ucomisd";
+				pf = "sd";
+				break;
+			}
+
 			NasmOpr oprd = nasm_gen_new_var(ci);
 			load_reserved_regs(ci, arg1, arg2);
 
 			NasmOpr opr1 = opr_to_nasm(ci.args[0]);
 			if (opr1.kind != REG) {
-				sb_appendf(&body, "  mov %s, %s\n", arg1, opr1.text);
+				sb_appendf(&body, "  mov%s %s, %s\n", pf, arg1, opr1.text);
 			} else sprintf(arg1, "%s", opr1.text);
 
 			NasmOpr opr2 = opr_to_nasm(ci.args[1]);
 			if (opr2.kind != REG) {
-				sb_appendf(&body, "  mov %s, %s\n", arg2, opr2.text);
+				sb_appendf(&body, "  mov%s %s, %s\n", pf, arg2, opr2.text);
 			} else sprintf(arg2, "%s", opr2.text);
 
 			if (oprd.kind != REG) {
@@ -472,22 +486,22 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			} else sprintf(dst, "%s", oprd.text);
 
 			if (ci.op == OP_EQ) {
-				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
+				sb_appendf(&body, "  %s %s, %s\n", cmp, arg1, arg2);
 				sb_appendf(&body, "  sete %s\n", dst);
 			} else if (ci.op == OP_NOT_EQ) {
-				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
+				sb_appendf(&body, "  %s %s, %s\n", cmp, arg1, arg2);
 				sb_appendf(&body, "  setne %s\n", dst);
 			} else if (ci.op == OP_GREAT) {
-				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
+				sb_appendf(&body, "  %s %s, %s\n", cmp, arg1, arg2);
 				sb_appendf(&body, "  setg %s\n", dst);
 			} else if (ci.op == OP_LESS) {
-				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
+				sb_appendf(&body, "  %s %s, %s\n", cmp, arg1, arg2);
 				sb_appendf(&body, "  setl %s\n", dst);
 			} else if (ci.op == OP_GREAT_EQ) {
-				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
+				sb_appendf(&body, "  %s %s, %s\n", cmp, arg1, arg2);
 				sb_appendf(&body, "  setge %s\n", dst);
 			} else if (ci.op == OP_LESS_EQ) {
-				sb_appendf(&body, "  cmp %s, %s\n", arg1, arg2);
+				sb_appendf(&body, "  %s %s, %s\n", cmp, arg1, arg2);
 				sb_appendf(&body, "  setle %s\n", dst);
 			}
 

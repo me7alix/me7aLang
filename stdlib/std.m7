@@ -22,3 +22,7 @@ macro do_while(expr, body) {
         if !(expr) do break
     }
 }
+
+macro va_flt(flt) {
+	((flt):f64)\
+}
