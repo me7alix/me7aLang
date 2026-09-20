@@ -63,6 +63,7 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 		case TYPE_BOOL:
 			sprintf(buf, "%d:%s", (i8) opr.as.literal.as.lint, tac_ir_dump_opr_type(opr));
 			break;
+		case TYPE_POINTER:
 		case TYPE_U64:
 		case TYPE_UPTR:
 			sprintf(buf, "%llu:%s", (u64) opr.as.literal.as.lint, tac_ir_dump_opr_type(opr));
@@ -70,7 +71,7 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 		case TYPE_ARRAY:
 			sprintf(buf, "arr");
 			break;
-		case TYPE_POINTER:
+		case TYPE_ENUM:
 		case TYPE_IPTR:
 		case TYPE_I64:
 			sprintf(buf, "%lli:%s", opr.as.literal.as.lint, tac_ir_dump_opr_type(opr));
@@ -122,10 +123,11 @@ void tac_ir_dump_inst(TAC_Instruction inst, char *res) {
 		case OP_MOD:         sprintf(res, "    var%s = %s %s %s", dst, arg1, "%", arg2);   break;
 		case OP_ASSIGN:      sprintf(res, "    var%s = %s", dst, arg1);                    break;
 		case OP_RETURN:      sprintf(res, "    return %s", arg1);                          break;
+		case OP_FUNC_CALL_C_VA:
 		case OP_FUNC_CALL: {
 			char buf[128];
 			tac_ir_dump_opr(inst.dst, dst);
-			sprintf(res, "    call %s", dst);
+			sprintf(res, "    call%s %s", inst.op == OP_FUNC_CALL_C_VA ? "_c_va" : "", dst);
 
 			for (size_t i = 0; inst.args[i].kind != OPR_NULL; i++) {
 				tac_ir_dump_opr(inst.args[i], arg1);

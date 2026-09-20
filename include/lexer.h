@@ -12,10 +12,15 @@ typedef enum {
 
 	TOK_EXTERN, TOK_STATIC,
 	TOK_STRUCT, TOK_FUNC,
+	TOK_UNION,
+
+	TOK_SWITCH,
+	TOK_CASE,
 
 	TOK_ASSIGN,
 	TOK_SEMI,
 	TOK_COL,
+	TOK_ENUM,
 
 	TOK_EQ,
 	TOK_STAR, TOK_AMP,
@@ -66,8 +71,12 @@ static struct {
 	{ "if",       TOK_IF_SYM     },
 	{ "else",     TOK_ELSE_SYM   },
 	{ "struct",   TOK_STRUCT     },
+	{ "union",    TOK_UNION      },
 	{ "impl",     TOK_IMPL       },
 	{ "extern",   TOK_EXTERN     },
+	{ "switch",   TOK_SWITCH     },
+	{ "case",     TOK_CASE       },
+	{ "enum",     TOK_ENUM       },
 	{ "true",     TOK_TRUE       },
 	{ "false",    TOK_FALSE      },
 	{ "break",    TOK_BREAK      },

@@ -19,6 +19,7 @@ typedef enum {
 	OP_LABEL, OP_FUNC_CALL,
 	OP_JUMP, OP_JUMP_IF_NOT,
 	OP_ASSIGN, OP_RETURN,
+	OP_FUNC_CALL_C_VA,
 } TAC_OpCode;
 
 typedef enum {

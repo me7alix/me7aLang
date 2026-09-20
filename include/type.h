@@ -23,6 +23,8 @@ typedef enum {
 	TYPE_FUNCTION,
 	// user types
 	TYPE_STRUCT,
+	TYPE_UNION,
+	TYPE_ENUM,
 } TypeKind;
 
 typedef struct AST_Node AST_Node;
@@ -64,13 +66,27 @@ typedef struct {
 	} as;
 } Member;
 
+typedef DA(Member) Members;
+
+typedef struct {
+	char *id;
+	long long value;
+} EnumVal;
+
 struct UserType {
 	TypeKind kind;
 	char *id;
 	union {
 		struct {
-			DA(Member) members;
+			Members members;
 		} ustruct;
+		struct {
+			Members members;
+		} uunion;
+		struct {
+			Type type;
+			DA(EnumVal) values;
+		} uenum;
 	} as;
 };
 
@@ -86,7 +102,9 @@ static bool compare_types(Type a, Type b) {
 			!(get_pointer_base(a)->kind == TYPE_NULL ||
 			get_pointer_base(b)->kind == TYPE_NULL)
 		) return false;
-	} else if (a.kind == TYPE_FUNCTION && b.kind == TYPE_FUNCTION) {
+	} else if (a.kind != b.kind) {
+		return false;
+	} else if (a.kind == TYPE_FUNCTION) {
 		if (!compare_types(*a.as.func.ret, *b.as.func.ret)) return false;
 		if (a.as.func.args.count != b.as.func.args.count)   return false;
 		for (size_t i = 0; i < a.as.func.args.count; i++) {
@@ -94,8 +112,10 @@ static bool compare_types(Type a, Type b) {
 				return false;
 			}
 		}
-	} else if (a.kind != b.kind) {
-		return false;
+	} else if (a.kind == TYPE_STRUCT || a.kind == TYPE_UNION || a.kind == TYPE_ENUM) {
+		if (strcmp(a.as.user->id, b.as.user->id) != 0) {
+			return false;
+		}
 	}
 	return true;
 }
@@ -131,6 +151,13 @@ static void render_type(StringBuilder *sb, Type t) {
 		break;
 	case TYPE_STRUCT:
 		sb_appendf(sb, "%s", t.as.user->id);
+		break;
+	case TYPE_UNION:
+		sb_appendf(sb, "%s", t.as.user->id);
+		break;
+	case TYPE_ENUM:
+		sb_appendf(sb, "%s:", t.as.user->id);
+		render_type(sb, t.as.user->as.uenum.type);
 	}
 }
 

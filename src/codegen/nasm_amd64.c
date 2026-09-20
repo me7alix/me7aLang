@@ -101,6 +101,7 @@ static Register *reg_allocator_get(uint vid) {
 static void opr_type_to_stack(TAC_Operand t, char *buf) {
 	static char *types[] = {"byte", "word", "dword", "qword"};
 	switch (tac_ir_get_opr_type(t).kind) {
+	case TYPE_UNION:
 	case TYPE_STRUCT:
 		sprintf(buf, "");
 		break;
@@ -211,6 +212,7 @@ NasmOpr opr_to_nasm(TAC_Operand opr) {
 		case TYPE_U64:
 			sprintf(buf, "%llu", val);
 			break;
+		case TYPE_ENUM:
 		case TYPE_ARRAY:
 		case TYPE_POINTER:
 		case TYPE_IPTR:
@@ -376,7 +378,7 @@ NasmOpr nasm_gen_new_var(TAC_Instruction ci) {
 	if (opt_level > 0) {
 		Register reg;
 		reg_allocator_free(&regal, inst_idx);
-		if (is_type_integer(type)) {
+		if (is_type_integer(type) || is_pointer(type)) {
 			size_t row = get_reg_size(type);
 			if (reg_allocator_push_ce(&regal, ci.dst.as.var.addr_id, (int*)&reg)) {
 				return nasm_oprt(REG, type, RF[reg][row]);
@@ -634,9 +636,6 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			sprintf(dst, "%s", oprd.text);
 			load_reserved_regs(ci, arg1, arg2);
 
-			if (dt.kind == st.kind)
-				UNREACHABLE;
-
 			if (
 				dt.kind == TYPE_F32 && st.kind == TYPE_FLOAT ||
 				dt.kind == TYPE_FLOAT && st.kind == TYPE_F32
@@ -798,7 +797,8 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			}
 
 			if (ci.args[0].kind != OPR_NULL) {
-				if (tac_ir_get_opr_type(ci.dst).kind == TYPE_STRUCT) {
+				Type type = tac_ir_get_opr_type(ci.dst);
+				if (type.kind == TYPE_STRUCT || type.kind == TYPE_UNION) {
 					sb_appendf(&body, "  lea rsi, %s\n", opr_to_nasm(ci.args[0]).text);
 					sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst).text);
 					sb_appendf(&body, "  mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
@@ -807,7 +807,8 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					nasm_mov(oprd, opr_to_nasm(ci.args[0]));
 				}
 			} else {
-				if (tac_ir_get_opr_type(ci.dst).kind == TYPE_STRUCT) {
+				Type type = tac_ir_get_opr_type(ci.dst);
+				if (type.kind == TYPE_STRUCT || type.kind == TYPE_UNION) {
 					sb_appendf(&body, "  xor rax, rax\n");
 					sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst).text);
 					sb_appendf(&body, "  mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
@@ -821,7 +822,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			sprintf(dst, "%s", oprd.text);
 			char ts[32]; opr_type_to_stack(ci.dst, ts);
 
-			if (ci.dst.as.var.type.kind != TYPE_STRUCT) {
+			if (ci.dst.as.var.type.kind != TYPE_STRUCT || ci.dst.as.var.type.kind != TYPE_UNION) {
 				load_reserved_regs(ci, arg1, arg2);
 				sb_appendf(&body, "  mov rax, %s\n", opr_to_nasm(ci.args[0]).text);
 				sb_appendf(&body, "  mov %s, %s[rax]\n", arg1, ts);
@@ -895,6 +896,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			sb_appendf(&body, "  jmp .FE\n");
 		} break;
 
+		case OP_FUNC_CALL_C_VA:
 		case OP_FUNC_CALL: {
 			bool is_shadow_space_used = false;
 
@@ -909,6 +911,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			size_t gn_idx = 0;
 			size_t fl_idx = 0;
 			size_t sh_idx = 0;
+			size_t flt_cnt = 0;
 
 			for (size_t i = 0; ci.args[i].kind != OPR_NULL; i++) {
 				char ts[32]; opr_type_to_stack(ci.args[i], ts);
@@ -929,6 +932,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						nasm_mov(dst, opr_to_nasm(ci.args[i]));
 					} else {
 						if (is_float) {
+							flt_cnt++;
 							NasmOpr dst = nasm_oprt(REG, at, RFf[sysv_fl_fa[fl_idx++]]);
 							nasm_mov(dst, opr_to_nasm(ci.args[i]));
 						} else {
@@ -947,6 +951,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 						nasm_mov(dst, opr_to_nasm(ci.args[i]));
 					} else {
 						if (is_float) {
+							flt_cnt++;
 							NasmOpr dst = nasm_oprt(REG, at, RFf[win_fl_fa[fl_idx++]]);
 							nasm_mov(dst, opr_to_nasm(ci.args[i]));
 						} else {
@@ -956,6 +961,11 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 					} break;
 				}
 			}
+
+			if (ci.op == OP_FUNC_CALL_C_VA && flt_cnt > 0) {
+				sb_appendf(&body, "  mov eax, %zu\n", flt_cnt);
+			}
+
 			sb_appendf(&body, "  call %s%s\n", (tp == TP_MACOS ? "_" : ""), ci.dst.as.name);
 			if (is_shadow_space_used) sb_appendf(&body, "  add rsp, 32\n");
 		} break;

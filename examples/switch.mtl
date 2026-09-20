@@ -1,0 +1,21 @@
+import "std.mtl"
+
+fn main() {
+	while true {
+		letter: u8
+
+		printf("Enter a letter: ")
+		scanf(" %c", &letter)
+
+		switch letter {
+		case 'a'
+			printf("I got 'a'\n")
+		case 'b'
+			printf("I got 'b'\n")
+		case 'c', 'd'
+			printf("I got 'c' or 'd'\n")
+		case
+			printf("I got something\n")
+		}
+	}
+}

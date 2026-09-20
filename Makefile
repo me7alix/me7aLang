@@ -22,8 +22,8 @@ endif
 
 DEBUG_DIR   := build/debug
 RELEASE_DIR := build/release
-OUT_DEBUG   := $(DEBUG_DIR)/m7c$(EXE)
-OUT_RELEASE := $(RELEASE_DIR)/m7c$(EXE)
+OUT_DEBUG   := $(DEBUG_DIR)/mtlc$(EXE)
+OUT_RELEASE := $(RELEASE_DIR)/mtlc$(EXE)
 
 OBJS_DEBUG   := $(patsubst %.c,$(DEBUG_DIR)/%.o,$(SRCS))
 OBJS_RELEASE := $(patsubst %.c,$(RELEASE_DIR)/%.o,$(SRCS))

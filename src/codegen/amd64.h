@@ -95,6 +95,8 @@ static size_t get_reg_size(Type t) {
 	case TYPE_I64:
 	case TYPE_U64:
 		return 3;
+	case TYPE_ENUM:
+		return get_reg_size(t.as.user->as.uenum.type);
 	default:
 		UNREACHABLE;
 	}
@@ -105,9 +107,13 @@ static void align_up(uint *x, uint a) {
 }
 
 static uint get_type_alignment(Type type) {
-	if (type.kind == TYPE_STRUCT) {
+	if (type.kind == TYPE_STRUCT || type.kind == TYPE_UNION) {
 		uint max_al = 0;
-		da_foreach (Member, member, &type.as.user->as.ustruct.members) {
+		Members *members =
+			type.kind == TYPE_STRUCT ?
+			&type.as.user->as.ustruct.members :
+			&type.as.user->as.uunion.members;
+		da_foreach (Member, member, members) {
 			if (member->kind == MBR_FIELD) {
 				uint al = get_type_alignment(member->as.field.type);
 				if (al > max_al) max_al = al;
@@ -132,26 +138,44 @@ static uint get_type_size(Type type) {
 		}
 		align_up(&total, max_align);
         return total;
+	} else if (type.kind == TYPE_UNION) {
+		uint max_size = 0;
+		da_foreach (Member, member, &type.as.user->as.ustruct.members) {
+			if (member->kind != MBR_FIELD) continue;
+			uint size  = get_type_size(member->as.field.type);
+			if (size > max_size) max_size = size;
+		}
+        return max_size;
 	}
 	return 1 << get_reg_size(type);
 }
 
 static uint get_struct_offset(TAC_Operand var) {
 	uint total = 0;
-	if (var.as.var.fields.count == 0)
-		return 0;
-	for (size_t i = 0; i < var.as.var.fields.count; i++) {
-		char *off = da_get(&var.as.var.fields, i);
-		da_foreach (Member, member, &var.as.var.type.as.user->as.ustruct.members) {
-			if (member->kind != MBR_FIELD) continue;
-			uint size  = get_type_size(member->as.field.type);
-			uint align = get_type_alignment(member->as.field.type);
-			align_up(&total, align);
-			if (strcmp(member->as.field.id, off) == 0) {
-				var.as.var.type = member->as.field.type;
-				break;
+	Type type = var.as.var.type;
+	if (type.kind == TYPE_STRUCT || type.kind == TYPE_UNION) {
+		for (size_t i = 0; i < var.as.var.fields.count; i++) {
+			char *off = da_get(&var.as.var.fields, i);
+			if (type.kind == TYPE_STRUCT) {
+				da_foreach (Member, member, &type.as.user->as.ustruct.members) {
+					if (member->kind != MBR_FIELD) continue;
+					uint size  = get_type_size(member->as.field.type);
+					uint align = get_type_alignment(member->as.field.type);
+					align_up(&total, align);
+					if (strcmp(member->as.field.id, off) == 0) {
+						type = member->as.field.type;
+						break;
+					}
+					total += size;
+				}
+			} else {
+				da_foreach (Member, member, &type.as.user->as.uunion.members) {
+					if (strcmp(member->as.field.id, off) == 0) {
+						type = member->as.field.type;
+						break;
+					}
+				}
 			}
-			total += size;
 		}
 	}
 	return total;

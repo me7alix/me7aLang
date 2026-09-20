@@ -1,0 +1,100 @@
+import "std.mtl"
+
+enum AST_Kind {
+	Number,
+	Expr,
+}
+
+enum AST_Op {
+	Add, Sub,
+	Mul, Div,
+}
+
+struct AST {
+	kind: AST_Kind
+	as: union {
+		number: f64
+		expr: struct {
+			op: AST_Op
+			lhs: *AST
+			rhs: *AST
+		}
+	}
+}
+
+fn expr(op: AST_Op, lhs: *AST, rhs: *AST): *AST {
+	n := new(AST)
+	n.kind = Expr
+	n.as.expr.op = op
+	n.as.expr.lhs = lhs
+	n.as.expr.rhs = rhs
+	return n
+}
+
+fn number(val: f64): *AST{
+	n := new(AST)
+	n.kind = Number
+	n.as.number = val
+	return n
+}
+
+fn ast_calc(n: *AST): f64 {
+	switch n.kind {
+	case Number
+		return n.as.number
+
+	case Expr
+		lhs := ast_calc(n.as.expr.lhs)
+		rhs := ast_calc(n.as.expr.rhs)
+
+		switch n.as.expr.op {
+			case Add; return lhs + rhs
+			case Sub; return lhs - rhs
+			case Mul; return lhs * rhs
+			case Div; return lhs / rhs
+		}
+	}
+}
+
+fn ast_dump(n: *AST) {
+	switch n.kind {
+	case Number
+		printf("%lf", n.as.number)
+
+	case Expr
+		op: u8
+		switch n.as.expr.op {
+			case Add; op = '+'
+			case Sub; op = '-'
+			case Mul; op = '*'
+			case Div; op = '/'
+		}
+
+		printf("(")
+		ast_dump(n.as.expr.lhs)
+		printf(" %c ", op:int)
+		ast_dump(n.as.expr.rhs)
+		printf(")")
+	}
+}
+
+fn main() {
+	n := expr(Div,
+		expr(Add,
+			expr(Mul,
+				number(3),
+				number(5),
+			),
+			number(20),
+		),
+		number(15),
+	)
+
+
+	printf("expr: ")
+	ast_dump(n)
+	printf("\n")
+
+	result := ast_calc(n)
+	printf("result: %lf\n", result)
+}

@@ -1,6 +1,6 @@
-# me7aLang
+# metaLang
 
-**me7aLang** (metaLang) is a general-purpose low-level programming language created for educational purposes.
+**metaLang** is a general-purpose low-level programming language created for educational purposes.
 The compiler is kind of toyish, written in **C**, with a small number of dependencies and a simple design focused on clarity and learning.
 
 ## Features
@@ -10,7 +10,7 @@ The compiler is kind of toyish, written in **C**, with a small number of depende
 - Supports a growing subset of language features
 
 ### Macro features
-me7aLang supports object-like and function-like macros, like C, but with few extra features. Function-like macros are followed with brackets so it's much more convenient to write them.
+metaLang supports object-like and function-like macros, like C, but with few extra features. Function-like macros are followed with brackets so it's much more convenient to write them.
 
 You can pass blocks of code in brackets and it will be parsed as a single argument, so it's allowed to write such macros:
 ```
@@ -36,19 +36,19 @@ make release -B
 
 3. Compile and run an example:
 ```bash
-./build/release/m7c -I ./stdlib -o ./build/fib ./examples/fib.m7
+./build/release/mtlc -I ./stdlib -o ./build/fib ./examples/fib.mtl
 ./build/fib
 ```
 
 4. Add the environment variable `METALANG_HOME` with the path to the compiler. Now you don't have to provide the standard library path manually:
 ```bash
-./build/release/m7c -o ./build/fib ./examples/fib.m7
+./build/release/mtlc -o ./build/fib ./examples/fib.m7
 ./build/fib
 ```
 
 ## Examples
 ```
-import "std.m7"
+import "std.mtl"
 
 fn main() {
     printf("Hello, World!\n")
@@ -62,7 +62,6 @@ The compiler supports **Linux**, **Windows**, and **macOS**, and has been tested
 
 ## Supported Assemblers
 
-- [FASM](https://flatassembler.net)
 - [NASM](https://nasm.us)
 - GAS (aarch64)
 

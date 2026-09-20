@@ -73,6 +73,8 @@ typedef enum {
 typedef enum {
 	AST_PROG,
 
+	AST_CASE,
+	AST_SWITCH_STMT,
 	AST_FOR_STMT,
 	AST_WHILE_STMT,
 	AST_IF_STMT,
@@ -122,7 +124,7 @@ struct AST_Node {
 			AST_Nodes args;
 			Type type;
 			AST_Node *body;
-			DA(AST_Nodes) defers_stack;
+			DA(AST_Nodes) defer_stack;
 		} func_def;
 		struct {
 			AST_Nodes stmts;
@@ -131,6 +133,7 @@ struct AST_Node {
 			char *id;
 			AST_Nodes args;
 			Type type;
+			bool is_c_va;
 		} func_call;
 		struct {
 			char *id;
@@ -201,6 +204,14 @@ struct AST_Node {
 			char *id;
 			uint uid;
 		} vid;
+		struct {
+			AST_Node *expr;
+			AST_Nodes cases;
+		} stmt_switch;
+		struct {
+			AST_Nodes exprs;
+			AST_Node *body;
+		} sw_case;
 		AST_Nodes array;
 		AST_Node *func_ret_exp;
 		Literal literal;
@@ -225,6 +236,7 @@ typedef union {
 		AST_Nodes args;
 		Type type;
 		char *extern_smb;
+		bool is_c_va;
 	} func_extern;
 	struct {
 		Type type;

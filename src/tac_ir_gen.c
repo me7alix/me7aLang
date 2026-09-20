@@ -65,23 +65,25 @@ void append_inst(TAC_Func *func, TAC_Instruction inst) {
 Type tac_ir_get_opr_type(TAC_Operand op) {
 	switch (op.kind) {
 	case OPR_VAR: {
-		if (op.as.var.type.kind == TYPE_STRUCT) {
-			Type res = op.as.var.type;
+		Type type = op.as.var.type;
+		if (type.kind == TYPE_STRUCT || type.kind == TYPE_UNION) {
 			for (size_t i = 0; i < op.as.var.fields.count; i++) {
+				Members *members =
+					type.kind == TYPE_STRUCT ?
+					&type.as.user->as.ustruct.members :
+					&type.as.user->as.uunion.members;
 				char *off = da_get(&op.as.var.fields, i);
-				da_foreach (Member, member, &op.as.var.type.as.user->as.ustruct.members) {
+				da_foreach (Member, member, members) {
 					if (member->kind == MBR_FIELD) {
 						if (strcmp(member->as.field.id, off) == 0) {
-							op.as.var.type = member->as.field.type;
-							res = member->as.field.type;
+							type = member->as.field.type;
 							break;
 						}
 					}
 				}
 			}
-			return res;
 		}
-		return op.as.var.type;
+		return type;
 	} break;
 
 	case OPR_LITERAL:  return op.as.literal.type;
@@ -478,8 +480,16 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 		if (inst.op == OP_CAST) {
 			Type lt = tac_ir_get_opr_type(inst.args[0]);
 			Type rt = tac_ir_get_opr_type(inst.dst);
-			if (lt.kind == rt.kind || (is_pointer(lt) && is_pointer(rt)))
+
+			if (lt.kind == TYPE_ENUM) {
+				lt = lt.as.user->as.uenum.type;
+			} else if (rt.kind == TYPE_ENUM) {
+				rt = rt.as.user->as.uenum.type;
+			}
+
+			if (compare_types(lt, rt)) {
 				inst.op = OP_ASSIGN;
+			}
 		}
 
 		ctx->last_var = inst.dst.as.var.addr_id;
@@ -639,7 +649,8 @@ void tac_ir_gen_var_mut(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 
 void tac_ir_gen_func_call(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	TAC_Instruction func_call = {
-		.op = OP_FUNC_CALL,
+		.op = cn->as.func_call.is_c_va ?
+			OP_FUNC_CALL_C_VA : OP_FUNC_CALL,
 		.dst = (TAC_Operand) {
 			.kind = OPR_NAME,
 			.as.name = cn->as.func_call.id,
@@ -763,35 +774,18 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 
 			IRGenExprCtx ctx = {0};
 			ctx.is_right_of_eq = true;
+			TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->as.func_ret.expr);
 
-			TAC_Operand res =
-				tac_ir_gen_expr(&ctx, prog, func, cn->as.func_ret.expr);
-
-			switch (res.kind) {
-			case OPR_LITERAL:
-				append_inst(func, ((TAC_Instruction){
-					.op = OP_RETURN,
-					.args[0] = res,
-				}));
-				break;
-			case OPR_VAR:
-				append_inst(func, (TAC_Instruction){
-					.op = OP_RETURN,
-					.args[0] = (TAC_Operand){
-						.kind = OPR_VAR,
-						.as.var.type = cn->as.func_ret.type,
-						.as.var.addr_id = res.as.var.addr_id,
-					},
-				});
-				break;
-			default:
-				UNREACHABLE;
-			}
+			append_inst(func, (TAC_Instruction){
+				.op = OP_RETURN,
+				.args[0] = res,
+			});
 		} break;
 
 		case AST_LOOP_BREAK:
-			if (ctx->loop_gen <= 0)
+			if (ctx->loop_gen <= 0) {
 				throw_error(cn->loc, "break outside of loop");
+			}
 
 			append_inst(func, ((TAC_Instruction){
 				.op = OP_JUMP,
@@ -803,11 +797,13 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 			break;
 
 		case AST_LOOP_CONTINUE:
-			if (ctx->loop_gen <= 0)
+			if (ctx->loop_gen <= 0) {
 				throw_error(cn->loc, "continue outside of loop");
+			}
 
-			if (ctx->for_var_mut)
+			if (ctx->for_var_mut) {
 				tac_ir_gen_var_mut(prog, func, ctx->for_var_mut);
+			}
 
 			append_inst(func, (TAC_Instruction){
 				.op = OP_JUMP,
@@ -875,6 +871,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 
 		case AST_FOR_STMT: {
 			ctx->loop_gen++;
+
 			switch (cn->as.stmt_for.var->kind) {
 				case AST_VAR_MUT: tac_ir_gen_var_mut(prog, func, cn->as.stmt_for.var); break;
 				case AST_VAR_DEF: tac_ir_gen_var_def(prog, func, cn->as.stmt_for.var); break;
@@ -934,6 +931,99 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 
 			ctx->loop_gen--;
 			ctx->for_var_mut = NULL;
+		} break;
+
+		case AST_SWITCH_STMT: {
+			AST_Node *default_body = NULL;
+			uint label_end = label_id++;
+
+			IRGenExprCtx ectx = {0};
+			TAC_Operand lhs = tac_ir_gen_expr(&ectx, prog, func, cn->as.stmt_switch.expr);
+
+			da_foreach (AST_Node*, cs, &cn->as.stmt_switch.cases) {
+				uint case_start = label_id++;
+
+				if ((*cs)->as.sw_case.exprs.count == 0) {
+					default_body = (*cs)->as.sw_case.body;
+					continue;
+				}
+
+				da_foreach (AST_Node*, expr, &(*cs)->as.sw_case.exprs) {
+					IRGenExprCtx ectx = {0};
+					TAC_Operand rhs = tac_ir_gen_expr(&ectx, prog, func, *expr);
+
+					TAC_Instruction cmp = {
+						.op = OP_NOT_EQ,
+						.args[0] = lhs,
+						.args[1] = rhs,
+						.dst = (TAC_Operand) {
+							.kind = OPR_VAR,
+							.as.var.type = (Type){TYPE_BOOL},
+							.as.var.addr_id = var_id++,
+						}
+					};
+
+					TAC_Instruction jmp = {
+						.op = OP_JUMP_IF_NOT,
+						.args[0] = cmp.dst,
+						.dst = (TAC_Operand) {
+							.kind = OPR_LABEL,
+							.as.label_id = case_start,
+						}
+					};
+
+					append_inst(func, cmp);
+					append_inst(func, jmp);
+				}
+
+				uint case_end = label_id++;
+
+				append_inst(func, (TAC_Instruction){
+					.op = OP_JUMP,
+					.dst = (TAC_Operand){
+						.kind = OPR_LABEL,
+						.as.label_id = case_end,
+					}
+				});
+
+				append_inst(func, (TAC_Instruction){
+					.op = OP_LABEL,
+					.args[0] = (TAC_Operand) {
+						.kind = OPR_LABEL,
+						.as.label_id = case_start,
+					},
+				});
+
+				tac_ir_gen_body(ctx, prog, func, (*cs)->as.sw_case.body);
+
+				append_inst(func, (TAC_Instruction){
+					.op = OP_JUMP,
+					.dst = (TAC_Operand){
+						.kind = OPR_LABEL,
+						.as.label_id = label_end,
+					}
+				});
+
+				append_inst(func, (TAC_Instruction){
+					.op = OP_LABEL,
+					.args[0] = (TAC_Operand) {
+						.kind = OPR_LABEL,
+						.as.label_id = case_end,
+					},
+				});
+			}
+
+			if (default_body) {
+				tac_ir_gen_body(ctx, prog, func, default_body);
+			}
+
+			append_inst(func, (TAC_Instruction){
+				.op = OP_LABEL,
+				.args[0] = (TAC_Operand) {
+					.kind = OPR_LABEL,
+					.as.label_id = label_end,
+				},
+			});
 		} break;
 
 		default:

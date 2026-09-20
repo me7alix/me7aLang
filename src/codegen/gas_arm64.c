@@ -684,9 +684,6 @@ void gas_gen_func(StringBuilder *code, TAC_Func func) {
 			load_reserved_regs(ci, arg1, arg2, dst);
 			if (oprd.kind == REG) sprintf(dst, "%s", oprd.text);
 
-			if (dst_type.kind == arg1_type.kind)
-				UNREACHABLE;
-
 			int dsz = 0;
 			int ssz = 0;
 			bool ssig = false;
@@ -832,8 +829,10 @@ void gas_gen_func(StringBuilder *code, TAC_Func func) {
 			sb_appendf(&body, "  b 1f\n");
 		} break;
 
+		case OP_FUNC_CALL_C_VA:
 		case OP_FUNC_CALL: {
 			bool is_shadow_space_used = false;
+
 			for (size_t i = 0; ci.args[i].kind != OPR_NULL; i++) {
 				if (i >= ARR_LEN(sysv_gn_fa)) {
 					is_shadow_space_used = true;
@@ -841,6 +840,7 @@ void gas_gen_func(StringBuilder *code, TAC_Func func) {
 					break;
 				}
 			}
+
 			for (size_t i = 0; ci.args[i].kind != OPR_NULL; i++) {
 				size_t arg_size = get_reg_size(tac_ir_get_opr_type(ci.args[i]));
 				switch (tp) {
@@ -863,6 +863,7 @@ void gas_gen_func(StringBuilder *code, TAC_Func func) {
 					}
 				}
 			}
+
 			sb_appendf(&body, "  bl %s%s\n", (tp == TP_MACOS ? "_" : ""), ci.dst.as.name);
 			if (is_shadow_space_used) sb_appendf(&body, "  add sp, sp, 32\n");
 		} break;

@@ -49,16 +49,20 @@ int ImportedTable_compare(char *cur_str, char *str) {
 Tokens get_input(PreprocCtx *p, char *file, bool *is_imported) {
 	static StringBuilder path = {0};
 	*is_imported = false;
+
 	da_foreach (char*, imp, p->imported_folders) {
 		sb_reset(&path);
 		sb_appendf(&path, "%s/%s", *imp, file);
+
 		char *code = read_file(path.items);
 		if (code) {
 			if (ImportedTable_get(&p->import_registry, path.items)) {
 				*is_imported = true;
 				return (Tokens){0};
 			}
-			Lexer lex = lexer_lex(path.items, code);
+
+			char *np = strdup(path.items);
+			Lexer lex = lexer_lex(np, code);
 			return (Tokens){
 				.items = lex.tokens.items,
 				.count = lex.tokens.count,
@@ -66,6 +70,7 @@ Tokens get_input(PreprocCtx *p, char *file, bool *is_imported) {
 			};
 		}
 	}
+
 	return (Tokens){0};
 }
 
@@ -104,6 +109,7 @@ void insert_macro(PreprocCtx *p) {
 		pp_append(p, next(p));
 		return;
 	}
+
 	switch (macro->kind) {
 	case MACRO_OBJ: {
 		p->inserted_macro = true;
@@ -111,14 +117,17 @@ void insert_macro(PreprocCtx *p) {
 			pp_append(p, *tok);
 		next(p);
 	} break;
+
 	case MACRO_FUNC:
 		if (peek2(p).kind != TOK_OPAR) {
 			pp_append(p, next(p));
 			return;
 		} else next(p);
 		next(p);
+
 		p->inserted_macro = true;
 		DA(Tokens) args = {0};
+
 		while (peek(p).kind != TOK_CPAR) {
 			da_append(&args, (Tokens){0});
 			Tokens *arg = &da_last(&args);
@@ -135,23 +144,36 @@ void insert_macro(PreprocCtx *p) {
 				else append(arg, next(p));
 			}
 		}
+
 		next(p);
-		if (macro->as.func.args.count != args.count)
+
+		if (macro->as.func.args.count != args.count) {
 			throw_error(peek(p).loc, "arguments count mismatch");
+		}
+
 		da_foreach (Token, tok, &macro->as.func.body) {
 			if (tok->kind == TOK_ID) {
 				bool found = false;
+
 				for (size_t i = 0; i < macro->as.func.args.count; i++) {
 					char *arg = macro->as.func.args.items[i];
+
 					if (strcmp(arg, tok->data) == 0) {
-						da_foreach (Token, arg_tok, &da_get(&args, i))
+						da_foreach (Token, arg_tok, &da_get(&args, i)) {
 							pp_append(p, *arg_tok);
+						}
+
 						found = true;
 						break;
 					}
 				}
-				if (!found) pp_append(p, *tok);
-			} else pp_append(p, *tok);
+
+				if (!found) {
+					pp_append(p, *tok);
+				}
+			} else {
+				pp_append(p, *tok);
+			}
 		}
 	}
 }
@@ -167,20 +189,28 @@ void insert_macro(PreprocCtx *p) {
 void preprocessor(PreprocCtx *p) {
 	char *file = p->input.items->loc.file;
 	p->imported_folders->items[0] = get_folder(file);
+
 	ImportedTable_add(&p->import_registry, file, true);
 	p->inserted_macro = true;
+
 	while (p->inserted_macro) {
 		p->inserted_macro = false;
+
 		while (peek(p).kind != TOK_EOF) {
 			switch (peek(p).kind) {
 			case TOK_IMPORT: {
 				next(p);
-				if (peek(p).kind != TOK_STRING)
+
+				if (peek(p).kind != TOK_STRING) {
 					throw_error(peek(p).loc, "filepath expected");
+				}
+
 				bool is_imported;
 				Tokens imported = get_input(p, peek(p).data, &is_imported);
-				if (!imported.items && !is_imported)
+				if (!imported.items && !is_imported) {
 					throw_error(peek(p).loc, "no such file");
+				}
+
 				next(p);
 				expect(next(p), TOK_SEMI);
 				if (!is_imported) {
@@ -196,20 +226,25 @@ void preprocessor(PreprocCtx *p) {
 					p->count = sp.count;
 				}
 			} break;
+
 			case TOK_MACRO_FUNC: {
 				next(p);
 				expect(peek(p), TOK_ID);
+
 				char *id = next(p).data;
 				expect(next(p), TOK_OPAR);
-				Macro macro = {.kind = MACRO_FUNC};
+				Macro macro = {MACRO_FUNC};
+
 				while (peek(p).kind != TOK_CPAR) {
 					if (peek(p).kind != TOK_ID)
 						throw_error(peek(p).loc, "TOK_ID expected");
 					da_append(&macro.as.func.args, next(p).data);
 					if (peek(p).kind == TOK_COM) next(p);
 				}
+
 				next(p);
 				expect(next(p), TOK_OBRA);
+
 				int cnt = 1;
 				while (true) {
 					if      (peek(p).kind == TOK_CBRA) cnt--;
@@ -217,19 +252,26 @@ void preprocessor(PreprocCtx *p) {
 					if (cnt == 0) break;
 					append(&macro.as.func.body, next(p));
 				}
+
 				MacroTable_add(&p->macro_definitions, id, macro);
 				next(p);
 			} break;
+
 			case TOK_MACRO_OBJ: {
 				next(p);
 				expect(peek(p), TOK_ID);
+
 				char *id = next(p).data;
 				Macro macro = {.kind = MACRO_OBJ};
-				while (peek(p).kind != TOK_SEMI)
+
+				while (peek(p).kind != TOK_SEMI) {
 					da_append(&macro.as.obj.body, next(p));
+				}
+
 				MacroTable_add(&p->macro_definitions, id, macro);
 				next(p);
 			} break;
+
 			case TOK_ID:
 				if (strcmp(peek(p).data, "__FILE__") == 0) {
 					pp_append(p, ((Token){.kind = TOK_STRING, .data = next(p).loc.file}));
@@ -244,15 +286,18 @@ void preprocessor(PreprocCtx *p) {
 					pp_append(p, ((Token){.kind = TOK_ID, .data = sb.items}));
 				} else insert_macro(p);
 				break;
+
 			default:
 				pp_append(p, next(p));
 			}
 		}
+
 		pp_append(p, ((Token){.kind = TOK_EOF}));
 		da_copy(&p->input, &p->output);
 		da_reset(&p->output);
 		p->count = 0;
 	}
+
 	while (true) {
 		bool change = false;
 		while (peek(p).kind != TOK_EOF) {
@@ -294,11 +339,13 @@ void preprocessor(PreprocCtx *p) {
 				change = true;
 			} else pp_append(p, next(p));
 		}
+
 		pp_append(p, ((Token){.kind = TOK_EOF}));
 		da_copy(&p->input, &p->output);
 		da_reset(&p->output);
 		p->count = 0;
 		if (!change) break;
 	}
+
 	da_copy(&p->output, &p->input);
 }

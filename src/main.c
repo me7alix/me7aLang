@@ -44,18 +44,23 @@ bool ARM64 = false;
 void throw_error(Location loc, char *error) {
 	size_t lines_num = loc.line_num + 1;
 	size_t chars_num = loc.line_char-loc.line_start + 1;
+
 	fprintf(stderr, "%s:%zu:%zu: %s\n", loc.file, lines_num, chars_num, error);
 	loc.line_char = loc.line_start;
+
 	char error_pointer[128] = {0};
 	size_t cnt = 0;
+
 	while (*loc.line_char != '\n' && *loc.line_char != '\0'){
 		fprintf(stderr, "%c", *loc.line_char);
 		if (cnt < chars_num - 1) {
 			char ws = *loc.line_char == '\t' ? '\t' : ' ';
 			error_pointer[cnt++] = ws;
 		}
+
 		loc.line_char++;
 	}
+
 	fprintf(stderr, "\n");
 	error_pointer[cnt++] = '^';
 	fprintf(stderr, "%s\n", error_pointer);
@@ -66,19 +71,23 @@ char *read_file(const char *filename) {
 	FILE* file = fopen(filename, "rb");
 	if (!file) return NULL;
 	fseek(file, 0, SEEK_END);
+
 	long filesize = ftell(file);
 	rewind(file);
+
 	char *buffer = (char*) malloc(filesize + 1);
 	if (!buffer) {
 		fclose(file);
 		return NULL;
 	}
+
 	size_t read_size = fread(buffer, 1, filesize, file);
 	if (read_size != filesize) {
 		free(buffer);
 		fclose(file);
 		return NULL;
 	}
+
 	buffer[filesize] = '\0';
 	fclose(file);
 	return buffer;
@@ -129,7 +138,7 @@ bool is_src_file(char *str) {
 	size_t strl = strlen(str);
 	for (int rp = strl - 1; rp >= 0; rp--) {
 		if (str[rp] == '.') {
-			if (strcmp(str + rp + 1, "m7") == 0) {
+			if (strcmp(str + rp + 1, "mtl") == 0) {
 				return true;
 			}
 		}
@@ -307,6 +316,7 @@ int main(int argc, char **argv) {
 		case CG_GAS_AARCH64:
 			cg = gas_gen_prog(&prog, tp, opt_level);
 		}
+
 		sprintf(output_file, "%s.asm", srcs.items[i]);
 		write_to_file(output_file, cg);
 
@@ -356,6 +366,7 @@ int main(int argc, char **argv) {
 			sb_appendf(&cmd, " %s", *obj_file);
 		sb_appendf(&cmd, " %s", link_dynamically);
 		system(cmd.items);
+
 		switch (tp) {
 		case TP_MACOS:
 		case TP_LINUX:
