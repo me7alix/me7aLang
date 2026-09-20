@@ -1,4 +1,4 @@
-import "raylib.m7"
+import "raylib.mtl"
 
 def SCREEN_WIDTH  800
 def SCREEN_HEIGHT 600

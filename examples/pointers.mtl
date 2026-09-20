@@ -1,4 +1,4 @@
-import "std/libc.m7"
+import "std.mtl"
 
 fn change_fifth(arr: *int) do
 	*(arr + 4) = 111

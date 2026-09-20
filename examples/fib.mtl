@@ -1,4 +1,4 @@
-import "std.m7"
+import "std.mtl"
 
 fn main() {
 	cnt: u64

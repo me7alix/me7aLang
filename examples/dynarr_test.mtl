@@ -1,4 +1,4 @@
-import "std/dynarr.m7"
+import "std/dynarr.mtl"
 
 DynArr(Numbers, int)
 DynArr(Integers, int)

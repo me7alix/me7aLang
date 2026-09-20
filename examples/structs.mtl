@@ -1,22 +1,12 @@
-import "std/libc.m7"
-
-struct Address {
-	city:      *u8
-	post_code: int
-
-	fn print() {
-		printf(
-			"%s [%d]\n",
-			self.city,
-			self.post_code,
-		)
-	}
-}
+import "std.mtl"
 
 struct Person {
-	name:   *u8
+	name: *u8
 	salary: int
-	addr:   Address
+	addr: struct {
+		city: *u8
+		post_code: int
+	}
 
 	fn print() {
 		printf(
@@ -25,8 +15,11 @@ struct Person {
 			self.name,
 			self.salary,
 		)
-		printf("Address: ")
-		self.addr.print()
+		printf(
+			"Address: %s [%d]\n",
+			self.addr.city,
+			self.addr.post_code,
+		)
 	}
 }
 

@@ -1,4 +1,4 @@
-import "std/hashmap.m7"
+import "std/hashmap.mtl"
 
 HashMapStr(HM_StrInt, int)
 

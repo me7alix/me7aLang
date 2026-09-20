@@ -1,4 +1,4 @@
-import "std/libc.m7"
+import "std/libc.mtl"
 
 fn main() {
 	a := 6

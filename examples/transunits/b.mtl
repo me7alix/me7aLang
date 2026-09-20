@@ -1,4 +1,4 @@
-import "std/libc.m7"
+import "std.mtl"
 
 fn print_hello() {
 	printf("Hello")

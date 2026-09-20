@@ -1,5 +1,5 @@
-import "std/libc.m7"
-import "raylib.m7"
+import "std.mtl"
+import "raylib.mtl"
 
 def TILE_SIZE  30
 def MAP_WIDTH  20
