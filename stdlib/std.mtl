@@ -1,4 +1,4 @@
-import "std/libc.m7"
+import "std/libc.mtl"
 
 macro arr_len(arr) {
 	(sizeof(arr) / sizeof(*(arr))) \
@@ -21,8 +21,4 @@ macro do_while(expr, body) {
         block body
         if !(expr) do break
     }
-}
-
-macro va_flt(flt) {
-	((flt):f64)\
 }

@@ -1,4 +1,4 @@
-import "std/libc.m7"
+import "std/libc.mtl"
 
 macro da_foreach(vn, da) {
 	for vn := (da).items; (vn - (da).items):uptr < (da).count; vn = vn + 1 \
