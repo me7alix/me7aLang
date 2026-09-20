@@ -1,16 +1,18 @@
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/macros.m7 && ./build/prog
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/ifchain.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/dynarr_test.m7 && ./build/prog
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/hashmap_test.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/hashmap_test.m7 && ./build/prog
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/pointers.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/pointers.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/bwops.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/structs.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/fib.m7 && echo '10' | ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/snake.m7 -lf /usr/lib/libraylib.so
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/transunits/a.m7 examples/transunits/b.m7 && ./build/prog
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/float.m7 && ./build/prog
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/float.m7 && ./build/prog
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/macros.mtl && ./build/prog
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/bubble.mtl && ./build/prog
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/bubble.mtl && ./build/prog
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/ifchain.mtl && ./build/prog
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/dynarr_test.mtl && ./build/prog
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/hashmap_test.mtl && ./build/prog
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/hashmap_test.mtl && ./build/prog
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/pointers.mtl && ./build/prog
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/pointers.mtl && ./build/prog
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/bwops.mtl && ./build/prog
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/structs.mtl && ./build/prog
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/fib.mtl && echo '10' | ./build/prog
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/snake.mtl -lf /usr/lib/libraylib.so
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/transunits/a.mtl examples/transunits/b.mtl && ./build/prog
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/float.mtl && ./build/prog
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/float.mtl && ./build/prog
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/ast.mtl && ./build/prog
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/ast.mtl && ./build/prog

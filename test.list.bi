@@ -1,14 +1,14 @@
-:i count 16
-:b shell 84
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/macros.m7 && ./build/prog
+:i count 18
+:b shell 86
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/macros.mtl && ./build/prog
 :i returncode 0
 :b stdout 3
 17
 
 :b stderr 0
 
-:b shell 84
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
+:b shell 86
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/bubble.mtl && ./build/prog
 :i returncode 0
 :b stdout 61
 0: 0
@@ -24,8 +24,8 @@
 
 :b stderr 0
 
-:b shell 84
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/bubble.m7 && ./build/prog
+:b shell 86
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/bubble.mtl && ./build/prog
 :i returncode 0
 :b stdout 61
 0: 0
@@ -41,8 +41,8 @@
 
 :b stderr 0
 
-:b shell 85
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/ifchain.m7 && ./build/prog
+:b shell 87
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/ifchain.mtl && ./build/prog
 :i returncode 0
 :b stdout 90
 a 0
@@ -68,8 +68,8 @@ X 15
 
 :b stderr 0
 
-:b shell 89
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/dynarr_test.m7 && ./build/prog
+:b shell 91
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/dynarr_test.mtl && ./build/prog
 :i returncode 0
 :b stdout 62
 count: 3
@@ -84,8 +84,8 @@ last: 78
 
 :b stderr 0
 
-:b shell 90
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/hashmap_test.m7 && ./build/prog
+:b shell 92
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/hashmap_test.mtl && ./build/prog
 :i returncode 0
 :b stdout 28
 one: (nil)
@@ -94,8 +94,8 @@ twenty	20
 
 :b stderr 0
 
-:b shell 90
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/hashmap_test.m7 && ./build/prog
+:b shell 92
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/hashmap_test.mtl && ./build/prog
 :i returncode 0
 :b stdout 28
 one: (nil)
@@ -104,8 +104,8 @@ twenty	20
 
 :b stderr 0
 
-:b shell 86
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/pointers.m7 && ./build/prog
+:b shell 88
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/pointers.mtl && ./build/prog
 :i returncode 0
 :b stdout 126
 arr1:
@@ -134,8 +134,8 @@ arr2:
 
 :b stderr 0
 
-:b shell 86
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/pointers.m7 && ./build/prog
+:b shell 88
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/pointers.mtl && ./build/prog
 :i returncode 0
 :b stdout 126
 arr1:
@@ -164,8 +164,8 @@ arr2:
 
 :b stderr 0
 
-:b shell 83
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/bwops.m7 && ./build/prog
+:b shell 85
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/bwops.mtl && ./build/prog
 :i returncode 0
 :b stdout 129
 XOR swap
@@ -186,8 +186,8 @@ Bitwise not
 
 :b stderr 0
 
-:b shell 85
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/structs.m7 && ./build/prog
+:b shell 87
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/structs.mtl && ./build/prog
 :i returncode 0
 :b stdout 53
 Name: Michael
@@ -196,8 +196,8 @@ Address: New York [100101]
 
 :b stderr 0
 
-:b shell 93
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/fib.m7 && echo '10' | ./build/prog
+:b shell 95
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/fib.mtl && echo '10' | ./build/prog
 :i returncode 0
 :b stdout 30
 cnt: 1
@@ -213,23 +213,35 @@ cnt: 1
 
 :b stderr 0
 
-:b shell 93
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/snake.m7 -lf /usr/lib/libraylib.so
+:b shell 95
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/snake.mtl -lf /usr/lib/libraylib.so
 :i returncode 0
 :b stdout 0
 
 :b stderr 0
 
-:b shell 115
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/transunits/a.m7 examples/transunits/b.m7 && ./build/prog
+:b shell 118
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/transunits/a.mtl examples/transunits/b.mtl && ./build/prog
 :i returncode 0
 :b stdout 13
 Hello World!
 
 :b stderr 0
 
-:b shell 83
-./build/release/m7c -O0 -I ./stdlib -o build/prog examples/float.m7 && ./build/prog
+:b shell 85
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/float.mtl && ./build/prog
+:i returncode 0
+:b stdout 53
+a = 21.299999
+b = 3.300000
+a > b
+24.599998
+10.700000
+
+:b stderr 0
+
+:b shell 85
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/float.mtl && ./build/prog
 :i returncode 0
 :b stdout 53
 a = 21.299999
@@ -241,14 +253,20 @@ a > b
 :b stderr 0
 
 :b shell 83
-./build/release/m7c -O1 -I ./stdlib -o build/prog examples/float.m7 && ./build/prog
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/ast.mtl && ./build/prog
 :i returncode 0
-:b stdout 53
-a = 21.299999
-b = 3.300000
-a > b
-24.599998
-10.700000
+:b stdout 73
+expr: (((3.000000 * 5.000000) + 20.000000) / 15.000000)
+result: 2.333333
+
+:b stderr 0
+
+:b shell 83
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/ast.mtl && ./build/prog
+:i returncode 0
+:b stdout 73
+expr: (((3.000000 * 5.000000) + 20.000000) / 15.000000)
+result: 2.333333
 
 :b stderr 0
 
