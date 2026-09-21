@@ -23,6 +23,13 @@ static bool is_there_return;
 static uint stack_offset;
 static uint inst_idx;
 
+// Scratch registers allocator
+static int CSR = 0;
+#define nSR scratch[CSR=(CSR+1)%ARR_LEN(scratch)]
+#define SR scratch[CSR]
+#define nSRs RF[nSR][3]
+#define SRs RF[SR][3]
+
 typedef struct {
 	Type type;
 	double value;
@@ -111,6 +118,16 @@ static void opr_type_to_stack(TAC_Operand t, char *buf) {
 	}
 }
 
+static void emit_mov_chunk(const char *reg, uint32_t offset, uint32_t chunk_size) {
+	if (offset == 0) {
+		sb_appendf(&body, "  mov %s, [rsi]\n", reg);
+		sb_appendf(&body, "  mov [rdi], %s\n", reg);
+	} else {
+		sb_appendf(&body, "  mov %s, [rsi + %u]\n", reg, offset);
+		sb_appendf(&body, "  mov [rdi + %u], %s\n", offset, reg);
+	}
+}
+
 NasmOpr opr_to_nasm(TAC_Operand opr) {
 	int kind;
 	char buf[64];
@@ -153,9 +170,9 @@ NasmOpr opr_to_nasm(TAC_Operand opr) {
 			if (opr.as.var.addr_kind == VAR_LOCAL) {
 				uint *off = OffTable_get(&stack_table, opr.as.var.addr_id);
 				if (off) {
-					sb_appendf(&body, "  mov rax, qword[rbp - %u]\n", *off);
-					if (fo) sprintf(buf, "%s[rax + %u]", ts, fo);
-					else    sprintf(buf, "%s[rax]", ts);
+					sb_appendf(&body, "  mov %s, qword[rbp - %u]\n", nSRs, *off);
+					if (fo) sprintf(buf, "%s[%s + %u]", ts, SRs, fo);
+					else    sprintf(buf, "%s[%s]", ts, SRs);
 				} else {
 					Register reg = *reg_allocator_get(opr.as.var.addr_id);
 					if (fo) sprintf(buf, "%s[%s + %u]", ts, RF[reg][3], fo);
@@ -328,6 +345,41 @@ NasmOpr opr_to_nasm(TAC_Operand opr) {
 	return nasm_oprt(kind, type, buf);
 }
 
+static void copy_struct(TAC_Operand dst, TAC_Operand src) {
+	uint32_t size = get_type_size(tac_ir_get_opr_type(dst));
+	if (size == 0) return;
+
+	sb_appendf(&body, "  lea rsi, %s\n", opr_to_nasm(src).text);
+	sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(dst).text);
+
+	if (size <= 64) {
+		uint32_t offset = 0;
+
+		while (size - offset >= 8) {
+			emit_mov_chunk("rax", offset, 8);
+			offset += 8;
+		}
+
+		if (size - offset >= 4) {
+			emit_mov_chunk("eax", offset, 4);
+			offset += 4;
+		}
+
+		if (size - offset >= 2) {
+			emit_mov_chunk("ax", offset, 2);
+			offset += 2;
+		}
+
+		if (size - offset >= 1) {
+			emit_mov_chunk("al", offset, 1);
+			offset += 1;
+		}
+	} else {
+		sb_appendf(&body, "  mov rcx, %u\n", size);
+		sb_appendf(&body, "  rep movsb\n");
+	}
+}
+
 static void type_to_reg(TAC_Operand opr, char *arg1, char *arg2) {
 	Type opr_type = tac_ir_get_opr_type(opr);
 	switch (opr_type.kind) {
@@ -378,7 +430,7 @@ NasmOpr nasm_gen_new_var(TAC_Instruction ci) {
 	if (opt_level > 0) {
 		Register reg;
 		reg_allocator_free(&regal, inst_idx);
-		if (is_type_integer(type) || is_pointer(type)) {
+		if (is_type_integer(type) || is_pointer(type) || type.kind == TYPE_BOOL) {
 			size_t row = get_reg_size(type);
 			if (reg_allocator_push_ce(&regal, ci.dst.as.var.addr_id, (int*)&reg)) {
 				return nasm_oprt(REG, type, RF[reg][row]);
@@ -733,43 +785,43 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				}
 			} else {
 				const char *ext_inst = ssig ? "movsx" : "movzx"; // ext inst
-				const char *DR = NULL; // dst
-				const char *SR = NULL; // src
-				const char *LR = NULL; // low
+				const char *dr = NULL; // dst
+				const char *sr = NULL; // src
+				const char *lr = NULL; // low
 
 				switch (dsz) {
-					case 1: DR = "al";  LR = "al";  break;
-					case 2: DR = "ax";  LR = "ax";  break;
-					case 4: DR = "eax"; LR = "eax"; break;
-					case 8: DR = "rax"; LR = "eax"; break;
+					case 1: dr = "al";  lr = "al";  break;
+					case 2: dr = "ax";  lr = "ax";  break;
+					case 4: dr = "eax"; lr = "eax"; break;
+					case 8: dr = "rax"; lr = "eax"; break;
 					default: UNREACHABLE;
 				}
 
 				switch (ssz) {
-					case 1: SR = "al";  break;
-					case 2: SR = "ax";  break;
-					case 4: SR = "eax"; break;
-					case 8: SR = "rax"; break;
+					case 1: sr = "al";  break;
+					case 2: sr = "ax";  break;
+					case 4: sr = "eax"; break;
+					case 8: sr = "rax"; break;
 					default: UNREACHABLE;
 				}
 
 				if (dsz > ssz) {
 					if (ssz == 4 && dsz == 8) {
 						if (ssig) {
-							sb_appendf(&body, "  movsxd %s, %s\n", DR, opr_to_nasm(ci.args[0]).text);
+							sb_appendf(&body, "  movsxd %s, %s\n", dr, opr_to_nasm(ci.args[0]).text);
 						} else {
-							sb_appendf(&body, "  mov %s, %s\n", LR, opr_to_nasm(ci.args[0]).text);
+							sb_appendf(&body, "  mov %s, %s\n", lr, opr_to_nasm(ci.args[0]).text);
 						}
 					} else {
-						sb_appendf(&body, "  %s %s, %s\n", ext_inst, DR, opr_to_nasm(ci.args[0]).text);
+						sb_appendf(&body, "  %s %s, %s\n", ext_inst, dr, opr_to_nasm(ci.args[0]).text);
 					}
-					sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst).text, DR);
+					sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst).text, dr);
 				} else if (dsz < ssz) {
-					sb_appendf(&body, "  mov %s, %s\n", SR, opr_to_nasm(ci.args[0]).text);
-					sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst).text, LR);
+					sb_appendf(&body, "  mov %s, %s\n", sr, opr_to_nasm(ci.args[0]).text);
+					sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst).text, lr);
 				} else {
-					sb_appendf(&body, "  mov %s, %s\n", DR, opr_to_nasm(ci.args[0]).text);
-					sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst).text, DR);
+					sb_appendf(&body, "  mov %s, %s\n", dr, opr_to_nasm(ci.args[0]).text);
+					sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst).text, dr);
 				}
 			}
 		} break;
@@ -799,10 +851,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 			if (ci.args[0].kind != OPR_NULL) {
 				Type type = tac_ir_get_opr_type(ci.dst);
 				if (type.kind == TYPE_STRUCT || type.kind == TYPE_UNION) {
-					sb_appendf(&body, "  lea rsi, %s\n", opr_to_nasm(ci.args[0]).text);
-					sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst).text);
-					sb_appendf(&body, "  mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
-					sb_appendf(&body, "  rep movsb\n");
+					copy_struct(ci.args[0], ci.dst);
 				} else {
 					nasm_mov(oprd, opr_to_nasm(ci.args[0]));
 				}
@@ -828,10 +877,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "  mov %s, %s[rax]\n", arg1, ts);
 				sb_appendf(&body, "  mov %s, %s\n", opr_to_nasm(ci.dst).text, arg1);
 			} else {
-				sb_appendf(&body, "  mov rsi, %s\n", opr_to_nasm(ci.args[0]).text);
-				sb_appendf(&body, "  lea rdi, %s\n", opr_to_nasm(ci.dst).text);
-				sb_appendf(&body, "  mov rcx, %u\n", get_type_size(tac_ir_get_opr_type(ci.dst)));
-				sb_appendf(&body, "  rep movsb\n");
+				copy_struct(ci.args[0], ci.dst);
 			}
 		} break;
 
