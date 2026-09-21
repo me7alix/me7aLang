@@ -90,7 +90,6 @@ fn main() {
 		number(15),
 	)
 
-
 	printf("expr: ")
 	ast_dump(n)
 	printf("\n")

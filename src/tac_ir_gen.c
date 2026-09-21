@@ -95,7 +95,6 @@ Type tac_ir_get_opr_type(TAC_Operand op) {
 }
 
 typedef struct {
-	bool is_right_of_eq;
 	bool is_field_gen;
 	bool is_met_call_gen;
 	bool is_field_op;
@@ -130,23 +129,8 @@ TAC_Operand tac_ir_gen_deref(IRGenExprCtx *ctx, TAC_Func *func, Type type, TAC_O
 		.as.var.addr_kind = var.as.var.kind,
 	};
 
-	if (!ctx->is_right_of_eq) {
-		ctx->last_var = 0;
-		return ret;
-	} else {
-		TAC_Instruction asn = {
-			.op = OP_ASSIGN,
-			.args[0] = ret,
-			.dst = (TAC_Operand) {
-				.kind = OPR_VAR,
-				.as.var.type = type,
-				.as.var.addr_id = var_id++,
-			}
-		};
-
-		append_inst(func, asn);
-		return da_last(&func->body).dst;
-	}
+	ctx->last_var = 0;
+	return ret;
 }
 
 TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_Node *en) {
@@ -601,14 +585,11 @@ void tac_ir_gen_var_mut(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	}
 
 	if (expr->kind != AST_BIN_EXP) {
-		ctx.is_right_of_eq = true;
 		tac_ir_gen_expr(&ctx, prog, func, expr);
 		return;
 	}
 
-	ctx.is_right_of_eq = false;
 	TAC_Operand dst = tac_ir_gen_expr(&ctx, prog, func, expr->as.ebin.l);
-	ctx.is_right_of_eq = true;
 	TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, expr->as.ebin.r);
 
 	TAC_OpCode op_eq;
@@ -765,15 +746,14 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 
 		case AST_FUNC_RET: {
 			if (cn->as.func_ret.type.kind == TYPE_NULL) {
-				append_inst(func, ((TAC_Instruction){
+				append_inst(func, (TAC_Instruction){
 					.op = OP_RETURN,
 					.args[0] = NULL_OPR,
-				}));
+				});
 				break;
 			}
 
 			IRGenExprCtx ctx = {0};
-			ctx.is_right_of_eq = true;
 			TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, cn->as.func_ret.expr);
 
 			append_inst(func, (TAC_Instruction){
