@@ -70,6 +70,6 @@ The compiler supports **Linux**, **Windows**, and **macOS**, and has been tested
 This project is released under the MIT License.
 
 ## Bugs
-- [OPEN] **Pointer arithmetic** (on the level of TAC IR generating): ptr += 1 is not like ptr = ptr + 1
+- [CLOSED] **Pointer arithmetic** (on the level of TAC IR generating): ptr += 1 is not like ptr = ptr + 1
 - [CLOSED] **Pointer to pointer etc operands** (on the level of codegen): `user: **User = ...; (*user).name <- throws unreachable`
-- [OPEN] **Tokens file path** (on the level of preprocessor): error messages often show incorrect path
+- [CLOSED] **Tokens file path** (on the level of preprocessor): error messages often show incorrect path
