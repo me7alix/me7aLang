@@ -38,6 +38,7 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 			sprintf(buf, "{%u}", opr.as.var.addr_id);
 			break;
 		}
+
 		char scnd[256];
 		if (opr.as.var.fields.count > 0) {
 			strcpy(scnd, buf);
@@ -46,6 +47,7 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 				sb_appendf(&fields, ".%s", *field);
 			sprintf(buf, "%s%s", scnd, fields.items);
 		}
+
 		strcpy(scnd, buf);
 		sprintf(buf, "%s:%s", scnd, tac_ir_dump_opr_type(opr));
 	} break;
@@ -79,7 +81,7 @@ void tac_ir_dump_opr(TAC_Operand opr, char *buf) {
 		case TYPE_FLOAT:
 		case TYPE_F32:
 		case TYPE_F64:
-			sprintf(buf, "%f:%s", (float) opr.as.literal.as.lfloat, tac_ir_dump_opr_type(opr));
+			sprintf(buf, "%g:%s", (double) opr.as.literal.as.lfloat, tac_ir_dump_opr_type(opr));
 			break;
 		default:
 			sprintf(buf, "ERR");
@@ -143,19 +145,23 @@ void ir_dump_func(TAC_Func func, FILE *fl) {
 	ht_foreach_node (TAC_VarIntervals, vi, &func.var_ints) {
 		fprintf(fl, "    | %03u [%u, %u]\n", vi->key, vi->val.start, vi->val.end);
 	}
+
 	for (size_t i = 0; i < func.body.count; i++) {
 		char res[256];
 		fprintf(fl, "%5zu:", i);
 		tac_ir_dump_inst(da_get(&func.body, i), res);
 		fprintf(fl, "%s\n", res);
 	}
+
 	fprintf(fl, "\n");
 }
 
 void tac_ir_dump_prog(TAC_Program *prog, char *filename) {
 	FILE *fl = fopen(filename, "w");
+
 	for (size_t i = 0; i < prog->funcs.count; i++) {
 		ir_dump_func(da_get(&prog->funcs, i), fl);
 	}
+
 	fclose(fl);
 }
