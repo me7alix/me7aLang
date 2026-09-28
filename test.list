@@ -16,3 +16,5 @@
 ./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/float.mtl && ./build/prog
 ./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/ast.mtl && ./build/prog
 ./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/ast.mtl && ./build/prog
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/pi.mtl -lf '-lm' && ./build/prog
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/pi.mtl -lf '-lm' && ./build/prog

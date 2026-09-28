@@ -1,4 +1,4 @@
-:i count 18
+:i count 20
 :b shell 86
 ./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/macros.mtl && ./build/prog
 :i returncode 0
@@ -267,6 +267,22 @@ result: 2.333333
 :b stdout 73
 expr: (((3.000000 * 5.000000) + 20.000000) / 15.000000)
 result: 2.333333
+
+:b stderr 0
+
+:b shell 92
+./build/release/mtlc -O0 -I ./stdlib -o build/prog examples/pi.mtl -lf '-lm' && ./build/prog
+:i returncode 0
+:b stdout 18
+3.141592621732447
+
+:b stderr 0
+
+:b shell 92
+./build/release/mtlc -O1 -I ./stdlib -o build/prog examples/pi.mtl -lf '-lm' && ./build/prog
+:i returncode 0
+:b stdout 18
+3.141592621732447
 
 :b stderr 0
 

@@ -1,0 +1,13 @@
+import "std.mtl"
+
+extern sqrt(val: f64): f64
+
+fn main() {
+	s: f64 = 0
+
+	for i: f64 = 1; i < 30000000; i+=1 {
+		s += 1 / (i * i)
+	}
+
+	printf("%.17g\n", sqrt(s * 6))
+}
