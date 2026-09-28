@@ -23,10 +23,12 @@ static int opt_level;
 static TAC_Operand NULL_OPR = {.kind = OPR_NULL};
 
 void calc_var_interval(TAC_Func *func, size_t idx, TAC_Operand opr) {
+	if (opr.kind != OPR_VAR) return;
+
 	if (
 		opr.as.var.kind == VAR_LOCAL ||
-		opr.as.var.kind == VAR_ADDR  &&
-		opr.as.var.addr_kind == VAR_LOCAL
+		(opr.as.var.kind == VAR_ADDR &&
+		opr.as.var.addr_kind == VAR_LOCAL)
 	) {
 		TAC_VarInterval *inter = TAC_VarIntervals_get(
 			&func->var_ints,
@@ -206,6 +208,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			.args[0] = res,
 			.dst = (TAC_Operand) {
 				.kind = OPR_VAR,
+				.as.var.addr_kind = VAR_LOCAL,
 				.as.var.type = en->as.method_call.type,
 				.as.var.addr_id = var_id++,
 			},
@@ -229,6 +232,8 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			.args[0] = res,
 			.dst = (TAC_Operand) {
 				.kind = OPR_VAR,
+				.as.var.kind = VAR_LOCAL,
+				.as.var.addr_kind = VAR_GLOBAL,
 				.as.var.type = en->as.func_call.type,
 				.as.var.addr_id = var_id++,
 			},
@@ -352,6 +357,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 						},
 						.dst = {
 							.kind = OPR_VAR,
+							.as.var.kind = VAR_LOCAL,
 							.as.var.type = exp_type,
 							.as.var.addr_id = var_id++,
 						},
@@ -378,6 +384,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 						},
 						.dst = {
 							.kind = OPR_VAR,
+							.as.var.kind = VAR_LOCAL,
 							.as.var.type = exp_type,
 							.as.var.addr_id = var_id++,
 						},
@@ -400,6 +407,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 						},
 						.dst = {
 							.kind = OPR_VAR,
+							.as.var.kind = VAR_LOCAL,
 							.as.var.type = exp_type,
 							.as.var.addr_id = var_id++,
 						},
@@ -447,6 +455,7 @@ TAC_Operand tac_ir_gen_expr(IRGenExprCtx *ctx, TAC_Program *prog, TAC_Func *func
 			.args[0] = arg,
 			.dst = (TAC_Operand){
 				.kind = OPR_VAR,
+				.as.var.kind = VAR_LOCAL,
 				.as.var.type = en->as.eun.type,
 				.as.var.addr_id = var_id++,
 			},
@@ -592,40 +601,11 @@ void tac_ir_gen_var_mut(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
 	TAC_Operand dst = tac_ir_gen_expr(&ctx, prog, func, expr->as.ebin.l);
 	TAC_Operand res = tac_ir_gen_expr(&ctx, prog, func, expr->as.ebin.r);
 
-	TAC_OpCode op_eq;
-	bool is_op_eq = true;
-	switch (expr->as.ebin.op) {
-		case AST_OP_ADD_EQ: op_eq = OP_ADD; break;
-		case AST_OP_SUB_EQ: op_eq = OP_SUB; break;
-		case AST_OP_MUL_EQ: op_eq = OP_MUL; break;
-		case AST_OP_DIV_EQ: op_eq = OP_DIV; break;
-		default: is_op_eq = false;
-	}
-
-	if (is_op_eq) {
-		TAC_Instruction op_eq_res = {
-			.op = op_eq,
-			.args[0] = dst,
-			.args[1] = res,
-			.dst = (TAC_Operand) {
-				.kind = OPR_VAR,
-				.as.var.type = cn->as.var_mut.type,
-				.as.var.addr_id = var_id++,
-			},
-		};
-		append_inst(func, op_eq_res);
-		append_inst(func, (TAC_Instruction){
-			.op = OP_ASSIGN,
-			.args[0] = op_eq_res.dst,
-			.dst = dst,
-		});
-	} else {
-		append_inst(func, (TAC_Instruction){
-			.op = OP_ASSIGN,
-			.args[0] = res,
-			.dst = dst,
-		});
-	}
+	append_inst(func, (TAC_Instruction){
+		.op = OP_ASSIGN,
+		.args[0] = res,
+		.dst = dst,
+	});
 }
 
 void tac_ir_gen_func_call(TAC_Program *prog, TAC_Func *func, AST_Node *cn) {
@@ -938,6 +918,7 @@ void tac_ir_gen_body(IRGenBodyCtx *ctx, TAC_Program *prog, TAC_Func *func, AST_N
 						.args[1] = rhs,
 						.dst = (TAC_Operand) {
 							.kind = OPR_VAR,
+							.as.var.kind = VAR_LOCAL,
 							.as.var.type = (Type){TYPE_BOOL},
 							.as.var.addr_id = var_id++,
 						}
