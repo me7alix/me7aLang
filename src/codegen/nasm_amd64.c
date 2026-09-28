@@ -510,6 +510,7 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 		case OP_EQ:      case OP_NOT_EQ: {
 			char *cmp = "cmp";
 			char *pf = "";
+			bool flt = true;
 			switch (ci.args[0].as.var.type.kind) {
 			case TYPE_FLOAT:
 			case TYPE_F32:
@@ -520,6 +521,8 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				cmp = "ucomisd";
 				pf = "sd";
 				break;
+			default:
+				flt = false;
 			}
 
 			NasmOpr oprd = nasm_gen_new_var(ci);
@@ -547,16 +550,20 @@ void nasm_gen_func(StringBuilder *code, TAC_Func func) {
 				sb_appendf(&body, "  setne %s\n", dst);
 			} else if (ci.op == OP_GREAT) {
 				sb_appendf(&body, "  %s %s, %s\n", cmp, arg1, arg2);
-				sb_appendf(&body, "  setg %s\n", dst);
+				if (flt) sb_appendf(&body, "  seta %s\n", dst);
+				else     sb_appendf(&body, "  setg %s\n", dst);
 			} else if (ci.op == OP_LESS) {
 				sb_appendf(&body, "  %s %s, %s\n", cmp, arg1, arg2);
-				sb_appendf(&body, "  setl %s\n", dst);
+				if (flt) sb_appendf(&body, "  setb %s\n", dst);
+				else     sb_appendf(&body, "  setl %s\n", dst);
 			} else if (ci.op == OP_GREAT_EQ) {
 				sb_appendf(&body, "  %s %s, %s\n", cmp, arg1, arg2);
-				sb_appendf(&body, "  setge %s\n", dst);
+				if (flt) sb_appendf(&body, "  setae %s\n", dst);
+				else     sb_appendf(&body, "  setge %s\n", dst);
 			} else if (ci.op == OP_LESS_EQ) {
 				sb_appendf(&body, "  %s %s, %s\n", cmp, arg1, arg2);
-				sb_appendf(&body, "  setle %s\n", dst);
+				if (flt) sb_appendf(&body, "  setbe %s\n", dst);
+				else     sb_appendf(&body, "  setle %s\n", dst);
 			}
 
 			if (oprd.kind != REG) {
